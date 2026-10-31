@@ -243,10 +243,7 @@ public final class FirisModels {
         }
         if (n < s)
             return;
-        com.atakmap.android.util.ATAKUtilities.scaleToFit(mapView, new com.atakmap.coremap.maps.coords.GeoPoint[] {
-                new com.atakmap.coremap.maps.coords.GeoPoint(s, w),
-                new com.atakmap.coremap.maps.coords.GeoPoint(n, e) },
-                mapView.getWidth(), mapView.getHeight());
+        DetectionFeed.fitVisible(mapView, s, w, n, e);
     }
 
     // ---- where it is by ----------------------------------------------------------
@@ -330,7 +327,7 @@ public final class FirisModels {
         changed();
         try {
             final String kml = Esri.get(URL);
-            final File tmp = new File(root, "firis_models.kml.tmp");
+            final File tmp = new File(root, "firis_models.kml." + System.nanoTime() + ".tmp");
             try (OutputStreamWriter w = new OutputStreamWriter(new FileOutputStream(tmp), StandardCharsets.UTF_8)) {
                 w.write(kml);
             }

@@ -416,8 +416,14 @@ public final class FireModel {
                         // The marker goes with the fire, so the map does not show a start somewhere else.
                         place(new GeoPoint(lat / pts.length, lon / pts.length));
                         try {
-                            com.atakmap.android.util.ATAKUtilities.scaleToFit(mapView, pts,
-                                    mapView.getWidth(), mapView.getHeight());
+                            double s = 90, w = 180, n = -90, e = -180;
+                            for (GeoPoint q : pts) {
+                                s = Math.min(s, q.getLatitude());
+                                n = Math.max(n, q.getLatitude());
+                                w = Math.min(w, q.getLongitude());
+                                e = Math.max(e, q.getLongitude());
+                            }
+                            com.atakmap.android.firecast.DetectionFeed.fitVisible(mapView, s, w, n, e);
                         } catch (Exception e) {
                             Log.w(TAG, "could not go to the satellite perimeter", e);
                         }
@@ -1965,12 +1971,9 @@ public final class FireModel {
             final double reachM = Math.max(60, r.headM(r.steps[r.steps.length - 1]) * 1.3d);
             final double dLat = reachM / 111320d;
             final double dLon = reachM / (111320d * Math.max(0.02d, Math.cos(Math.toRadians(r.lat))));
-            final GeoPoint[] corners = {
-                    new GeoPoint(r.lat - dLat, r.lon - dLon), new GeoPoint(r.lat + dLat, r.lon + dLon) };
-            // The same fit the detection page's Go to uses; nothing cleverer, the half
-            // screen arithmetic sent the map somewhere else entirely (dev 1, 2026-10-11).
-            com.atakmap.android.util.ATAKUtilities.scaleToFit(mapView, corners, 0d,
-                    mapView.getWidth(), mapView.getHeight());
+            // Into the map the operator can see: the same fit as every Go to in Fire Cast,
+            // the box widened east by the open pane's share (2026-10-30).
+            com.atakmap.android.firecast.DetectionFeed.fitVisible(mapView, r.lat - dLat, r.lon - dLon, r.lat + dLat, r.lon + dLon);
         } catch (Exception e) {
             Log.w(TAG, "go to run failed", e);
         }
@@ -2466,18 +2469,7 @@ public final class FireModel {
                 if (r.result != null && r.problem == null)
                     all.put(toJson(r));
             final JSONObject out = new JSONObject().put("runs", all);
-            final File tmp = new File(root, "model.json.tmp");
-            final java.io.Writer w = new java.io.OutputStreamWriter(
-                    new java.io.FileOutputStream(tmp), java.nio.charset.StandardCharsets.UTF_8);
-            try {
-                w.write(out.toString());
-            } finally {
-                w.close();
-            }
-            if (!tmp.renameTo(saveFile)) {
-                saveFile.delete();
-                tmp.renameTo(saveFile);
-            }
+            com.atakmap.android.firecast.SafeFile.write(saveFile, out.toString());
         } catch (Exception e) {
             Log.w(TAG, "could not save the model runs", e);
         }

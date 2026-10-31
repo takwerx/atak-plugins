@@ -223,7 +223,8 @@ public class DetectionFeed {
      * fetch on the same worker.
      */
     private void restore() {
-        if (!saveFile.isFile())
+        SafeFile.sweep(root, saveFile.getName());
+        if (!saveFile.isFile() || saveFile.length() == 0)
             return;
         try {
             final org.json.JSONObject saved = new org.json.JSONObject(readText(saveFile));
@@ -322,19 +323,7 @@ public class DetectionFeed {
             final Esri.Box b = box;
             if (b != null)
                 out.put("box", new org.json.JSONArray().put(b.south).put(b.west).put(b.north).put(b.east));
-            final File tmp = new File(root, "detections.json.tmp");
-            final java.io.Writer w = new java.io.OutputStreamWriter(
-                    new java.io.FileOutputStream(tmp), java.nio.charset.StandardCharsets.UTF_8);
-            try {
-                w.write(out.toString());
-            } finally {
-                w.close();
-            }
-            if (!tmp.renameTo(saveFile)) {
-                saveFile.delete();
-                if (!tmp.renameTo(saveFile))
-                    Log.w(TAG, "could not move the saved detections into place");
-            }
+            SafeFile.write(saveFile, out.toString());
         } catch (Exception e) {
             Log.w(TAG, "could not save the detections", e);
         }
@@ -1130,8 +1119,21 @@ public class DetectionFeed {
             public void run() {
                 if (listener != null)
                     listener.onChanged();
+                if (!refreshing && !onRefreshed.isEmpty()) {
+                    final List<Runnable> due = new ArrayList<>(onRefreshed);
+                    onRefreshed.clear();
+                    for (Runnable r : due)
+                        r.run();
+                }
             }
         });
+    }
+
+    /** Run once, on main, when the refresh under way (or the next) has drawn. */
+    private final List<Runnable> onRefreshed = new ArrayList<>();
+
+    public void whenRefreshed(Runnable r) {
+        onRefreshed.add(r);
     }
 
     // ---- what the pane asks ------------------------------------------------------
@@ -1262,11 +1264,7 @@ public class DetectionFeed {
         try {
             final double halfDeg = Math.max(0.004d,
                     Math.max(d.footprint.alongScanM, d.footprint.alongTrackM) / 111320d * 4d);
-            final com.atakmap.coremap.maps.coords.GeoPoint[] corners = {
-                    new com.atakmap.coremap.maps.coords.GeoPoint(d.lat - halfDeg, d.lon - halfDeg),
-                    new com.atakmap.coremap.maps.coords.GeoPoint(d.lat + halfDeg, d.lon + halfDeg) };
-            com.atakmap.android.util.ATAKUtilities.scaleToFit(mapView, corners, 0d,
-                    mapView.getWidth(), mapView.getHeight());
+            fitVisible(mapView, d.lat - halfDeg, d.lon - halfDeg, d.lat + halfDeg, d.lon + halfDeg);
         } catch (Exception e) {
             Log.w(TAG, "go to failed", e);
         }

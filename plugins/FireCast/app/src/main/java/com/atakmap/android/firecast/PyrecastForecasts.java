@@ -377,7 +377,16 @@ public final class PyrecastForecasts {
 
     /** Fits the map to a forecast. Main thread. */
     public void goTo(Forecast f) {
-        com.atakmap.android.util.ATAKUtilities.scaleToFit(mapView, f.bounds(pct()), mapView.getWidth(), mapView.getHeight());
+        final com.atakmap.coremap.maps.coords.GeoPoint[] b = f.bounds(pct());
+        double s = 90, w = 180, n = -90, e = -180;
+        for (com.atakmap.coremap.maps.coords.GeoPoint p : b) {
+            s = Math.min(s, p.getLatitude());
+            n = Math.max(n, p.getLatitude());
+            w = Math.min(w, p.getLongitude());
+            e = Math.max(e, p.getLongitude());
+        }
+        if (n >= s)
+            DetectionFeed.fitVisible(mapView, s, w, n, e);
     }
 
     // ---- where it is by ----------------------------------------------------------

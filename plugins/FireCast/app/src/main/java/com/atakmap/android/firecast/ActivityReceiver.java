@@ -110,6 +110,50 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         }
     };
     private long keepListUntil;
+    /**
+     * A mark on a tapped fire at once, while its area is fetched; off when the fetch has
+     * drawn, or after a minute. The squares or the outline take a few seconds to arrive
+     * and an empty map in the meantime read as nothing there (operator, 2026-10-30).
+     */
+    private com.atakmap.android.maps.Marker pending;
+    private final Runnable clearPending = new Runnable() {
+        @Override
+        public void run() {
+            final com.atakmap.android.maps.Marker m = pending;
+            pending = null;
+            main.removeCallbacks(this);
+            if (m != null && m.getGroup() != null)
+                m.removeFromGroup();
+        }
+    };
+
+    private void markPending(double lat, double lon, String title) {
+        clearPending.run();
+        try {
+            final com.atakmap.android.maps.Marker m = new com.atakmap.android.maps.Marker(
+                    new com.atakmap.coremap.maps.coords.GeoPoint(lat, lon), "firecast.pending." + System.nanoTime());
+            m.setType("b-m-p-s-m");
+            m.setTitle(title);
+            m.setMetaString("callsign", title);
+            // Working mark: not saved by ATAK, not sent, not something to tap.
+            m.setMetaBoolean("archive", false);
+            m.setMetaBoolean("removable", true);
+            m.setMovable(false);
+            m.setClickable(false);
+            m.setMetaInteger("color", 0xFFFF40C0);
+            com.atakmap.android.maps.MapGroup g = getMapView().getRootGroup().findMapGroup("Fire Cast");
+            if (g == null) {
+                g = new com.atakmap.android.maps.DefaultMapGroup("Fire Cast");
+                getMapView().getRootGroup().addGroup(g);
+            }
+            g.addItem(m);
+            pending = m;
+            main.postDelayed(clearPending, 60000);
+            feed.whenRefreshed(clearPending);
+        } catch (Exception e) {
+            Log.w(TAG, "could not mark the fire", e);
+        }
+    }
     /** The area the list answers: {@link #AREA_ANY}, {@link #AREA_VIEW} or {@link #AREA_RADIUS}. */
     private String area;
     private double areaM;
@@ -288,6 +332,7 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
     /** Takes the map to a fire; the list stays open. */
     private void goTo(Activity.Fire f) {
         keepListUntil = System.currentTimeMillis() + 8000;
+        markPending(f.lat, f.lon, "Loading " + f.title() + "...");
         try {
             // Wide enough to hold a fire and its detections, not so wide that the extent
             // fetch comes back with a county's worth of industry around it.
@@ -330,6 +375,7 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
     /** Takes the map to a NASA perimeter and draws it: the feed is turned on if it was off. */
     private void goTo(com.atakmap.android.firecast.model.Feds.Fire p) {
         keepListUntil = System.currentTimeMillis() + 8000;
+        markPending(p.lat(), p.lon(), "Loading NASA perimeter...");
         try {
             final double padLat = (p.north - p.south) * 0.3 + 0.01, padLon = (p.east - p.west) * 0.3 + 0.01;
             DetectionFeed.fitVisible(getMapView(), p.south - padLat, p.west - padLon, p.north + padLat, p.east + padLon);
@@ -748,6 +794,7 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
 
     @Override
     protected void disposeImpl() {
+        clearPending.run();
         worker.shutdownNow();
         placeWorker.shutdownNow();
     }
