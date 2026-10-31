@@ -1,10 +1,10 @@
 ATAK Plugin — Cam Depot
 
-**Download Cam Depot 1.7** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Cam Depot 1.9** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/cam-depot/releases/download/v1.7/ATAK-Plugin-CamDepot-1.7--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/cam-depot/releases/download/v1.7/ATAK-Plugin-CamDepot-1.7--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/cam-depot/releases/download/v1.7/ATAK-Plugin-CamDepot-1.7--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/cam-depot/releases/download/v1.9/ATAK-Plugin-CamDepot-1.9--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/cam-depot/releases/download/v1.9/ATAK-Plugin-CamDepot-1.9--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/cam-depot/releases/download/v1.9/ATAK-Plugin-CamDepot-1.9--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/cam-depot/releases
 
@@ -59,7 +59,15 @@ source submission zip).
 _________________________________________________________________
 STATUS
 
-Version 1.7: Suggest Cameras, and a shorter pane.
+Version 1.9: a cleaner pane, and Texas cameras that play on the first tap.
+
+- Opening a Texas camera now wakes its stream in the background, so Live video
+  starts on the first tap instead of timing out on a camera nobody has watched
+  in a while.
+- The search box hint is cyan, the Show row fits its three counts on one line
+  in every state, and the Favorites button no longer cuts its label short.
+
+Version 1.7 added Suggest Cameras and the shorter pane:
 
 - Suggest Cameras: tap a point on the map and the list narrows to the cameras
   whose reported aim covers it, nearest first, with the pan-tilt-zoom cameras
@@ -72,9 +80,10 @@ Version 1.7: Suggest Cameras, and a shorter pane.
   once and left on a Settings page of rows that read their value.
 - Turning many bearing lines on at once no longer stalls ATAK.
 
-Release candidate. Version 1.7.
+Release candidate. Version 1.9.
 
-Exercised on hardware: Samsung Galaxy XCover Pro and Galaxy S10 (ATAK-CIV
+Exercised on hardware: Samsung Galaxy S9+ phones on official ATAK-CIV 5.6, 5.7
+and 5.8, with the tak.gov-signed 1.9 builds, and a Galaxy S10 (ATAK-CIV
 5.8.0.3). Panel,
 filters, favorites, camera imagery, live video, bearing lines and the zoom
 threshold have been run against the live catalog, as a release build with
