@@ -410,7 +410,54 @@ copy the morning after.
 
 ---
 
-## 9. Finding what you already have
+## 9. Satellite (Sentinel-2)
+
+Recent satellite pictures of the ground, from the European Sentinel-2
+satellites, for the last 14 days. Each row is one pass over one area, named for
+the nearest town, with its date and how much of it is cloud.
+
+![The pass list](screenshots/60_satellite_list.png)
+
+The right-hand button sets where to look: **Newest First** around the map
+center, **Near: Map Center** (passes covering the center come first), or
+**Near: Me** around your own position. Tapping it searches again from there.
+The left-hand button picks the view.
+
+**Tap a row to go there.** An orange box shows exactly the area the pass
+covers, before you add anything.
+
+![The orange box shows what the pass covers](screenshots/61_satellite_outline.png)
+
+**Add Online** streams the picture over whatever map you have. It needs a
+signal; this version has no offline copy of a satellite pass. Added, the pass
+draws over the map and the row offers **Remove**.
+
+![A pass added and drawing](screenshots/62_satellite_added.png)
+
+### Two views
+
+- **True Color**, the picture as the eye sees it, about 10 meters to a pixel.
+- **SWIR Fire View**, the same place in shortwave infrared. Healthy plants
+  show bright green and bare or burned ground shows brown; active fire and a
+  fresh burn glow orange and red. Thin smoke mostly clears.
+
+![True Color](screenshots/64_satellite_true_color.png)
+
+![SWIR Fire View, the same fields](screenshots/65_satellite_swir.png)
+
+Every pass you add is held in both views, so switching downloads nothing. The
+**View** button chooses which to show, and under **Remove** each added pass has
+a button that flips every pass you added to the other view at once.
+
+![The View chooser](screenshots/63_satellite_view_chooser.png)
+
+Clouds hide the ground in both views, so check the cloud figure on the row. The
+satellites pass each place every few days, and a pass usually appears within a
+day. Contains modified Copernicus Sentinel data.
+
+---
+
+## 10. Finding what you already have
 
 Every page has a filter button, next to **Back**, that cycles **All** →
 **Installed** → **Available**. Set to **Installed**, the page becomes a list of
@@ -447,7 +494,7 @@ on at a time.
 
 ---
 
-## 10. Removing
+## 11. Removing
 
 **Remove** appears on anything installed, and says what removing actually frees
 before it does it.
@@ -469,7 +516,7 @@ deletes nothing. A pin is a shortcut, not a download.
 
 ---
 
-## 11. Where files go
+## 12. Where files go
 
 Map Depot writes into ATAK's own folders, so what it installs is
 indistinguishable from data put there by hand.
@@ -479,6 +526,7 @@ indistinguishable from data put there by hand.
 | Elevation | `atak/DTED/`, one file per one-degree square |
 | Streaming base maps | `atak/imagery/`, as map source files |
 | Streaming overlays and disaster aerials | `atak/grg/`, as map source files, so ATAK lists them under Image Overlay |
+| Satellite passes | `atak/grg/`, as map source files, two per pass (one per view) |
 | Disaster aerials, offline copies | `atak/grg/`, as MBTiles, listed under Image Overlay too |
 | Offline public land vector tiles | `atak/imagery/`, as vector tile packages |
 | Forest Service map sheets | `atak/grg/`, as georeferenced PDFs |
@@ -494,7 +542,7 @@ so no layer is left pointing at something that is gone.
 
 ---
 
-## 12. In the plugin
+## 13. In the plugin
 
 The same guide ships inside the plugin as a PDF, for when you are in the field
 without this page. In ATAK go to **Settings → Tool Preferences → Map Depot →

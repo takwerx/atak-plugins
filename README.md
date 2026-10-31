@@ -89,17 +89,18 @@ fires.
 _________________________________________________________________
 STATUS
 
+Version 1.16: Satellite (Sentinel-2), a new section listing recent satellite
+passes over the map center or your position, in true color or as a fire view
+that makes fresh burn and active fire stand out. Tap a pass to see its outline
+and go there; Add Online streams it over the map. Every pass is held in both
+views, and one button flips them all.
+
 Version 1.14: the catalog reader accepted event ids and pack paths only up
 to 40 characters, which silently dropped one Maxar event and fourteen Civil
 Air Patrol and Maxar offline copies from the Disaster Aerials list; the
 limit is 64 now and they are listed. The landing page picture in the guide
 and manual shows every section, and the manual prints no question marks
 where it had arrows.
-
-Version 1.15: Satellite (Sentinel-2), a new section listing recent satellite
-passes over the map center or your position, newest first, in true color or
-as a fire view that makes fresh burn and active fire stand out. Tap a pass to
-see its outline and go there; Add Online streams it over the map.
 
 Version 1.13: pictures from the signed build in the guide and manual
 (outlines, a flight with the roads overlay on top, the sectioned overlay
