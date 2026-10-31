@@ -159,16 +159,33 @@ perimeter* starts a run from that outline.
   - *A point:* tap the map. Drag the marker to make it exact.
   - *NASA satellite perimeter:* pick a fire in the map view.
   - *A perimeter you draw* with ATAK's shape tool.
+  - *A shape on the map:* tap one, drawn, sent, or a Feature Layer perimeter.
 
   Then the settings:
 
   - *Conditions:* as observed, at the gust, a dry day, or dry with 20 mph wind.
-  - *Station:* automatic, or pick one by name.
-  - *Started:* how long ago it started.
+  - *Weather:* a station, your own observation, or a Kestrel station.
+  - *Ignition:* when it started; the rings run from then.
   - *Horizon:* one or three hours ahead.
 
   Then *Run model*.
 ]
+]
+
+#tak-slide[
+= Your own weather and the ignition
+
+*Weather* takes what you measured at the fire: wind, direction, gust,
+temperature, humidity and the 1 h fuel moisture. An eye-level wind (a hand-held
+meter) is taken as the wind at the flames. *From a Kestrel station* lists the
+stations the Kestrel Wx plugin shares, ready to check and use. An observation
+is used while under six hours old.
+
+#v(6pt)
+
+*Ignition* is when the fire started: minutes ago, a clock time, or minutes
+before dispatch. A run from a point then begins at the ignition, and one of
+its rings is *now*.
 ]
 
 #tak-slide[

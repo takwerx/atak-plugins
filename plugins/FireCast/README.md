@@ -62,8 +62,10 @@ in the pane with a list behind a long press and a time slider on the run you pic
     unless you pick the smaller or larger end. Forecasts are kept on the device
     and come back with no signal.
 
-The fire model runs on the device. Start from a point, a perimeter you draw, or
-any NASA perimeter on the map, every piece of it, and the
+The fire model runs on the device. Start from a point, a perimeter you draw, any
+shape already on the map (a FIRIS perimeter in Feature Layer, a shape a contact
+sent), or any NASA perimeter, every piece of it, set when it ignited, use your
+own weather observation or a Kestrel Wx station's, and the
 plugin spreads a fire over the real fuel, slope and canopy (LANDFIRE) with the
 wind from the nearest weather station, how dry the fuels are, and embers,
 counting the buildings and people reached from FEMA's building inventory (people

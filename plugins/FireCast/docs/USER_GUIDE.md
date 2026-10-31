@@ -89,9 +89,10 @@ Tap **Run a Model**.
    - **A point**: tap the map where the fire is. A marker labeled *Fire start* is placed. Drag it, or use Fine Adjust on its menu, to make it exact.
    - **NASA satellite perimeter**: a list of the fires in the map view with a NASA outline from the last three days, biggest first, each with its county and state, acres, how long it has burned and how old the outline is. It follows the map as you pan and zoom; nothing is drawn until you tap one. The run then starts from every piece of that outline, with everything inside already burning.
    - **A perimeter you draw**: trace the fire's edge with ATAK's shape tool.
+   - **A shape already on the map**: tap it. A shape you drew earlier, one a contact sent, an imported KML, or a perimeter from another layer, such as a FIRIS perimeter in Feature Layer. Every piece of it starts burning. A line is refused; the outline has to be an area.
    - **Remove the perimeter** when one is set.
 
-   The button then says what the run starts from: *Start from: a point*, *NASA perimeter* or *drawn perimeter*.
+   The button then says what the run starts from: *Start from: a point*, *NASA perimeter*, *map shape* or *drawn perimeter*.
 
 ![Start the Run From](screenshots/25_how_the_fire_starts.png)
 
@@ -99,8 +100,13 @@ Tap **Run a Model**.
 
 2. Set what you know:
    - **Conditions:** *As observed* at the weather station, *As observed but at the gust*, *Dry day*, or *Dry and 20 mph wind*. The last two are for planning what a bad day would do.
-   - **Station:** *automatic* picks a nearby weather station by distance and height, so a station on a ridge does not stand in for a valley. Tap it to pick one by name.
-   - **Started:** how long ago the fire started, from not known to three hours. With a perimeter this calibrates the model's speed.
+   - **Weather:** where the wind, temperature and humidity come from:
+     - *A weather station*: automatic picks a nearby station by distance and height, so a station on a ridge does not stand in for a valley; or pick one by name.
+     - *My observation*: type in what you measured at the fire: wind speed, the direction it comes from (degrees, or N, SW and so on), gust, temperature, humidity, and the 1 h fuel moisture if you have it. Tick *eye level* for a hand-held meter; the model then takes it as the wind at the flames. Otherwise it is a 20 ft wind.
+     - *From a Kestrel station on the map*: the stations the Kestrel Wx plugin shares to the team, with their reading and age. Pick one and the form opens filled in, to check or change before using it.
+
+     Your observation is used while it is under six hours old and held through the run. The page and the shared run say whose reading it was and when. *Stop using my observation* goes back to the stations.
+   - **Ignition:** when the fire started: not known, now, minutes ago, a clock time, or minutes before dispatch (enter the dispatch time, then how long before). For a point start the run begins at the ignition, so each ring is where the fire should be at its time since, one of them marked *now*, and on by the horizon. With a perimeter it is the fire's age, which calibrates the model's speed.
    - **Horizon:** one hour or three hours ahead.
 3. Tap **Run model**. It takes a few seconds.
 
