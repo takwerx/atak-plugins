@@ -76,6 +76,31 @@ public final class FireModel {
         prefs.edit().putInt(PREF_HORIZON, m).apply();
     }
 
+    /**
+     * The steps of a run from an ignition: every 20, 30 or 60 minutes out to {@code total},
+     * with the minute the run was made among them so one ring is "now".
+     */
+    static int[] stepsTo(int total, int now) {
+        final int every = total <= 75 ? 20 : total <= 300 ? 30 : 60;
+        final java.util.TreeSet<Integer> set = new java.util.TreeSet<>();
+        for (int m = every; m < total + every; m += every)
+            set.add(Math.min(m, total));
+        if (now > 0)
+            set.add(now);
+        // Steps closer than 10 minutes to "now" give way to it.
+        final java.util.Iterator<Integer> it = set.iterator();
+        while (it.hasNext()) {
+            final int m = it.next();
+            if (m != now && now > 0 && Math.abs(m - now) < 10)
+                it.remove();
+        }
+        final int[] out = new int[set.size()];
+        int i = 0;
+        for (int m : set)
+            out[i++] = m;
+        return out;
+    }
+
     /** The color of a step's ring: red for the first, through orange to yellow for the last. */
     static int stepColor(int i, int n) {
         final double f = n <= 1 ? 0 : i / (double) (n - 1);
@@ -173,6 +198,22 @@ public final class FireModel {
         public String perimeterKind;
         /** When the fire started, epoch ms, or 0 for unknown; with a perimeter it calibrates the run. */
         public long startedAt;
+        /**
+         * Where the run's clock starts, epoch ms: the ignition the operator set, for a
+         * point start, so the rings are where the fire should be at each time since,
+         * one of them now; 0 for a run that starts at {@link #ranAt}.
+         */
+        public long originAt;
+
+        /** The moment the run's minutes count from: the ignition when set, else when it ran. */
+        public long t0() {
+            return originAt > 0 ? originAt : ranAt;
+        }
+
+        /** Minutes from the run's start to when it ran: the fire's age at the run, 0 without an ignition. */
+        public int nowMinutes() {
+            return originAt > 0 ? (int) Math.round((ranAt - originAt) / 60000d) : 0;
+        }
         /** True when the pixel under the marker does not burn; the ground run starts from the nearest fuel. */
         public boolean startNotBurnable;
         /** The rate multiplier calibration settled on; 1 when there was none. */
@@ -372,14 +413,28 @@ public final class FireModel {
         return perimeter;
     }
 
-    /** Minutes ago the fire started, as the operator set it; 0 for unknown. */
-    public int startedMinutesAgo() {
-        return prefs.getInt(PREF_STARTED, 0);
+    /**
+     * When the fire ignited, epoch ms, as the operator set it: "5 minutes before
+     * dispatch". 0 when not known. A clock time, not minutes ago, so it stays the same
+     * moment however long the crew takes to get there (operator, 2026-10-31).
+     */
+    public long ignitionAt() {
+        return prefs.getLong(PREF_IGNITION, 0L);
     }
 
-    public void setStartedMinutesAgo(int m) {
-        prefs.edit().putInt(PREF_STARTED, m).apply();
+    public void setIgnitionAt(long at) {
+        prefs.edit().putLong(PREF_IGNITION, at > 0 ? at : 0L).apply();
     }
+
+    /** The ignition when it is usable now: in the past and within {@link #IGNITION_MAX_MS}. */
+    public long usableIgnition(long now) {
+        final long at = ignitionAt();
+        return at > 0 && at <= now && now - at <= IGNITION_MAX_MS ? at : 0;
+    }
+
+    /** The oldest ignition a run will start from: past this the weather and fuel since are not known. */
+    public static final long IGNITION_MAX_MS = 12L * 3600_000L;
+    private static final String PREF_IGNITION = "model.ignitionAt";
 
     /** Hands the operator ATAK's polygon tool; the shape they close becomes the perimeter. */
     public void drawPerimeter() {
@@ -1115,10 +1170,24 @@ public final class FireModel {
                 r.perimeterNote = r.perimeter == null ? null : perimeterNote;
                 r.perimeterKind = r.perimeter == null ? null : perimeterKind;
                 r.perimeterParts = r.perimeter == null ? null : perimeterParts;
-                final boolean threeHours = horizonMinutes() >= 180;
-                r.steps = threeHours ? STEPS_3H : STEPS_MIN;
+                final long ign = usableIgnition(r.ranAt);
+                // A point start with an ignition runs from the ignition: the rings are
+                // where the fire should be at each time since, through now and on by the
+                // horizon. A perimeter is the fire as it is now; there the ignition is
+                // its age, which calibrates the rates.
+                if (ign > 0 && perimeter == null)
+                    r.originAt = ign;
+                r.startedAt = ign;
+                final int total = r.nowMinutes() + horizonMinutes();
+                final boolean threeHours = total > 60;
+                r.steps = r.originAt > 0 ? stepsTo(total, r.nowMinutes()) : threeHours ? STEPS_3H : STEPS_MIN;
                 r.halfKm = threeHours ? 10 : HALF_KM;
                 r.cellM = threeHours ? 30 : 15;
+                if (total > 180) {
+                    // Longer than three hours of spread: more ground, coarser cells.
+                    r.halfKm = Math.min(MAX_HALF_KM, 10 + Math.ceil((total - 180) / 60d) * 2);
+                    r.cellM = r.halfKm > 10 ? 60 : 30;
+                }
                 if (r.perimeter != null) {
                     // A perimeter wider than the usual square gets a square that holds it with
                     // room to spread past its edge; past 10 km the cells grow to 60 m so the run
@@ -1132,8 +1201,6 @@ public final class FireModel {
                         r.cellM = r.halfKm > 10 ? 60 : 30;
                     }
                 }
-                final int ago = startedMinutesAgo();
-                r.startedAt = ago > 0 ? r.ranAt - ago * 60000L : 0;
                 try {
                     r.site = Landfire.at(lat, lon);
                 } catch (Exception e) {
@@ -1172,7 +1239,7 @@ public final class FireModel {
                     try {
                         final long[] times = new long[hoursN];
                         for (int h = 0; h < hoursN; h++)
-                            times[h] = r.ranAt + h * 3_600_000L;
+                            times[h] = r.t0() + h * 3_600_000L;
                         r.forecast = Weather.forecastAt(lat, lon, times);
                         if (r.forecast[0] != null)
                             r.stations.add(0, r.forecast[0]);
@@ -1901,7 +1968,7 @@ public final class FireModel {
             status = "Running the fire " + (k + 1) + " of " + SIZE_RUNS + " times with the weather nudged…";
             changed();
             final Spread.Result m = Spread.run(land, r.lat, r.lon, r.halfKm, last, behaviorFor(r, n[0], n[1], n[2]),
-                    r.seeds(), r.rateScale, fieldFor(r, useField, n[0], n[1]), r.ranAt, r.cellM, hours);
+                    r.seeds(), r.rateScale, fieldFor(r, useField, n[0], n[1]), r.t0(), r.cellM, hours);
             nudges.add(n);
             acres.add(m.acres(last));
         }
@@ -1942,7 +2009,7 @@ public final class FireModel {
         final double[] n = r.sizeNudges[i];
         final Spread.Result m = Spread.run(land, r.lat, r.lon, r.halfKm, r.steps[r.steps.length - 1],
                 behaviorFor(r, n[0], n[1], n[2]), r.seeds(), r.rateScale, fieldFor(r, useField, n[0], n[1]),
-                r.ranAt, r.cellM, r.hourly == null ? 1 : r.hourly.length);
+                r.t0(), r.cellM, r.hourly == null ? 1 : r.hourly.length);
         if (m.cellsSeen > 4)
             r.ground = m;
     }
@@ -2037,7 +2104,7 @@ public final class FireModel {
         }
         final Spread.Wind field = fieldFor(r, useField, 1, 0);
         final Spread.Result g = Spread.run(land, r.lat, r.lon, r.halfKm, r.steps[r.steps.length - 1],
-                behavior, r.seeds(), r.rateScale, field, r.ranAt, r.cellM, r.hourly == null ? 1 : r.hourly.length);
+                behavior, r.seeds(), r.rateScale, field, r.t0(), r.cellM, r.hourly == null ? 1 : r.hourly.length);
         Log.d(TAG, "ground run: " + g.cellsSeen + " cells reached of " + g.cellsBurnable + " burnable, "
                 + g.fuelsCrossed + " fuels, " + (System.currentTimeMillis() - t0) + " ms");
         if (g.cellsSeen < 2) {
@@ -2313,6 +2380,9 @@ public final class FireModel {
         final StringBuilder c = new StringBuilder();
         c.append("FireCast model run, ").append(new java.text.SimpleDateFormat("EEE d MMM yyyy HH:mm", Locale.US)
                 .format(new java.util.Date(r.ranAt))).append(".\n");
+        if (r.originAt > 0)
+            c.append("Ignition set to ").append(stamp(r.originAt)).append(", ").append(r.nowMinutes())
+                    .append(" min before the run: the rings run from the ignition.\n");
         c.append(r.perimeter == null ? "Start at " : "nasa".equals(r.perimeterKind) ? "From NASA's satellite perimeter around "
                 : "shape".equals(r.perimeterKind) ? "From a shape on the map around " : "From a drawn perimeter around ")
                 .append(String.format(Locale.US, "%.5f, %.5f.\n", r.lat, r.lon));
@@ -2335,7 +2405,7 @@ public final class FireModel {
             c.append('\n');
         }
         for (int i = 0; i < r.steps.length; i++) {
-            c.append("By ").append(stamp(r.ranAt + r.steps[i] * 60000L)).append(" (").append(r.steps[i]).append(" min): ")
+            c.append("By ").append(stamp(r.t0() + r.steps[i] * 60000L)).append(" (").append(r.steps[i]).append(" min): ")
                     .append(acresText(r.acres(r.steps[i])));
             if (r.structures != null)
                 c.append(", ").append(r.structures[i]).append(r.structures[i] == 1 ? " building" : " buildings");
@@ -2549,7 +2619,7 @@ public final class FireModel {
             shapes.addAll(r.ground.rings(r.atMinutes));
         else
             shapes.add(ellipse(r, r.atMinutes));
-        final String title = "By " + stamp(r.ranAt + r.atMinutes * 60000L);
+        final String title = "By " + stamp(r.t0() + r.atMinutes * 60000L);
         for (Polygon p : shapes) {
             final AttributeSet a = new AttributeSet();
             a.setAttribute("_title", title);
@@ -2695,7 +2765,8 @@ public final class FireModel {
                     .put("tenMeterWind", r.tenMeterWind).put("moistureNote", r.moistureNote);
             o.put("canopyHeightFt", r.canopyHeightFt).put("crownRatio", r.crownRatio).put("conditions", r.conditions)
                     .put("visible", r.visible).put("ground", r.ground != null).put("halfKm", r.halfKm)
-                    .put("startedAt", r.startedAt).put("rateScale", r.rateScale).put("cellM", r.cellM);
+                    .put("startedAt", r.startedAt).put("rateScale", r.rateScale).put("cellM", r.cellM)
+                    .put("originAt", r.originAt);
             final org.json.JSONArray stepsA = new org.json.JSONArray();
             for (int m : r.steps)
                 stepsA.put(m);
@@ -2887,6 +2958,8 @@ public final class FireModel {
             final double half = o.optDouble("halfKm", r.cellM >= 30 ? 10 : HALF_KM);
             r.halfKm = half >= HALF_KM && half <= MAX_HALF_KM ? Math.rint(half) : r.cellM >= 30 ? 10 : HALF_KM;
             r.startedAt = o.optLong("startedAt", 0);
+            final long origin = o.optLong("originAt", 0);
+            r.originAt = origin > 0 && origin <= r.ranAt && r.ranAt - origin <= IGNITION_MAX_MS ? origin : 0;
             final org.json.JSONArray stepsA = o.optJSONArray("steps");
             if (stepsA != null && stepsA.length() > 0 && stepsA.length() <= 6) {
                 final int[] st = new int[stepsA.length()];

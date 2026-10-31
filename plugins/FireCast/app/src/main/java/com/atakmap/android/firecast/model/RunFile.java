@@ -286,7 +286,7 @@ public final class RunFile {
                 shapes.add(FireModel.ellipse(r, r.steps[i]));
             if (shapes.isEmpty())
                 continue;
-            final String clock = FireModel.stamp(r.ranAt + r.steps[i] * 60000L);
+            final String clock = FireModel.stamp(r.t0() + r.steps[i] * 60000L);
             final String acres = FireModel.acresText(r.acres(r.steps[i]));
             k.append("<Placemark><name>").append(esc("By " + clock + " (" + r.steps[i] + " min), " + acres))
                     .append("</name><description>").append(esc("FireCast model run" + who + " at "

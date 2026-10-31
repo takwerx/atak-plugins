@@ -125,26 +125,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         view.findViewById(R.id.btn_started).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                final int[] mins = { 0, 10, 20, 30, 45, 60, 90, 120, 180 };
-                final String[] labels = new String[mins.length];
-                int current = 0;
-                for (int i = 0; i < mins.length; i++) {
-                    labels[i] = mins[i] == 0 ? "Not known" : mins[i] + " min ago";
-                    if (mins[i] == model.startedMinutesAgo())
-                        current = i;
-                }
-                new android.app.AlertDialog.Builder(getMapView().getContext())
-                        .setTitle("When did it start?")
-                        .setSingleChoiceItems(labels, current, new android.content.DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(android.content.DialogInterface dialog, int which) {
-                                dialog.dismiss();
-                                model.setStartedMinutesAgo(mins[which]);
-                                render();
-                            }
-                        })
-                        .setNegativeButton("Cancel", null)
-                        .show();
+                chooseIgnition();
             }
         });
         view.findViewById(R.id.btn_station).setOnClickListener(new View.OnClickListener() {
@@ -456,6 +437,94 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         return b.toString();
     }
 
+    /** "Ignition:\n23:40 (35 min ago)", or not known, or set but too old to use. */
+    private String ignitionLabel() {
+        final long at = model.ignitionAt(), now = System.currentTimeMillis();
+        if (at <= 0)
+            return "Ignition:\nnot known";
+        if (model.usableIgnition(now) == 0)
+            return "Ignition:\n" + clock(at) + " (not used)";
+        final long ago = Math.max(0, (now - at) / 60000L);
+        return "Ignition:\n" + clock(at) + " (" + (ago < 120 ? ago + " min" : (ago / 60) + " h " + (ago % 60) + " min") + " ago)";
+    }
+
+    /**
+     * When the fire ignited: a clock time, so "5 minutes before dispatch" stays the same
+     * moment however long the crew takes to get there (operator, 2026-10-31).
+     */
+    private void chooseIgnition() {
+        final String[] items = { "Not known", "Now", "5 min ago", "15 min ago", "30 min ago", "1 hour ago", "2 hours ago",
+                "Set the time...", "Minutes before dispatch..." };
+        final int[] mins = { -1, 0, 5, 15, 30, 60, 120 };
+        new android.app.AlertDialog.Builder(getMapView().getContext())
+                .setTitle("When did it ignite?")
+                .setItems(items, new android.content.DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(android.content.DialogInterface dialog, int which) {
+                        final long now = System.currentTimeMillis();
+                        if (which < mins.length) {
+                            model.setIgnitionAt(mins[which] < 0 ? 0 : now - mins[which] * 60000L);
+                            render();
+                        } else if (which == 7) {
+                            pickClock("Ignition time", new ClockPicked() {
+                                @Override
+                                public void at(long t) {
+                                    model.setIgnitionAt(t);
+                                    render();
+                                }
+                            });
+                        } else {
+                            pickClock("Dispatch time", new ClockPicked() {
+                                @Override
+                                public void at(final long dispatch) {
+                                    final String[] before = { "At dispatch", "5 min before", "10 min before", "15 min before",
+                                            "30 min before", "1 hour before" };
+                                    final int[] m = { 0, 5, 10, 15, 30, 60 };
+                                    new android.app.AlertDialog.Builder(getMapView().getContext())
+                                            .setTitle("Ignition, before dispatch at " + clock(dispatch))
+                                            .setItems(before, new android.content.DialogInterface.OnClickListener() {
+                                                @Override
+                                                public void onClick(android.content.DialogInterface d, int i) {
+                                                    model.setIgnitionAt(dispatch - m[i] * 60000L);
+                                                    render();
+                                                }
+                                            })
+                                            .setNegativeButton("Cancel", null)
+                                            .show();
+                                }
+                            });
+                        }
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private interface ClockPicked {
+        void at(long epochMs);
+    }
+
+    /** A 24-hour time picker on the MapView context; a time later than now is taken as yesterday's. */
+    private void pickClock(String title, final ClockPicked done) {
+        final java.util.Calendar c = java.util.Calendar.getInstance();
+        final android.app.TimePickerDialog d = new android.app.TimePickerDialog(getMapView().getContext(),
+                new android.app.TimePickerDialog.OnTimeSetListener() {
+                    @Override
+                    public void onTimeSet(android.widget.TimePicker v, int hour, int minute) {
+                        final java.util.Calendar t = java.util.Calendar.getInstance();
+                        t.set(java.util.Calendar.HOUR_OF_DAY, hour);
+                        t.set(java.util.Calendar.MINUTE, minute);
+                        t.set(java.util.Calendar.SECOND, 0);
+                        t.set(java.util.Calendar.MILLISECOND, 0);
+                        if (t.getTimeInMillis() > System.currentTimeMillis() + 60000L)
+                            t.add(java.util.Calendar.DAY_OF_MONTH, -1);
+                        done.at(t.getTimeInMillis());
+                    }
+                }, c.get(java.util.Calendar.HOUR_OF_DAY), c.get(java.util.Calendar.MINUTE), true);
+        d.setTitle(title);
+        d.show();
+    }
+
     /** Start the run from: a point, NASA's satellite perimeter, or one traced; and taking a perimeter off (operator's name, 2026-10-30). */
     private void chooseStart() {
         final GeoPoint start = model.startPoint();
@@ -517,8 +586,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                         : "shape".equals(model.perimeterKind()) ? "Start from: map shape" : "Start from: drawn perimeter")
                 : start != null ? "Start from: a point" : "Start from: choose");
         ((Button) view.findViewById(R.id.btn_horizon)).setText(model.horizonMinutes() >= 180 ? "Horizon:\n3 hours" : "Horizon:\n1 hour");
-        final int ago = model.startedMinutesAgo();
-        ((Button) view.findViewById(R.id.btn_started)).setText(ago == 0 ? "Started:\nnot known" : "Started:\n" + ago + " min ago");
+        ((Button) view.findViewById(R.id.btn_started)).setText(ignitionLabel());
         ((Button) view.findViewById(R.id.btn_conditions)).setText("Conditions:\n" + FireModel.conditionsLabel(model.conditions()));
         String stationLabel = "Station:\nautomatic";
         if (!model.station().isEmpty()) {
@@ -596,10 +664,14 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         if (r.ground != null)
             body.addView(stepTable(r));
         final StringBuilder goes = new StringBuilder();
+        if (r.originAt > 0)
+            goes.append("Ignition set to ").append(clock(r.originAt)).append(", ").append(r.nowMinutes())
+                    .append(" min before this run: each ring is where the fire should be by its time, the ")
+                    .append(clock(r.ranAt)).append(" one now.\n");
         if (r.ground != null) {
             for (int i = 0; i < r.steps.length; i++) {
                 final int min = r.steps[i];
-                goes.append(clock(r.ranAt + min * 60000L)).append(" (").append(min).append(" min): ").append(acres(r.acres(min)))
+                goes.append(clock(r.t0() + min * 60000L)).append(" (").append(min).append(" min): ").append(acres(r.acres(min)))
                         .append(", farthest ").append(Units.format(r.headM(min)))
                         .append(" to the ").append(Units.compass(r.headDeg(min)));
                 if (r.structures != null) {
@@ -619,7 +691,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                 final int last = r.steps[r.steps.length - 1];
                 final double[] crown = r.ground.crownAcres(last);
                 if (crown[0] >= 0.05 || crown[1] >= 0.05)
-                    goes.append("Crown fire by ").append(clock(r.ranAt + last * 60000L)).append(": ")
+                    goes.append("Crown fire by ").append(clock(r.t0() + last * 60000L)).append(": ")
                             .append(acres(crown[0])).append(" crowning through the trees, ")
                             .append(acres(crown[1])).append(" torching. Flames that size are past any line at the head.\n");
                 else
@@ -644,14 +716,14 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             final double grew = r.ground.acres(end) - r.ground.acres(0);
             if (r.perimeter != null && grew < 0.5)
                 goes.append(String.format(Locale.US, "No spread past the perimeter by %s: %sthe fine dead fuel is %.0f%% water",
-                        clock(r.ranAt + end * 60000L), r.weather == null || Double.isNaN(r.weather.relativeHumidity) ? ""
+                        clock(r.t0() + end * 60000L), r.weather == null || Double.isNaN(r.weather.relativeHumidity) ? ""
                                 : String.format(Locale.US, "at %.0f%% humidity ", r.weather.relativeHumidity),
                         r.m1)).append(r.m1 >= 20 ? ", too wet to carry fire. " : " and the fire is too slow to cross a cell. ")
                         .append("Conditions: Dry day shows what it would do once it dries out.\n");
             else if (r.acres(end) < 0.5)
                 goes.append("A slow fire: the fuel here carries fire at ").append(rate(o.rosFtPerMin))
                         .append(" at this wind, so it covers ").append(acres(r.acres(end))).append(" by ")
-                        .append(clock(r.ranAt + end * 60000L)).append(". A stronger wind or a drier day moves it much "
+                        .append(clock(r.t0() + end * 60000L)).append(". A stronger wind or a drier day moves it much "
                         + "faster; Conditions: Dry and 20 mph wind shows how much.\n");
             if (r.structureNote != null)
                 goes.append(r.structureNote).append('\n');
@@ -902,8 +974,8 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         // The bar's two ends, so the range reads without touching it.
         final LinearLayout ends = new LinearLayout(view.getContext());
         ends.setOrientation(LinearLayout.HORIZONTAL);
-        final TextView from = bodyView("Run, " + clock(r.ranAt));
-        final TextView to = bodyView(clock(r.ranAt + last * 60000L));
+        final TextView from = bodyView(r.originAt > 0 ? "Ignition, " + clock(r.originAt) : "Run, " + clock(r.ranAt));
+        final TextView to = bodyView(clock(r.t0() + last * 60000L));
         from.setTextSize(13f);
         to.setTextSize(13f);
         from.setTextColor(0xFFB0B0B0);
@@ -921,11 +993,12 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
     private static String timeText(FireModel.Run r, int minutes) {
         final int last = r.steps[r.steps.length - 1];
         if (minutes <= 0)
-            return "Slide to see where the fire is at any time up to " + clock(r.ranAt + last * 60000L)
+            return "Slide to see where the fire is at any time up to " + clock(r.t0() + last * 60000L)
                     + ". Its edge is drawn on the map in cyan.";
-        final StringBuilder sb = new StringBuilder("By ").append(clock(r.ranAt + minutes * 60000L))
-                .append(", in ").append(minutes < 60 ? minutes + " min"
+        final StringBuilder sb = new StringBuilder("By ").append(clock(r.t0() + minutes * 60000L))
+                .append(r.originAt > 0 ? ", " : ", in ").append(minutes < 60 ? minutes + " min"
                         : minutes % 60 == 0 ? (minutes / 60) + " h" : (minutes / 60) + " h " + (minutes % 60) + " min")
+                .append(r.originAt > 0 ? " after ignition" : "")
                 .append(": ").append(acres(r.acres(minutes))).append(", farthest ").append(Units.format(r.headM(minutes)))
                 .append(" to the ").append(Units.compass(r.headDeg(minutes)));
         if (r.ground != null && r.startCanopy != null) {
@@ -958,7 +1031,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         for (int i = 0; i < r.steps.length; i++) {
             final int min = r.steps[i];
             t.addView(tableRow(0xFF000000 | FireModel.stepColor(i, r.steps.length),
-                    "", clock(r.ranAt + min * 60000L) + "  (" + min + " min)",
+                    "", clock(r.t0() + min * 60000L) + (r.originAt > 0 && min == r.nowMinutes() ? "  now" : "  (" + min + " min)"),
                     acresShort(r.acres(min)),
                     r.structures == null ? "" : String.valueOf(r.structures[i]),
                     r.people == null ? "" : (r.people[i] < 1 ? "0" : String.valueOf(Math.round(r.people[i]))), false));
@@ -968,7 +1041,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             final double[] from = { r.lat, r.lon };
             for (Object[] c : r.critical)
                 sb.append(c[0]).append(", ").append(Units.rangeBearing(from, (Double) c[1], (Double) c[2]))
-                        .append(" of the start, by ").append(clock(r.ranAt + r.steps[(Integer) c[3]] * 60000L)).append('\n');
+                        .append(" of the start, by ").append(clock(r.t0() + r.steps[(Integer) c[3]] * 60000L)).append('\n');
             final LinearLayout wrap = new LinearLayout(view.getContext());
             wrap.setOrientation(LinearLayout.VERTICAL);
             wrap.addView(t);
