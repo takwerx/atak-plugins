@@ -1,6 +1,5 @@
 package com.atakmap.android.firecast.model;
 
-import com.atakmap.coremap.maps.coords.GeoPoint;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
@@ -16,6 +15,7 @@ import com.atakmap.android.dropdown.DropDownReceiver;
 import com.atakmap.android.firecast.Units;
 import com.atakmap.android.firecast.plugin.R;
 import com.atakmap.android.maps.MapView;
+import com.atakmap.coremap.maps.coords.GeoPoint;
 
 import java.util.Locale;
 
@@ -31,6 +31,45 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
     private final FireModel model;
     private final Runnable reopenPane;
     private final View view;
+
+    // NASA's satellite perimeters (FEDS) as a list that follows the map: each fire's box
+    // and numbers only; an outline is fetched and drawn only for the one picked.
+    private boolean fedsOpen;
+    private java.util.List<Feds.Fire> fedsFires;
+    private String fedsStatus;
+    private boolean fedsLoading;
+    /** The box the last list answered, so a pan inside it does not ask again. */
+    private double[] fedsBox;
+    private final android.os.Handler fedsMain = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final java.util.concurrent.ExecutorService fedsWorker = java.util.concurrent.Executors.newSingleThreadExecutor();
+    /** County and state per fire, looked up once for the rows shown; "" when the Census has none. Main thread. */
+    private final java.util.Map<String, String> fedsPlaces = new java.util.HashMap<>();
+    private final java.util.Set<String> fedsAsked = new java.util.HashSet<>();
+    private final java.util.concurrent.ExecutorService placeWorker = java.util.concurrent.Executors.newFixedThreadPool(3);
+    /** The rows named, so a wide view does not send hundreds of lookups. */
+    private static final int FEDS_ROWS = 40;
+    /** GL thread: post only (a View or a map item touched here is a native crash). */
+    private final com.atakmap.map.AtakMapView.OnMapMovedListener fedsMoved = new com.atakmap.map.AtakMapView.OnMapMovedListener() {
+        @Override
+        public void onMapMoved(com.atakmap.map.AtakMapView v, boolean animate) {
+            fedsMain.removeCallbacks(fedsSettled);
+            fedsMain.postDelayed(fedsSettled, 600);
+        }
+    };
+    private final Runnable fedsSettled = new Runnable() {
+        @Override
+        public void run() {
+            if (!fedsOpen || fedsLoading || !isVisible())
+                return;
+            final double[] now = viewBox();
+            final double[] was = fedsBox;
+            // Inside the box already answered, and not much smaller than it: nothing new.
+            if (now == null || (was != null && now[0] >= was[0] && now[1] >= was[1] && now[2] <= was[2] && now[3] <= was[3]
+                    && (now[3] - now[1]) > (was[3] - was[1]) * 0.4))
+                return;
+            loadFeds();
+        }
+    };
     private final LinearLayout body;
     /** The run whose details the page shows; the newest unless one was tapped. */
     private FireModel.Run shown;
@@ -52,9 +91,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         view.findViewById(R.id.btn_place).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                // The page gives way to the map so the tap lands on it.
-                closeDropDown();
-                model.pickStart();
+                chooseStart();
             }
         });
         view.findViewById(R.id.btn_run).setOnClickListener(new View.OnClickListener() {
@@ -63,36 +100,6 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                 if (model.perimeter() != null ? !model.runFromPerimeter() : !model.runFromStart())
                     return;
                 render();
-            }
-        });
-        view.findViewById(R.id.btn_perimeter).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (model.perimeter() != null) {
-                    model.clearPerimeter();
-                    render();
-                    return;
-                }
-                final GeoPoint start = model.startPoint();
-                final String[] choices = { start != null ? "Satellite perimeter around the start (NASA, twice a day)"
-                        : "Satellite perimeter around the middle of the map (NASA, twice a day)", "Draw it on the map" };
-                new android.app.AlertDialog.Builder(getMapView().getContext())
-                        .setTitle("Fire perimeter")
-                        .setItems(choices, new android.content.DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(android.content.DialogInterface dialog, int which) {
-                                if (which == 1) {
-                                    closeDropDown();
-                                    model.drawPerimeter();
-                                    return;
-                                }
-                                final GeoPoint at = start != null ? start : getMapView().getCenterPoint().get();
-                                model.satellitePerimeter(at.getLatitude(), at.getLongitude());
-                                render();
-                            }
-                        })
-                        .setNegativeButton("Cancel", null)
-                        .show();
             }
         });
         view.findViewById(R.id.btn_horizon).setOnClickListener(new View.OnClickListener() {
@@ -249,6 +256,248 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             render();
     }
 
+    private void openFeds() {
+        fedsOpen = true;
+        fedsBox = null;
+        fedsFires = null;
+        try {
+            getMapView().addOnMapMovedListener(fedsMoved);
+        } catch (Exception ignored) {
+        }
+        loadFeds();
+        render();
+    }
+
+    private void closeFeds() {
+        fedsOpen = false;
+        fedsMain.removeCallbacks(fedsSettled);
+        try {
+            getMapView().removeOnMapMovedListener(fedsMoved);
+        } catch (Exception ignored) {
+        }
+    }
+
+    /** What is on screen as south, west, north, east; null when the map cannot say or it crosses 180. */
+    private double[] viewBox() {
+        try {
+            final com.atakmap.coremap.maps.coords.GeoBounds b = getMapView().getBounds();
+            if (b == null)
+                return null;
+            final double s = b.getSouth(), n = b.getNorth(), w = b.getWest(), e = b.getEast();
+            if (Double.isNaN(s) || Double.isNaN(n) || Double.isNaN(w) || Double.isNaN(e) || w >= e || s >= n)
+                return null;
+            return new double[] { Math.max(-90, s), Math.max(-180, w), Math.min(90, n), Math.min(180, e) };
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** Main thread: asks NASA for the fires in view, the list redrawn when it answers. */
+    private void loadFeds() {
+        final double[] box = viewBox();
+        if (box == null) {
+            fedsStatus = "The map cannot say what is in view; pan a little and it asks again.";
+            render();
+            return;
+        }
+        fedsLoading = true;
+        fedsStatus = "Looking for NASA's satellite perimeters in view...";
+        fedsWorker.execute(new Runnable() {
+            @Override
+            public void run() {
+                java.util.List<Feds.Fire> found = null;
+                String said;
+                try {
+                    found = Feds.inBox(box[0], box[1], box[2], box[3]);
+                    said = null;
+                } catch (Exception e) {
+                    com.atakmap.coremap.log.Log.w("FireCast", "FEDS list: " + e);
+                    said = "Could not reach NASA's satellite perimeters (no network, or the service did not answer).";
+                }
+                final java.util.List<Feds.Fire> fires = found;
+                final String problem = said;
+                fedsMain.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        fedsLoading = false;
+                        if (!fedsOpen)
+                            return;
+                        if (fires != null) {
+                            fedsFires = fires;
+                            fedsBox = box;
+                            fedsStatus = null;
+                        } else {
+                            fedsStatus = problem;
+                        }
+                        if (isVisible())
+                            render();
+                    }
+                });
+            }
+        });
+    }
+
+    /** The list: biggest first, nothing drawn until one is picked. */
+    private void renderFeds() {
+        body.addView(headingView("NASA satellite perimeters in view"));
+        final java.util.List<Feds.Fire> fires = fedsFires;
+        String text = fedsStatus;
+        if (text == null && fires != null)
+            text = fires.isEmpty()
+                    ? "No fire in view has a NASA outline from the last 3 days. Pan or zoom out to a fire; the list follows the map."
+                    : fires.size() + (fires.size() == 1 ? " fire" : " fires") + " in view with a NASA outline from the last 3 days, "
+                            + "biggest first. Tap one to start from it; only that one is drawn. The list follows the map."
+                            + (fires.size() >= 200 ? " Zoom in to see them all." : "");
+        if (text != null)
+            body.addView(bodyView(text));
+        if (fires != null) {
+            final GeoPoint c = getMapView().getCenterPoint().get();
+            final int shown = Math.min(fires.size(), FEDS_ROWS);
+            askPlaces(fires, shown);
+            for (int i = 0; i < shown; i++) {
+                final Feds.Fire f = fires.get(i);
+                final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.model_run_row, null);
+                row.findViewById(R.id.run_toggle).setVisibility(View.GONE);
+                row.findViewById(R.id.run_delete).setVisibility(View.GONE);
+                final Button name = row.findViewById(R.id.run_name);
+                name.setSingleLine(false);
+                name.setMaxLines(3);
+                name.setText(fedsRow(f, c, fedsPlaces.get(fireKey(f))));
+                name.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        closeFeds();
+                        model.satellitePerimeter(f);
+                        render();
+                    }
+                });
+                body.addView(row);
+            }
+        }
+        final View closeRow = PluginLayoutInflater.inflate(pluginContext, R.layout.model_run_row, null);
+        closeRow.findViewById(R.id.run_toggle).setVisibility(View.GONE);
+        closeRow.findViewById(R.id.run_delete).setVisibility(View.GONE);
+        final Button cancel = closeRow.findViewById(R.id.run_name);
+        cancel.setGravity(Gravity.CENTER);
+        cancel.setText("Close the list");
+        cancel.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                closeFeds();
+                render();
+            }
+        });
+        body.addView(closeRow);
+    }
+
+    /** The fire's number, the part of its id that stays the same from one 12-hour step to the next. */
+    private static String fireKey(Feds.Fire f) {
+        final int a = f.id.indexOf('|'), b = f.id.lastIndexOf('|');
+        return a >= 0 && b > a ? f.id.substring(a + 1, b) : f.id;
+    }
+
+    /** Looks up the county and state of each shown row not yet asked; the list redraws as they come. */
+    private void askPlaces(java.util.List<Feds.Fire> fires, int shown) {
+        for (int i = 0; i < shown; i++) {
+            final Feds.Fire f = fires.get(i);
+            final String key = fireKey(f);
+            if (!fedsAsked.add(key))
+                continue;
+            placeWorker.execute(new Runnable() {
+                @Override
+                public void run() {
+                    String name;
+                    try {
+                        name = Feds.place(f.lat(), f.lon());
+                    } catch (Exception e) {
+                        name = null;
+                    }
+                    final String got = name;
+                    fedsMain.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (got == null) {
+                                fedsAsked.remove(key);
+                                return;
+                            }
+                            fedsPlaces.put(key, got);
+                            fedsMain.removeCallbacks(placesRedraw);
+                            fedsMain.postDelayed(placesRedraw, 300);
+                        }
+                    });
+                }
+            });
+        }
+    }
+
+    private final Runnable placesRedraw = new Runnable() {
+        @Override
+        public void run() {
+            if (fedsOpen && isVisible())
+                render();
+        }
+    };
+
+    /** "Rio Arriba County, NM / 1,250 acres, burning 9 days, outline 12 h old / 140 mi NW of the middle of the map". */
+    private static String fedsRow(Feds.Fire f, GeoPoint from, String place) {
+        final StringBuilder b = new StringBuilder();
+        if (place != null && !place.isEmpty())
+            b.append(place).append('\n');
+        b.append(Double.isNaN(f.areaKm2) ? "size not known" : String.format(Locale.US, "%,.0f acres", f.areaKm2 * 247.105d));
+        if (!Double.isNaN(f.burningDays))
+            b.append(f.burningDays <= 0 ? ", first seen in this outline" : f.burningDays < 1 ? ", burning half a day"
+                    : ", burning " + Math.round(f.burningDays) + (Math.round(f.burningDays) == 1 ? " day" : " days"));
+        final long ageMin = Math.max(0, (System.currentTimeMillis() - f.atMs) / 60000L);
+        b.append(", outline ").append(ageMin < 120 ? ageMin + " min" : (ageMin / 60) + " h").append(" old");
+        if (from != null) {
+            final GeoPoint at = new GeoPoint(f.lat(), f.lon());
+            b.append("\n").append(Units.format(from.distanceTo(at))).append(' ')
+                    .append(Units.compass(from.bearingTo(at))).append(" of the middle of the map");
+        }
+        return b.toString();
+    }
+
+    /** How the fire starts: a point, NASA's satellite perimeter, or one traced; and taking a perimeter off. */
+    private void chooseStart() {
+        final GeoPoint start = model.startPoint();
+        final boolean hasPerimeter = model.perimeter() != null;
+        final java.util.List<String> items = new java.util.ArrayList<>();
+        items.add("A point: tap the map where the fire starts");
+        items.add("NASA satellite perimeter: pick a fire in the map view");
+        items.add("Draw the perimeter on the map");
+        if (hasPerimeter)
+            items.add("Remove the perimeter");
+        new android.app.AlertDialog.Builder(getMapView().getContext())
+                .setTitle("How the fire starts")
+                .setItems(items.toArray(new String[0]), new android.content.DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(android.content.DialogInterface dialog, int which) {
+                        switch (which) {
+                            case 0:
+                                // The page gives way to the map so the tap lands on it.
+                                closeFeds();
+                                model.clearPerimeter();
+                                closeDropDown();
+                                model.pickStart();
+                                break;
+                            case 1:
+                                openFeds();
+                                break;
+                            case 2:
+                                closeFeds();
+                                closeDropDown();
+                                model.drawPerimeter();
+                                break;
+                            default:
+                                model.clearPerimeter();
+                                render();
+                        }
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
     /** Main thread. */
     public void render() {
         body.removeAllViews();
@@ -258,8 +507,9 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         final FireModel.Run r = shown;
         final com.atakmap.coremap.maps.coords.GeoPoint start = model.startPoint();
         ((Button) view.findViewById(R.id.btn_run)).setEnabled(!model.isRunning() && (start != null || model.perimeter() != null));
-        ((Button) view.findViewById(R.id.btn_perimeter)).setText(model.perimeter() == null ? "Draw perimeter"
-                : model.perimeterNote() != null ? "Perimeter:\nsatellite, tap to drop" : "Perimeter:\ndrawn, tap to drop");
+        ((Button) view.findViewById(R.id.btn_place)).setText(model.perimeter() != null
+                ? (model.perimeterNote() != null ? "Start: NASA perimeter" : "Start: drawn perimeter")
+                : start != null ? "Start: a point" : "Start: choose");
         ((Button) view.findViewById(R.id.btn_horizon)).setText(model.horizonMinutes() >= 180 ? "Horizon:\n3 hours" : "Horizon:\n1 hour");
         final int ago = model.startedMinutesAgo();
         ((Button) view.findViewById(R.id.btn_started)).setText(ago == 0 ? "Started:\nnot known" : "Started:\n" + ago + " min ago");
@@ -277,9 +527,13 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             section("Running", model.status());
             return;
         }
+        if (model.startNote() != null && !fedsOpen)
+            section("Start", model.startNote());
+        if (fedsOpen)
+            renderFeds();
         if (start == null && model.perimeter() == null) {
-            section("Fire model", "Tap Place start, then tap the map where the fire starts. Or Draw perimeter: take NASA's satellite "
-                    + "outline of the fire, or trace its edge as you find it; say when it started and the run is scaled to what it has already done. Move the marker if it "
+            section("Fire model", "Tap Start and choose how the fire starts: a point you tap on the map, NASA's satellite "
+                    + "perimeter of the fire, or a perimeter you draw; with a perimeter, say when it started and the run is scaled to what it has already done. Move the marker if it "
                     + "needs to be exact (drag it, or Fine Adjust on its menu), pick the conditions, then Run model. "
                     + "Where the fire is at 20, 40 and 60 minutes is drawn on the map, with everything the run assumed.");
             return;
@@ -378,7 +632,14 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                         + "from the nearest fuel, ").append(Units.format(r.ground.startOffsetM)).append(" to the ")
                         .append(Units.compass(r.ground.startOffsetDeg)).append(".\n");
             final int end = r.steps[r.steps.length - 1];
-            if (r.acres(end) < 0.5)
+            final double grew = r.ground.acres(end) - r.ground.acres(0);
+            if (r.perimeter != null && grew < 0.5)
+                goes.append(String.format(Locale.US, "No spread past the perimeter by %s: %sthe fine dead fuel is %.0f%% water",
+                        clock(r.ranAt + end * 60000L), r.weather == null || Double.isNaN(r.weather.relativeHumidity) ? ""
+                                : String.format(Locale.US, "at %.0f%% humidity ", r.weather.relativeHumidity),
+                        r.m1)).append(r.m1 >= 20 ? ", too wet to carry fire. " : " and the fire is too slow to cross a cell. ")
+                        .append("Conditions: Dry day shows what it would do once it dries out.\n");
+            else if (r.acres(end) < 0.5)
                 goes.append("A slow fire: the fuel here carries fire at ").append(rate(o.rosFtPerMin))
                         .append(" at this wind, so it covers ").append(acres(r.acres(end))).append(" by ")
                         .append(clock(r.ranAt + end * 60000L)).append(". A stronger wind or a drier day moves it much "
@@ -387,10 +648,10 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                 goes.append(r.structureNote).append('\n');
             else if (r.structures != null)
                 goes.append("Structures and people from FEMA's national building inventory; a building counts when the fire reaches the ground beside it.\n");
-            goes.append(String.format(Locale.US, "Across the ground: %d fuel%s crossed in %d cells of 15 m. Neighborhoods burn house to house "
+            goes.append(String.format(Locale.US, "Across the ground: %d fuel%s crossed in %d cells of %.0f m. Neighborhoods burn house to house "
                     + "at the rate measured in nine North American conflagrations; roads slow it; commercial blocks, water and bare ground stop it. "
                     + "At the start the head would run toward %s at %s.",
-                    r.ground.fuelsCrossed, r.ground.fuelsCrossed == 1 ? "" : "s", r.ground.cellsSeen,
+                    r.ground.fuelsCrossed, r.ground.fuelsCrossed == 1 ? "" : "s", r.ground.cellsSeen, r.cellM,
                     Units.compass(o.headingDeg), rate(o.rosFtPerMin)));
         } else {
             goes.append("Head runs toward ").append(Units.compass(o.headingDeg))
@@ -876,6 +1137,17 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
 
     @Override
     public void onDropDownVisible(boolean v) {
+        if (!fedsOpen)
+            return;
+        try {
+            if (v)
+                getMapView().addOnMapMovedListener(fedsMoved);
+            else {
+                getMapView().removeOnMapMovedListener(fedsMoved);
+                fedsMain.removeCallbacks(fedsSettled);
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     @Override
@@ -888,5 +1160,8 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
 
     @Override
     protected void disposeImpl() {
+        closeFeds();
+        fedsWorker.shutdownNow();
+        placeWorker.shutdownNow();
     }
 }

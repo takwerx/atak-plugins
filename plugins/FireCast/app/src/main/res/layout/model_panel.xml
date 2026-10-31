@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The model page. Back, Place start and Clear all are pinned; everything else, the
+<!-- The model page. Back, Start and Clear all are pinned; Start is how the fire
+     starts (a point, NASA's satellite perimeter or a drawn one), first because it is
+     the first thing chosen (operator, 2026-10-30); everything else, the
      settings and the run's text, is one scroller, so the output is always reachable
      (operator, 2026-10-12: "now I can't scroll up and see the output"). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -25,7 +27,7 @@
             android:layout_weight="1"
             android:layout_height="wrap_content"
             android:layout_marginLeft="6dp"
-            android:text="Place start" />
+            android:text="Start: choose" />
         <Button
             android:id="@+id/btn_clear"
             style="@style/TakwerxButton"
@@ -74,20 +76,20 @@
                 android:baselineAligned="false"
                 android:paddingTop="6dp">
                 <Button
-                    android:id="@+id/btn_perimeter"
-                    style="@style/TakwerxTileButton"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:text="Draw perimeter" />
-                <Button
                     android:id="@+id/btn_started"
                     style="@style/TakwerxTileButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
-                    android:layout_marginLeft="6dp"
                     android:text="Started:\nnot known" />
+                <Button
+                    android:id="@+id/btn_horizon"
+                    style="@style/TakwerxTileButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="6dp"
+                    android:text="Horizon:\n1 hour" />
             </LinearLayout>
             <LinearLayout
                 android:layout_width="match_parent"
@@ -96,19 +98,11 @@
                 android:baselineAligned="false"
                 android:paddingTop="6dp">
                 <Button
-                    android:id="@+id/btn_horizon"
-                    style="@style/TakwerxTileButton"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:text="Horizon:\n1 hour" />
-                <Button
                     android:id="@+id/btn_run"
                     style="@style/TakwerxButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
-                    android:layout_height="match_parent"
-                    android:layout_marginLeft="6dp"
+                    android:layout_height="wrap_content"
                     android:text="Run model" />
             </LinearLayout>
             <LinearLayout

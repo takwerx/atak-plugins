@@ -107,6 +107,7 @@ Outbound HTTPS (TCP 443) only; nothing inbound.
   - data.pyrecast.org - PyreCast forecasts (www.pyrecast.com for the link in the pane).
   - atak.s3.us-west-1.amazonaws.com - FIRIS model runs.
   - openveda.cloud - NASA's satellite fire perimeters (FEDS), for a model run's start.
+  - geocoding.geo.census.gov - county and state of each fire in that list (Census Bureau).
 
 No sign-in, no token, no credential of any kind is sent or stored. The device's
 position is sent only as part of a request to the services above.

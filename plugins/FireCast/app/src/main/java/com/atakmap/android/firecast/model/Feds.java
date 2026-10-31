@@ -26,8 +26,10 @@ public final class Feds {
     /** f=geojson, never f=json: this server answers f=json with a flat list and WKT geometry. */
     private static final String ITEMS = "https://openveda.cloud/api/features/collections/"
             + "public.eis_fire_snapshot_perimeter_nrt/items";
-    /** How far from the start a perimeter may be and still be this fire's. */
-    public static final double REACH_M = 3000;
+    /** A fire whose latest outline is older than this has gone out or gone quiet; it is left off the list. */
+    public static final long RECENT_MS = 72L * 3600_000L;
+    /** "CONUS|97224|2026-10-30T12:00:00": what an item id looks like, and all it may be. */
+    private static final java.util.regex.Pattern ID = java.util.regex.Pattern.compile("[A-Z]{2,12}\\|[0-9.]{1,12}\\|[0-9T:-]{10,25}");
     /** The most features and vertices read from one answer; a real box holds a few dozen fires. */
     private static final int MAX_FEATURES = 200, MAX_VERTICES = 100_000;
     /**
@@ -36,22 +38,48 @@ public final class Feds {
      */
     private static final int RING_VERTICES = 400;
 
-    /** One fire's satellite perimeter. */
+    /** One fire in a list: its box and numbers, not its outline. */
+    public static final class Fire {
+        /** The service's item id, "CONUS|fireid|step". */
+        public final String id;
+        public final double areaKm2, burningDays;
+        /** The 12-hour step its outline was drawn at, epoch ms UTC. */
+        public final long atMs;
+        public final double south, west, north, east;
+
+        Fire(String id, double areaKm2, double burningDays, long atMs, double s, double w, double n, double e) {
+            this.id = id;
+            this.areaKm2 = areaKm2;
+            this.burningDays = burningDays;
+            this.atMs = atMs;
+            south = s;
+            west = w;
+            north = n;
+            east = e;
+        }
+
+        public double lat() {
+            return (south + north) / 2d;
+        }
+
+        public double lon() {
+            return (west + east) / 2d;
+        }
+    }
+
+    /** One fire's outline, as the run's perimeter. */
     public static final class Perimeter {
         /** The outer ring, [lat, lon] pairs, not closed. */
         public final double[][] ring;
         /** The 12-hour step it was drawn at, epoch ms UTC. */
         public final long atMs;
-        /** Hours the fire had been burning at that step. */
-        public final double burningHours;
-        /** 0 when the start is inside it, otherwise how far to its nearest corner. */
-        public final double distanceM;
+        /** Days between its first and last detection at that step. */
+        public final double burningDays;
 
-        Perimeter(double[][] ring, long atMs, double burningHours, double distanceM) {
+        Perimeter(double[][] ring, long atMs, double burningDays) {
             this.ring = ring;
             this.atMs = atMs;
-            this.burningHours = burningHours;
-            this.distanceM = distanceM;
+            this.burningDays = burningDays;
         }
     }
 
@@ -59,41 +87,103 @@ public final class Feds {
     }
 
     /**
-     * The perimeter around this point, or the nearest within {@link #REACH_M}; null when
-     * there is none. Worker thread. Throws when the service cannot be read.
+     * The fires in a box whose outline is under {@link #RECENT_MS} old, biggest first:
+     * each one's box and numbers only, a few hundred bytes a fire, so a wide view lists
+     * them without fetching their outlines. Worker thread. Throws when the service
+     * cannot be read.
      */
-    public static Perimeter near(double lat, double lon) throws Exception {
-        if (!(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180))
-            throw new IllegalArgumentException("start out of range");
-        final double dLat = REACH_M / 111320d;
-        final double dLon = dLat / Math.max(0.02d, Math.cos(Math.toRadians(lat)));
-        final String url = ITEMS + "?f=geojson&limit=" + MAX_FEATURES + "&bbox="
-                + String.format(Locale.US, "%.4f,%.4f,%.4f,%.4f", lon - dLon, lat - dLat, lon + dLon, lat + dLat);
+    public static List<Fire> inBox(double s, double w, double n, double e) throws Exception {
+        if (!(s >= -90 && n <= 90 && s < n && w >= -180 && e <= 180 && w < e))
+            throw new IllegalArgumentException("box out of range");
+        final String url = ITEMS + "?f=geojson&bbox-only=true&properties=fireid,farea,t,duration&sortby=-t&limit="
+                + MAX_FEATURES + "&bbox=" + String.format(Locale.US, "%.4f,%.4f,%.4f,%.4f", w, s, e, n);
         final JSONObject o = new JSONObject(Esri.get(url));
         final JSONArray features = o.optJSONArray("features");
+        final List<Fire> out = new ArrayList<>();
         if (features == null)
-            return null;
-        Perimeter best = null;
-        int vertices = 0;
+            return out;
+        final long cutoff = System.currentTimeMillis() - RECENT_MS;
         for (int f = 0; f < features.length() && f < MAX_FEATURES; f++) {
             final JSONObject feature = features.optJSONObject(f);
             if (feature == null)
                 continue;
+            final String id = feature.optString("id", "");
             final JSONObject props = feature.optJSONObject("properties");
-            final long at = props == null ? 0 : parseTime(props.optString("t", ""));
-            final double hours = props == null ? Double.NaN : props.optDouble("duration", Double.NaN);
-            for (double[][] ring : outerRings(feature.optJSONObject("geometry"))) {
-                vertices += ring.length;
-                if (vertices > MAX_VERTICES)
-                    throw new IllegalStateException("satellite perimeters too large to read");
-                final double d = Spread.inside(ring, lat, lon) ? 0 : nearestM(ring, lat, lon);
-                if (d > REACH_M)
-                    continue;
-                if (best == null || d < best.distanceM || (d == best.distanceM && at > best.atMs))
-                    best = new Perimeter(thin(ring), at, hours, d);
+            if (props == null || !ID.matcher(id).matches())
+                continue;
+            final long at = parseTime(props.optString("t", ""));
+            if (at < cutoff)
+                continue;
+            final List<double[][]> rings = outerRings(feature.optJSONObject("geometry"));
+            if (rings.isEmpty())
+                continue;
+            double ss = 90, ww = 180, nn = -90, ee = -180;
+            for (double[] p : rings.get(0)) {
+                ss = Math.min(ss, p[0]);
+                nn = Math.max(nn, p[0]);
+                ww = Math.min(ww, p[1]);
+                ee = Math.max(ee, p[1]);
             }
+            // FEDS duration is days between the first and last detection, half a day a step.
+            final double km2 = props.optDouble("farea", Double.NaN), days = props.optDouble("duration", Double.NaN);
+            out.add(new Fire(id, km2 >= 0 && km2 < 1e6 ? km2 : Double.NaN, days >= 0 && days < 1e5 ? days : Double.NaN,
+                    at, ss, ww, nn, ee));
         }
-        return best;
+        java.util.Collections.sort(out, new java.util.Comparator<Fire>() {
+            @Override
+            public int compare(Fire a, Fire b) {
+                return Double.compare(Double.isNaN(b.areaKm2) ? 0 : b.areaKm2, Double.isNaN(a.areaKm2) ? 0 : a.areaKm2);
+            }
+        });
+        return out;
+    }
+
+    /** One fire's outline, its largest polygon. Worker thread. Throws when it cannot be read. */
+    public static Perimeter outline(Fire fire) throws Exception {
+        if (!ID.matcher(fire.id).matches())
+            throw new IllegalArgumentException("not a FEDS id");
+        final JSONObject feature = new JSONObject(Esri.get(ITEMS + "/" + Esri.enc(fire.id).replace("+", "%20") + "?f=geojson"));
+        double[][] best = null;
+        int vertices = 0;
+        for (double[][] ring : outerRings(feature.optJSONObject("geometry"))) {
+            vertices += ring.length;
+            if (vertices > MAX_VERTICES)
+                throw new IllegalStateException("satellite perimeter too large to read");
+            if (best == null || Spread.ringAcres(ring) > Spread.ringAcres(best))
+                best = ring;
+        }
+        if (best == null)
+            throw new IllegalStateException("no outline in the answer");
+        final JSONObject props = feature.optJSONObject("properties");
+        final long at = props == null ? fire.atMs : Math.max(fire.atMs, parseTime(props.optString("t", "")));
+        return new Perimeter(thin(best), at, fire.burningDays);
+    }
+
+    /**
+     * "Rio Arriba County, NM" for a point, from the Census Bureau's geocoder; null off the
+     * US or when it does not say. Worker thread. Throws when it cannot be read.
+     */
+    public static String place(double lat, double lon) throws Exception {
+        if (!(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180))
+            return null;
+        final JSONObject o = new JSONObject(Esri.get("https://geocoding.geo.census.gov/geocoder/geographies/coordinates?x="
+                + String.format(Locale.US, "%.5f&y=%.5f", lon, lat)
+                + "&benchmark=Public_AR_Current&vintage=Current_Current&layers=Counties,States&format=json"));
+        final JSONObject result = o.optJSONObject("result");
+        final JSONObject g = result == null ? null : result.optJSONObject("geographies");
+        if (g == null)
+            return null;
+        final String county = first(g.optJSONArray("Counties"), "NAME"), state = first(g.optJSONArray("States"), "STUSAB");
+        if (county == null && state == null)
+            return null;
+        return county == null ? state : state == null ? county : county + ", " + state;
+    }
+
+    private static String first(JSONArray a, String key) {
+        final JSONObject o = a == null ? null : a.optJSONObject(0);
+        final String v = o == null ? "" : o.optString(key, "").trim();
+        // Names only: letters, spaces and the punctuation county names carry, nothing longer than a name.
+        return v.isEmpty() || v.length() > 60 || !v.matches("[\\p{L} .'\\-]+") ? null : v;
     }
 
     /** The outer ring of each polygon in a Polygon or MultiPolygon, [lat, lon]. */
@@ -147,16 +237,6 @@ public final class Feds {
         for (int i = 0; i < RING_VERTICES; i++)
             out[i] = ring[(int) ((long) i * ring.length / RING_VERTICES)];
         return out;
-    }
-
-    private static double nearestM(double[][] ring, double lat, double lon) {
-        final double mLon = 111320d * Math.max(0.02d, Math.cos(Math.toRadians(lat)));
-        double best = Double.MAX_VALUE;
-        for (double[] p : ring) {
-            final double dy = (p[0] - lat) * 111320d, dx = (p[1] - lon) * mLon;
-            best = Math.min(best, Math.sqrt(dx * dx + dy * dy));
-        }
-        return best;
     }
 
     /** "2026-10-30T12:00:00", UTC with or without a zone; 0 when unreadable. */

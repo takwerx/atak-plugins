@@ -341,6 +341,13 @@ public final class FireModel {
         return perimeterNote;
     }
 
+    /** What the page says about the start: where its perimeter came from, or why there is none. */
+    private volatile String startNote;
+
+    public String startNote() {
+        return startNote;
+    }
+
     public double[][] perimeter() {
         return perimeter;
     }
@@ -362,32 +369,28 @@ public final class FireModel {
     }
 
     /**
-     * The satellite perimeter (NASA FEDS) around this point, or the nearest within 3 km,
-     * as the run's perimeter: drawn on the map like a traced one and said where it came
-     * from. The answer lands in {@link #status()}.
+     * A fire picked from NASA's list (FEDS): its outline fetched and made the run's
+     * perimeter, drawn on the map like a traced one, the map taken to it, and the page
+     * told where it came from. The answer lands in {@link #startNote()}.
      */
-    public void satellitePerimeter(final double lat, final double lon) {
-        status = "Looking for a satellite perimeter near the start...";
+    public void satellitePerimeter(final Feds.Fire fire) {
+        startNote = "Fetching NASA's satellite perimeter...";
         changed();
         worker.execute(new Runnable() {
             @Override
             public void run() {
-                String said;
+                String said = null;
                 Feds.Perimeter p = null;
                 try {
-                    p = Feds.near(lat, lon);
-                    if (p == null)
-                        said = "No satellite perimeter within 2 mi of the start. NASA's outlines come from the VIIRS "
-                                + "passes, twice a day; a fire too small or too new for them has none. Draw it instead.";
-                    else if (Feds.spanM(p.ring) > 1.6d * halfKmFor(horizonMinutes()) * 1000d)
+                    p = Feds.outline(fire);
+                    if (Feds.spanM(p.ring) / 2000d + spreadRoomKm(horizonMinutes() >= 180) > MAX_HALF_KM)
                         said = "This fire's satellite perimeter is " + Units.format(Feds.spanM(p.ring))
-                                + " across, more than the model's square holds. Place a start on the edge that is "
-                                + "moving instead.";
-                    else
-                        said = null;
+                                + " across, more than the model can take on the phone ("
+                                + Units.format(2 * (MAX_HALF_KM - spreadRoomKm(horizonMinutes() >= 180)) * 1000d)
+                                + "). Choose A point and place it on the edge that is moving instead.";
                 } catch (Exception e) {
                     Log.w(TAG, "FEDS perimeter: " + e);
-                    said = "Could not reach NASA's satellite perimeters (no network, or the service did not answer).";
+                    said = "Could not fetch NASA's satellite perimeter (no network, or the service did not answer).";
                 }
                 final Feds.Perimeter found = said == null ? p : null;
                 final String problem = said;
@@ -395,18 +398,29 @@ public final class FireModel {
                     @Override
                     public void run() {
                         if (found == null) {
-                            status = problem;
+                            startNote = problem;
                             changed();
                             return;
                         }
                         final GeoPoint[] pts = new GeoPoint[found.ring.length];
-                        for (int i = 0; i < pts.length; i++)
+                        double lat = 0, lon = 0;
+                        for (int i = 0; i < pts.length; i++) {
                             pts[i] = new GeoPoint(found.ring[i][0], found.ring[i][1]);
-                        setPerimeter(pts, fedsNote(found));
+                            lat += found.ring[i][0];
+                            lon += found.ring[i][1];
+                        }
+                        setPerimeter(pts, fedsNote(found, fire));
                         if (perimeterPicker == null)
                             drawPerimeterPicker();
                         perimeterPicker.show(pts);
-                        status = perimeterNote;
+                        // The marker goes with the fire, so the map does not show a start somewhere else.
+                        place(new GeoPoint(lat / pts.length, lon / pts.length));
+                        try {
+                            com.atakmap.android.util.ATAKUtilities.scaleToFit(mapView, pts,
+                                    mapView.getWidth(), mapView.getHeight());
+                        } catch (Exception e) {
+                            Log.w(TAG, "could not go to the satellite perimeter", e);
+                        }
                         changed();
                     }
                 });
@@ -414,19 +428,33 @@ public final class FireModel {
         });
     }
 
-    private static double halfKmFor(int horizonMin) {
-        return horizonMin >= 180 ? 10 : HALF_KM;
+    /** The widest square a run will take: 40 km across, 60 m cells, about 450,000 of them. */
+    static final double MAX_HALF_KM = 20;
+
+    /** Room past a perimeter's edge for the fire to spread into, km. */
+    private static double spreadRoomKm(boolean threeHours) {
+        return threeHours ? 8 : 3;
     }
 
-    private static String fedsNote(Feds.Perimeter p) {
+    /** The farthest corner of a perimeter from a point, km. */
+    static double perimeterReachKm(double[][] ring, double lat, double lon) {
+        final double mLon = 111.32d * Math.max(0.02d, Math.cos(Math.toRadians(lat)));
+        double far = 0;
+        for (double[] p : ring) {
+            final double dy = (p[0] - lat) * 111.32d, dx = (p[1] - lon) * mLon;
+            far = Math.max(far, Math.sqrt(dx * dx + dy * dy));
+        }
+        return far;
+    }
+
+    private static String fedsNote(Feds.Perimeter p, Feds.Fire fire) {
         final StringBuilder b = new StringBuilder("Satellite perimeter: NASA FEDS, drawn from the VIIRS heat detections");
         if (p.atMs > 0) {
             final long agoMin = Math.max(0, (System.currentTimeMillis() - p.atMs) / 60000L);
             b.append(" at ").append(new java.text.SimpleDateFormat("MMM d HH:mm", Locale.US).format(new java.util.Date(p.atMs)))
                     .append(" (").append(agoMin < 120 ? agoMin + " min" : (agoMin / 60) + " h").append(" ago)");
         }
-        b.append(p.distanceM > 0 ? ", " + Units.format(p.distanceM) + " from the start" : "")
-                .append(". Its edges are 375 m steps; it is not the incident's mapped perimeter.");
+        b.append(". Its edges are 375 m steps; it is not the incident's mapped perimeter.");
         return b.toString();
     }
 
@@ -449,6 +477,7 @@ public final class FireModel {
 
     private void setPerimeter(GeoPoint[] ring, String note) {
         perimeterNote = note;
+        startNote = note;
         if (note == null)
             prefs.edit().remove(PREF_PERIMETER_NOTE).apply();
         else
@@ -469,6 +498,7 @@ public final class FireModel {
     public void clearPerimeter() {
         perimeter = null;
         perimeterNote = null;
+        startNote = null;
         prefs.edit().remove(PREF_PERIMETER).remove(PREF_PERIMETER_NOTE).apply();
         if (perimeterPicker != null)
             perimeterPicker.clearDrawn();
@@ -683,6 +713,7 @@ public final class FireModel {
                 if (r.length >= 3) {
                     perimeter = r;
                     perimeterNote = prefs.getString(PREF_PERIMETER_NOTE, null);
+                    startNote = perimeterNote;
                 }
             }
         } catch (Exception e) {
@@ -891,6 +922,16 @@ public final class FireModel {
                 r.steps = threeHours ? STEPS_3H : STEPS_MIN;
                 r.halfKm = threeHours ? 10 : HALF_KM;
                 r.cellM = threeHours ? 30 : 15;
+                if (r.perimeter != null) {
+                    // A perimeter wider than the usual square gets a square that holds it with
+                    // room to spread past its edge; past 10 km the cells grow to 60 m so the run
+                    // stays the same size on the phone.
+                    final double need = perimeterReachKm(r.perimeter, lat, lon) + spreadRoomKm(threeHours);
+                    if (need > r.halfKm) {
+                        r.halfKm = Math.min(MAX_HALF_KM, Math.ceil(need));
+                        r.cellM = r.halfKm > 10 ? 60 : 30;
+                    }
+                }
                 final int ago = startedMinutesAgo();
                 r.startedAt = ago > 0 ? r.ranAt - ago * 60000L : 0;
                 try {
@@ -2649,8 +2690,10 @@ public final class FireModel {
             r.visible = o.optBoolean("visible", true);
             // The grid is (2 halfKm / cell)^2 cells: only the two sizes a run makes, and a
             // whole number of km, which is how the ground is kept on disk.
-            r.cellM = o.optDouble("cellM", 15) >= 30 ? 30 : 15;
-            r.halfKm = r.cellM >= 30 ? 10 : HALF_KM;
+            final double cell = o.optDouble("cellM", 15);
+            r.cellM = cell >= 60 ? 60 : cell >= 30 ? 30 : 15;
+            final double half = o.optDouble("halfKm", r.cellM >= 30 ? 10 : HALF_KM);
+            r.halfKm = half >= HALF_KM && half <= MAX_HALF_KM ? Math.rint(half) : r.cellM >= 30 ? 10 : HALF_KM;
             r.startedAt = o.optLong("startedAt", 0);
             final org.json.JSONArray stepsA = o.optJSONArray("steps");
             if (stepsA != null && stepsA.length() > 0 && stepsA.length() <= 6) {
