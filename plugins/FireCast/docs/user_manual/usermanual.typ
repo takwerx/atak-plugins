@@ -68,6 +68,16 @@ then open it from the toolbar.
 ]
 
 #tak-slide[
+= Detections on the map
+
+#image("16.png", width: 92%)
+
+Three VIIRS detections, each the 375 m square the sensor saw, inside one GOES
+detection, worked out from the satellite's viewing angle. The feeds list gives
+each feed's count in view.
+]
+
+#tak-slide[
 = Reading a detection
 
 Detections are colored by age: red within the hour, through amber, to gray past
@@ -85,6 +95,24 @@ radiative power.
 *What this does not mean* is on every panel. A heat detection is a hot pixel. It
 does not say the fire is at the center of the box, that an empty map is empty
 ground, or that a hot pixel is a wildfire and not a flare or a solar farm.
+]
+
+#tak-slide[
+= A detection up close
+
+#image("17.png", width: 88%)
+
+How big the footprint is and how that is known, which satellite and when.
+]
+
+#tak-slide[
+= Where is it burning?
+
+#image("18.png", width: 88%)
+
+The detections grouped into fires, biggest heat first, with the state, how long
+each has burned and when it was last seen. A fire seen in one scan only is often
+a burn pile.
 ]
 
 #tak-slide[

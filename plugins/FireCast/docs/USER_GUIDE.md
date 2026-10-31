@@ -43,9 +43,21 @@ The feeds:
 - **GOES** — a scan every few minutes. These have no footprint of their own, so it is worked out from the satellite's viewing angle.
 - **RADR** — burned areas mapped from satellite passes over the last fourteen days. These are real outlines of where fire has been, not where it is.
 
+![VIIRS and GOES detections on the map](screenshots/18_detections_on_map.png)
+
+Above, three VIIRS detections (the small squares, each the 375 m the sensor saw) inside one GOES detection (the large box, worked out from the satellite's viewing angle) on the same fire. The feeds list beside them gives each feed's count in view.
+
 Detections are colored by age, red within the hour, through amber, to gray after a day, and fade with it. **Filters** sets the time window (three hours to three days), the confidence, and whether to hide known industrial heat sources such as flares and solar farms. **Map key** explains the colors.
 
+![A detection's detail panel](screenshots/19_detection_detail.png)
+
 Tap a detection on the map or in the list for its detail panel: how big the footprint is and how that was worked out, when the satellite saw it, the radiative power, and a section called **What this does not mean**. A heat detection is a hot pixel. It does not say the fire is at the center of the box, that an empty map is empty ground, or that a hot pixel is a wildfire rather than a flare.
+
+### Where is it burning?
+
+![Where is it burning?](screenshots/20_where_is_it_burning.png)
+
+**Where is it burning?** groups the detections into fires and lists them, biggest heat first: the state, how long it has been burning, how many detections and when the last one was. **Area** and **Where** narrow the list. A fire seen in only one scan says so; that is often a burn pile.
 
 ## 3. The fire model
 
@@ -66,7 +78,41 @@ Tap **Fire model**.
 
 ![The start placed on the map](screenshots/6_start_placed.png)
 
-The model reads the real fuel, slope and canopy from LANDFIRE, wind from the nearest weather station (and the National Weather Service forecast for hours ahead), and how dry the fuels are from the national fuel moisture data. It spreads the fire cell by cell over the real ground, carries embers, lets roads slow it, and counts the buildings and people it reaches from FEMA's building inventory.
+### What goes into the model
+
+Everything below is fetched for the run and runs on the device. No run is sent anywhere.
+
+**The ground.** From LANDFIRE (USGS and the Forest Service), in 30 m cells, for a square 4 km each way around the start (10 km for a three-hour run):
+
+- the fuel model, one of the 40 Scott and Burgan fuel models (grass, grass-shrub, shrub, timber understory, timber litter, slash);
+- the slope and which way the slope faces;
+- the canopy: tree cover, tree height, the height of the lowest branches, and how dense the crowns are;
+- the vegetation type, which is how the model tells houses, roads and parks apart inside LANDFIRE's single urban class.
+
+The fire moves over this in 15 m steps (30 m for three hours).
+
+**The wind.** Three sources, the best one there is:
+
+- a weather station near the fire, a RAWS fire weather station or a National Weather Service station, picked by distance *and* height, so a station on a ridge does not stand in for a valley. **Station** on the model page picks one by name;
+- for the hours ahead, the National Weather Service hourly forecast at the start;
+- where it is available, the HRRR 3 km wind forecast from NOAA, which varies across the ground and hour by hour.
+
+**How dry the fuel is.**
+
+- Dead fuel (the 1 h, 10 h and 100 h sizes, twigs to logs): the Forest Service's fire danger figures for the nearest station, with the 1 h worked out from that station's humidity and temperature. With no station, the WFAS national grid.
+- Live fuel (brush, grass, conifer needles): the nearest field sample in the National Fuel Moisture Database from the last 45 days, or the seasonal figure when nobody has sampled nearby.
+
+**How it burns.** The Forest Service Fire Lab's Behave library, the same engine as BehavePlus, compiled into the plugin: Rothermel's surface fire spread, Scott and Reinhardt's crown fire (whether the fire stays on the ground, torches single trees or runs through the crowns), and Albini's ember distances.
+
+**How it spreads.** Cell by cell over the real ground, each cell at its own fuel, slope, canopy and wind. Embers carry it across a road or a block narrower than they fly. Roads slow it; commercial blocks, water, bare ground and farmed ground stop it. Houses burn house to house at the rate measured in nine North American conflagrations (Moran, Seielstad and Pietruszka, 2025).
+
+**What it reaches.** Buildings and the people in them from FEMA's national building inventory (USA Structures). A building counts when the fire reaches the ground beside it.
+
+**From a drawn perimeter.** With a perimeter and a start time, the model first runs from the middle of the perimeter for the time the fire has burned and compares that with what it actually covered. It then scales its rates to match, at most three times faster or slower, and says so on the page.
+
+**Predicted Fire Size.** The run is repeated 30 times with the wind speed, wind direction and fuel moisture nudged the way forecasts miss, and ranked by how much burned (below).
+
+**What is not in it.** Firefighting. Wind the fire makes itself. Wind bent by a canyon finer than the forecast grid. A fuel break narrower than 15 m. How the fuel looks today if it has changed since LANDFIRE mapped it.
 
 ### Reading a result
 
