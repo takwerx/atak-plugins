@@ -98,6 +98,17 @@ git subtree split --prefix=plugins/<Name> -b <name>-export
 git push https://github.com/takwerx/<plugin-repo>.git <name>-export:refs/heads/main
 ```
 
+That push is refused when the public repo holds a commit the split does not:
+a pull request merged there (the Claude worker opens them), the worker
+workflow, the Market's community list. On 2026-10-31 all 16 public repos did.
+`scripts/sync-public-repo.sh <Plugin>` checks it and `--merge` brings the
+public commits back into `plugins/<Name>`; `/ship` runs it in pre-flight.
+Merging alone is not enough: the plain split drops a parent it was never told
+about, so the script also writes a recorded split (the `--rejoin` commit)
+whose split has the public main as a parent, and that is what makes the next
+push a fast-forward. Do not reach for `split --onto <public> --rejoin`
+instead: it works once per plugin and then dies on every later sync.
+
 ### The plugin page standard — `plss-grid` is the reference
 
 Every plugin's public repo looks the same. `takwerx/plss-grid` is the reference
