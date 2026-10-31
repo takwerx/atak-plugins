@@ -55,7 +55,7 @@ Load the plugin from ATAK's Plugins manager, then open it from the toolbar.
 
 ![Map Depot in the ATAK toolbar](screenshots/1_plugin_in_toolbar.png)
 
-The landing page offers eight kinds of data, each on its own page.
+The landing page offers nine kinds of data, each on its own page.
 
 ![The Map Depot landing page](screenshots/2_landing_page.png)
 
@@ -76,6 +76,8 @@ The landing page offers eight kinds of data, each on its own page.
 - **Disaster Aerials** — the imagery flown or collected after a hurricane,
   flood, fire or tornado by NOAA, the Civil Air Patrol and Maxar, one overlay
   per flight, drawn over whatever map you have.
+- **Satellite (Sentinel-2)** — recent satellite passes over the map center or
+  your position, in true color or as a fire view, streamed over the map.
 
 ---
 
