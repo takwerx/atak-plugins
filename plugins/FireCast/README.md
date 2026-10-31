@@ -85,7 +85,7 @@ empty ground, that a hot pixel is a wildfire rather than a flare or a solar farm
 _________________________________________________________________
 STATUS
 
-0.2, in development, not released. Heat detections, a fire spread model that runs
+0.3, in development, not released. Heat detections, a fire spread model that runs
 on the device, and other agencies' published forecasts, all on the ATAK map. The
 model gives a direction and an order of magnitude, not a perimeter to plan on;
 the user guide says what it leaves out.
