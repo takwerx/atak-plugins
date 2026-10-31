@@ -464,6 +464,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         items.add("A point: tap the map");
         items.add("NASA satellite perimeter: pick a fire in the map view");
         items.add("A perimeter you draw on the map");
+        items.add("A shape already on the map: tap it (drawn, sent, or a Feature Layer perimeter)");
         if (hasPerimeter)
             items.add("Remove the perimeter");
         new android.app.AlertDialog.Builder(getMapView().getContext())
@@ -487,6 +488,11 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                                 closeDropDown();
                                 model.drawPerimeter();
                                 break;
+                            case 3:
+                                closeFeds();
+                                closeDropDown();
+                                model.pickShape();
+                                break;
                             default:
                                 model.clearPerimeter();
                                 render();
@@ -507,7 +513,8 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         final com.atakmap.coremap.maps.coords.GeoPoint start = model.startPoint();
         ((Button) view.findViewById(R.id.btn_run)).setEnabled(!model.isRunning() && (start != null || model.perimeter() != null));
         ((Button) view.findViewById(R.id.btn_place)).setText(model.perimeter() != null
-                ? (model.perimeterNote() != null ? "Start from: NASA perimeter" : "Start from: drawn perimeter")
+                ? ("nasa".equals(model.perimeterKind()) ? "Start from: NASA perimeter"
+                        : "shape".equals(model.perimeterKind()) ? "Start from: map shape" : "Start from: drawn perimeter")
                 : start != null ? "Start from: a point" : "Start from: choose");
         ((Button) view.findViewById(R.id.btn_horizon)).setText(model.horizonMinutes() >= 180 ? "Horizon:\n3 hours" : "Horizon:\n1 hour");
         final int ago = model.startedMinutesAgo();
@@ -620,7 +627,10 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             }
             if (r.calibrationNote != null)
                 goes.append(r.calibrationNote).append('\n');
-            if (r.perimeter != null && r.perimeterNote != null)
+            if (r.perimeter != null && "shape".equals(r.perimeterKind))
+                goes.append("Run from a shape on the map: everything inside it was burning at the start. ")
+                        .append(r.perimeterNote == null ? "" : r.perimeterNote).append('\n');
+            else if (r.perimeter != null && r.perimeterNote != null)
                 goes.append("Run from the satellite perimeter: everything inside it was burning at the start. ")
                         .append(r.perimeterNote).append('\n');
             else if (r.perimeter != null)

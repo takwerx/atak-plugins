@@ -169,6 +169,8 @@ public final class FireModel {
         }
         /** Where the perimeter came from when it was not drawn: the satellite outline and its age. */
         public String perimeterNote;
+        /** "nasa", "shape" (a shape already on the map) or null (drawn here). */
+        public String perimeterKind;
         /** When the fire started, epoch ms, or 0 for unknown; with a perimeter it calibrates the run. */
         public long startedAt;
         /** True when the pixel under the marker does not burn; the ground run starts from the nearest fuel. */
@@ -351,6 +353,14 @@ public final class FireModel {
         return perimeterNote;
     }
 
+    /** "nasa", "shape" or null for a perimeter drawn here. */
+    private volatile String perimeterKind;
+    private static final String PREF_PERIMETER_KIND = "model.perimeterKind";
+
+    public String perimeterKind() {
+        return perimeterKind;
+    }
+
     /** What the page says about the start: where its perimeter came from, or why there is none. */
     private volatile String startNote;
 
@@ -412,39 +422,145 @@ public final class FireModel {
                             changed();
                             return;
                         }
-                        final GeoPoint[] pts = new GeoPoint[found.ring.length];
-                        double lat = 0, lon = 0;
-                        for (int i = 0; i < pts.length; i++) {
-                            pts[i] = new GeoPoint(found.ring[i][0], found.ring[i][1]);
-                            lat += found.ring[i][0];
-                            lon += found.ring[i][1];
-                        }
-                        setPerimeter(pts, fedsNote(found, fire));
-                        setParts(found.rings != null && found.rings.length > 1 ? found.rings : null);
-                        // No copy of the outline: the NASA feed draws it, and a red twin on
-                        // the same edge read as a second perimeter (operator, 2026-10-30).
-                        if (perimeterPicker != null)
-                            perimeterPicker.clearDrawn();
-                        // The marker goes with the fire, so the map does not show a start somewhere else.
-                        place(new GeoPoint(lat / pts.length, lon / pts.length));
-                        try {
-                            double s = 90, w = 180, n = -90, e = -180;
-                            for (double[][] part : found.rings != null ? found.rings : new double[][][] { found.ring })
-                                for (double[] q : part) {
-                                    s = Math.min(s, q[0]);
-                                    n = Math.max(n, q[0]);
-                                    w = Math.min(w, q[1]);
-                                    e = Math.max(e, q[1]);
-                                }
-                            com.atakmap.android.firecast.DetectionFeed.fitVisible(mapView, s, w, n, e);
-                        } catch (Exception e) {
-                            Log.w(TAG, "could not go to the satellite perimeter", e);
-                        }
-                        changed();
+                        usePerimeter(found.rings != null ? found.rings : new double[][][] { found.ring },
+                                fedsNote(found, fire), "nasa", true);
                     }
                 });
             }
         });
+    }
+
+    /**
+     * A perimeter that is already somewhere else (NASA's outline, a shape on the map)
+     * as the start: every part, the largest the main one, no copy drawn (the outline
+     * is already on the map), the marker on it and, when asked, the map fitted to it.
+     */
+    private void usePerimeter(double[][][] rings, String note, String kind, boolean fit) {
+        int main = 0;
+        for (int i = 1; i < rings.length; i++)
+            if (Spread.ringAcres(rings[i]) > Spread.ringAcres(rings[main]))
+                main = i;
+        final double[][] big = rings[main];
+        final GeoPoint[] pts = new GeoPoint[big.length];
+        double lat = 0, lon = 0;
+        for (int i = 0; i < pts.length; i++) {
+            pts[i] = new GeoPoint(big[i][0], big[i][1]);
+            lat += big[i][0];
+            lon += big[i][1];
+        }
+        setPerimeter(pts, note);
+        setKind(kind);
+        if (rings.length > 1) {
+            final double[][][] ordered = rings.clone();
+            ordered[main] = rings[0];
+            ordered[0] = big;
+            setParts(ordered);
+        }
+        // No copy of the outline: it is on the map already, and a red twin on the same
+        // edge read as a second perimeter (operator, 2026-10-30).
+        if (perimeterPicker != null)
+            perimeterPicker.clearDrawn();
+        // The marker goes with the fire, so the map does not show a start somewhere else.
+        place(new GeoPoint(lat / pts.length, lon / pts.length));
+        if (fit) {
+            try {
+                double s = 90, w = 180, n = -90, e = -180;
+                for (double[][] part : rings)
+                    for (double[] q : part) {
+                        s = Math.min(s, q[0]);
+                        n = Math.max(n, q[0]);
+                        w = Math.min(w, q[1]);
+                        e = Math.max(e, q[1]);
+                    }
+                com.atakmap.android.firecast.DetectionFeed.fitVisible(mapView, s, w, n, e);
+            } catch (Exception e) {
+                Log.w(TAG, "could not go to the perimeter", e);
+            }
+        }
+        changed();
+    }
+
+    private void setKind(String kind) {
+        perimeterKind = kind;
+        if (kind == null)
+            prefs.edit().remove(PREF_PERIMETER_KIND).apply();
+        else
+            prefs.edit().putString(PREF_PERIMETER_KIND, kind).apply();
+    }
+
+    /**
+     * Waits for a tap on a shape already on the map, a drawn one, one a contact sent,
+     * an imported KML or another plugin's polygon (Feature Layer's FIRIS perimeters),
+     * and makes it the start. A line is refused. Main thread.
+     */
+    public void pickShape() {
+        if (picking)
+            cancelPick();
+        if (running)
+            return;
+        final MapEventDispatcher d = mapView.getMapEventDispatcher();
+        d.pushListeners();
+        d.clearListeners(MapEvent.MAP_CLICK);
+        d.clearListeners(MapEvent.MAP_LONG_PRESS);
+        d.clearListeners(MapEvent.ITEM_CLICK);
+        tapListener = new MapEventDispatcher.MapEventDispatchListener() {
+            @Override
+            public void onMapEvent(MapEvent event) {
+                final MapItem item = event.getItem();
+                if (!MapEvent.ITEM_CLICK.equals(event.getType()) || !(item instanceof com.atakmap.android.maps.Shape)) {
+                    TextContainer.getInstance().displayPrompt("That is not a shape. Tap the outline of an area, or Back to stop.");
+                    return;
+                }
+                final String said = takeShape((com.atakmap.android.maps.Shape) item);
+                cancelPick();
+                if (said != null) {
+                    startNote = said;
+                    changed();
+                }
+                if (onPlaced != null)
+                    onPlaced.run();
+            }
+        };
+        d.addMapEventListener(MapEvent.MAP_CLICK, tapListener);
+        d.addMapEventListener(MapEvent.ITEM_CLICK, tapListener);
+        mapView.addOnKeyListener(backListener);
+        if (onPickStart != null)
+            onPickStart.run();
+        TextContainer.getInstance().displayPrompt("Tap the shape to start the run from: a perimeter on the map, drawn, sent or from another layer.");
+        picking = true;
+    }
+
+    /** The shape's rings as the start; null when taken, else why not. */
+    private String takeShape(com.atakmap.android.maps.Shape shape) {
+        final GeoPoint[] pts;
+        try {
+            pts = shape.getPoints();
+        } catch (Exception e) {
+            return "That shape's points could not be read.";
+        }
+        if (pts == null || pts.length < 3 || pts.length > 100000)
+            return "That shape has no area to start from.";
+        final List<double[][]> rings = ShapeRings.split(pts);
+        final boolean closedType = !(shape instanceof com.atakmap.android.maps.Polyline)
+                || (shape.getStyle() & com.atakmap.android.maps.Polyline.STYLE_CLOSED_MASK) != 0
+                || shape.getMetaBoolean("collection", false);
+        if (rings.isEmpty() || (!closedType && !ShapeRings.closes(pts)))
+            return "That is a line, not an area. Tap the outline of an area.";
+        final double[][][] all = new double[rings.size()][][];
+        for (int i = 0; i < all.length; i++)
+            all[i] = Feds.thin(rings.get(i));
+        if (Feds.spanM(all) / 2000d + spreadRoomKm(horizonMinutes() >= 180) > MAX_HALF_KM)
+            return "That shape is " + Units.format(Feds.spanM(all)) + " across, more than the model can take on the phone. "
+                    + "Choose A point and place it on the edge that is moving instead.";
+        String title = shape.getTitle();
+        if (title == null || title.trim().isEmpty() || title.length() > 80)
+            title = "a shape on the map";
+        double acres = 0;
+        for (double[][] r : all)
+            acres += Spread.ringAcres(r);
+        usePerimeter(all, "From " + title.trim() + String.format(Locale.US, ", %s, a shape already on the map%s.",
+                acresText(acres), all.length > 1 ? " in " + all.length + " pieces" : ""), "shape", false);
+        return null;
     }
 
     /** The widest square a run will take: 40 km across, 60 m cells, about 450,000 of them. */
@@ -545,6 +661,8 @@ public final class FireModel {
     }
 
     private void setPerimeter(GeoPoint[] ring, String note) {
+        if (note == null)
+            setKind(null);
         perimeterNote = note;
         perimeterParts = null;
         prefs.edit().remove(PREF_PERIMETER_PARTS).apply();
@@ -568,6 +686,7 @@ public final class FireModel {
 
     public void clearPerimeter() {
         perimeter = null;
+        setKind(null);
         perimeterParts = null;
         prefs.edit().remove(PREF_PERIMETER_PARTS).apply();
         perimeterNote = null;
@@ -786,6 +905,7 @@ public final class FireModel {
                 if (r.length >= 3) {
                     perimeter = r;
                     perimeterNote = prefs.getString(PREF_PERIMETER_NOTE, null);
+                    perimeterKind = prefs.getString(PREF_PERIMETER_KIND, perimeterNote != null ? "nasa" : null);
                     startNote = perimeterNote;
                     final String parts = prefs.getString(PREF_PERIMETER_PARTS, null);
                     perimeterParts = parts == null ? null : partsFrom(new org.json.JSONArray(parts));
@@ -993,6 +1113,7 @@ public final class FireModel {
                 r.ranAt = System.currentTimeMillis();
                 r.perimeter = perimeter;
                 r.perimeterNote = r.perimeter == null ? null : perimeterNote;
+                r.perimeterKind = r.perimeter == null ? null : perimeterKind;
                 r.perimeterParts = r.perimeter == null ? null : perimeterParts;
                 final boolean threeHours = horizonMinutes() >= 180;
                 r.steps = threeHours ? STEPS_3H : STEPS_MIN;
@@ -2192,8 +2313,8 @@ public final class FireModel {
         final StringBuilder c = new StringBuilder();
         c.append("FireCast model run, ").append(new java.text.SimpleDateFormat("EEE d MMM yyyy HH:mm", Locale.US)
                 .format(new java.util.Date(r.ranAt))).append(".\n");
-        c.append(r.perimeter == null ? "Start at " : r.perimeterNote != null ? "From NASA's satellite perimeter around "
-                : "From a drawn perimeter around ")
+        c.append(r.perimeter == null ? "Start at " : "nasa".equals(r.perimeterKind) ? "From NASA's satellite perimeter around "
+                : "shape".equals(r.perimeterKind) ? "From a shape on the map around " : "From a drawn perimeter around ")
                 .append(String.format(Locale.US, "%.5f, %.5f.\n", r.lat, r.lon));
         if (r.fuelName != null)
             c.append("Fuel: ").append(r.fuelName).append(" (LANDFIRE 2024).\n");
@@ -2599,6 +2720,8 @@ public final class FireModel {
                     o.put("perimeterParts", partsJson(r.perimeterParts));
                 if (r.perimeterNote != null)
                     o.put("perimeterNote", r.perimeterNote);
+                if (r.perimeterKind != null)
+                    o.put("perimeterKind", r.perimeterKind);
             }
             if (r.structures != null) {
                 final org.json.JSONArray st = new org.json.JSONArray(), hm = new org.json.JSONArray(), pp = new org.json.JSONArray();
@@ -2825,6 +2948,8 @@ public final class FireModel {
                 r.perimeterParts = partsFrom(o.optJSONArray("perimeterParts"));
                 final String pn = o.optString("perimeterNote", "");
                 r.perimeterNote = pn.isEmpty() || pn.length() > 600 ? null : pn;
+                final String pk = o.optString("perimeterKind", r.perimeterNote != null ? "nasa" : "");
+                r.perimeterKind = "nasa".equals(pk) || "shape".equals(pk) ? pk : null;
             }
             r.fuelName = Behave.name(r.site.fuelModel);
             r.result = Behave.surface(r.site.fuelModel, r.m1, r.m10, r.m100, r.mHerb, r.mWoody,
