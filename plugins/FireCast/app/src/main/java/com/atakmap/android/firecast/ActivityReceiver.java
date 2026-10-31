@@ -86,6 +86,10 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         public void run() {
             if (!AREA_VIEW.equals(area) || loading || !isVisible())
                 return;
+            // A move the list made itself (a row tapped) keeps the list it came from, so
+            // the next fire is still there to tap; the operator's own pan or zoom reloads.
+            if (System.currentTimeMillis() < keepListUntil)
+                return;
             final Esri.Box now = feed.viewBox();
             final Esri.Box was = loadedBox;
             if (now == null)
@@ -97,6 +101,7 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
             load();
         }
     };
+    private long keepListUntil;
     /** The area the list answers: {@link #AREA_ANY}, {@link #AREA_VIEW} or {@link #AREA_RADIUS}. */
     private String area;
     private double areaM;
@@ -218,8 +223,9 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         load();
     }
 
-    /** Takes the map to a fire and closes, so the detections are what is on screen. */
+    /** Takes the map to a fire; the list stays open. */
     private void goTo(Activity.Fire f) {
+        keepListUntil = System.currentTimeMillis() + 4000;
         try {
             // Wide enough to hold a fire and its detections, not so wide that the extent
             // fetch comes back with a county's worth of industry around it.
@@ -232,12 +238,10 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         } catch (Exception e) {
             Log.w(TAG, "go to fire failed", e);
         }
-        closeDropDown();
-        // The map has moved somewhere new, so ask for that area now rather than waiting
-        // out the tick that would have noticed; and the pane comes back with the list
-        // for the place just flown to.
+        // The list stays open, so the next fire is one tap away (operator, 2026-10-30):
+        // the map goes there and the feeds ask for that area now.
+        keepListUntil = System.currentTimeMillis() + 4000;
         feed.refresh();
-        feed.reopenPane();
     }
 
     /** One tab: a TakwerxButton, half the row; tapping it shows its list. */
@@ -277,6 +281,7 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
 
     /** Takes the map to a NASA perimeter and draws it: the feed is turned on if it was off. */
     private void goTo(com.atakmap.android.firecast.model.Feds.Fire p) {
+        keepListUntil = System.currentTimeMillis() + 4000;
         try {
             final double padLat = (p.north - p.south) * 0.3 + 0.01, padLon = (p.east - p.west) * 0.3 + 0.01;
             final com.atakmap.coremap.maps.coords.GeoPoint[] corners = {
@@ -289,9 +294,8 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         }
         if (!feed.filters.isOn("feds"))
             feed.filters.setOn("feds", true);
-        closeDropDown();
+        keepListUntil = System.currentTimeMillis() + 4000;
         feed.refresh();
-        feed.reopenPane();
     }
 
     private void pickState() {
