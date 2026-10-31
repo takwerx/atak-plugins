@@ -56,6 +56,11 @@
     <string name="all_events">All Events</string>
     <string name="search_flights">Search</string>
     <string name="no_storms">No disaster aerials in the catalog yet.</string>
+    <string name="satellite_heading">Satellite (Sentinel-2)</string>
+    <string name="scene_visual">True Color</string>
+    <string name="scene_swir">SWIR Fire View</string>
+    <string name="choose_scene_style">View</string>
+    <string name="search_here">Search Here</string>
     <string name="beacon_heading">Beacon Box Maps</string>
     <string name="download">Download</string>
     <!-- For a streaming source: what is added is a pointer, the tiles stream -->
