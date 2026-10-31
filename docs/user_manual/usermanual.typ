@@ -29,7 +29,7 @@ itself where ATAK expects to find it.
 #toolbox.side-by-side(columns: (4fr, 8fr))[
   #image("02.png", width: 78%)
 ][
-  Eight kinds of data, each on its own page:
+  Nine kinds of data, each on its own page:
 
   - *Elevation (DTED2)* -- terrain, by state or province. What viewsheds and
     elevation readouts need.
@@ -47,6 +47,8 @@ itself where ATAK expects to find it.
     georeferenced PDFs and KMZs.
   - *Disaster Aerials* -- the imagery flown after a hurricane, flood, fire
     or tornado by NOAA, the Civil Air Patrol and Maxar, one overlay per flight.
+  - *Satellite (Sentinel-2)* -- recent satellite passes over the map center or
+    your position, in true color or as a fire view, streamed over the map.
 ]
 ]
 
