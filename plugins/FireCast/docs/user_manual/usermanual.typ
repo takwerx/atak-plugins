@@ -176,20 +176,24 @@ perimeter* starts a run from that outline.
 #tak-slide[
 = Your own weather and the ignition
 
-*Weather* lists the stations around the start as soon as it is placed:
-RAWS, National Weather Service and, in California, the utility stations (SCE,
-SDG&E, PG&E, HPWREN), each with its distance, height and reading. Automatic
-picks by distance and height. Or it takes what you measured at the fire: wind, direction, gust,
-temperature, humidity and the 1 h fuel moisture. An eye-level wind (a hand-held
-meter) is taken as the wind at the flames. *From a Kestrel station* lists the
-stations the Kestrel Wx plugin shares, ready to check and use. An observation
-is used while under six hours old.
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("25.png", width: 96%)
+][
+  *Weather* lists the stations around the start as soon as it is placed:
+  RAWS, National Weather Service and, in California, the utility stations (SCE,
+  SDG&E, PG&E, HPWREN), each with its distance, height and reading. Automatic
+  picks by distance and height. Or it takes what you measured at the fire: wind, direction, gust,
+  temperature, humidity and the 1 h fuel moisture. An eye-level wind (a hand-held
+  meter) is taken as the wind at the flames. *From a Kestrel station* lists the
+  stations the Kestrel Wx plugin shares, ready to check and use. An observation
+  is used while under six hours old.
 
-#v(6pt)
+  #v(6pt)
 
-*Ignition* is when the fire started: minutes ago, a clock time, or minutes
-before dispatch. A run from a point then begins at the ignition, and one of
-its rings is *now*.
+  *Ignition* is when the fire started: minutes ago, a clock time, or minutes
+  before dispatch. A run from a point then begins at the ignition, and one of
+  its rings is *now*.
+]
 ]
 
 #tak-slide[
@@ -322,7 +326,7 @@ and the page says why; *Dry day* shows what it would do once it dries.
 #tak-slide[
 = The slider on a run
 
-#image("15.jpg", width: 92%)
+#image("15.jpg", width: 72%)
 
 Drag the slider and the cyan edge moves to that time. The line above it says
 where the fire is by then: the acres, how far it has gone and the buildings.
@@ -407,18 +411,22 @@ in cyan. *ON* and *OFF* show or hide it; *Delete* removes it.
 #tak-slide[
 = Other forecasts
 
-*FIRIS Model Runs* shows the spread runs that California's fire analysts
-publish for ATAK. *PyreCast Forecasts* shows the ELMFIRE forecasts PyreCast
-publishes for large fires across the country, shown with their permission, with
-their logo and a link to pyrecast.com.
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("26.png", width: 96%)
+][
+  *FIRIS Model Runs* shows the spread runs that California's fire analysts
+  publish for ATAK. *PyreCast Forecasts* shows the ELMFIRE forecasts PyreCast
+  publishes for large fires across the country, shown with their permission, with
+  their logo and a link to pyrecast.com.
 
-#v(6pt)
+  #v(6pt)
 
-Each is a switch in the pane. Long press a switch for its list, and pick a fire
-to put its time slider on it; tap the run's name to go to it. A FIRIS run counts
-the structures, homes and people each hour reaches, from FEMA's inventory. PyreCast ranks its runs by what burned at the end
-of the forecast; FireCast shows the middle run unless you pick the smaller or
-larger end.
+  Each is a switch in the pane. Long press a switch for its list, and pick a fire
+  to put its time slider on it; tap the run's name to go to it. A FIRIS run counts
+  the structures, homes and people each hour reaches, from FEMA's inventory. PyreCast ranks its runs by what burned at the end
+  of the forecast; FireCast shows the middle run unless you pick the smaller or
+  larger end.
+]
 ]
 
 #tak-slide[

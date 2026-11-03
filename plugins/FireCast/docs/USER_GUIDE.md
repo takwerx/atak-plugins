@@ -99,12 +99,25 @@ The top line is always there: **Back**, **Run model**, **Rerun** (the run you ha
 2. Set what you know:
    - **Conditions:** *As observed* at the weather station, *As observed but at the gust*, *Dry day*, or *Dry and 20 mph wind*. The last two are for planning what a bad day would do.
    - **Weather:** where the wind, temperature and humidity come from:
+
+     ![Weather for the run](screenshots/28_weather.png)
+
      - *A weather station*: automatic picks a nearby station by distance and height, so a station on a ridge does not stand in for a valley; or pick one by name. The list is ready as soon as the start is placed, before any run: each station with its distance, height above or below the start, wind, humidity and the time of its reading. *HRRR wind* and *NWS forecast for this spot* are choices too. **OK** keeps what is ticked.
+
+       ![The station list](screenshots/29_station_list.png)
+
      - *My observation*: type in what you measured at the fire: wind speed, the direction it comes from (degrees, or N, SW and so on), gust, temperature, humidity, and the 1 h fuel moisture if you have it. Tick *eye level* for a hand-held meter; the model then takes it as the wind at the flames. Otherwise it is a 20 ft wind.
      - *From a Kestrel station on the map*: the stations the Kestrel Wx plugin shares to the team, with their reading and age. Pick one and the form opens filled in, to check or change before using it.
 
+       ![Kestrel stations](screenshots/30_kestrel_stations.png)
+
+       ![The observation form, filled in from a Kestrel](screenshots/31_observation_form.png)
+
+
      Your observation is used while it is under six hours old and held through the run. The page and the shared run say whose reading it was and when. *Stop using my observation* goes back to the stations.
    - **Ignition:** when the fire started: not known, now, minutes ago, a clock time, or minutes before dispatch (enter the dispatch time, then how long before). For a point start the run begins at the ignition, so each ring is where the fire should be at its time since, one of them marked *now*, and on by the horizon. With a perimeter it is the fire's age, which calibrates the model's speed.
+
+     ![When did it ignite?](screenshots/32_ignition.png)
    - **Horizon:** one hour or three hours ahead.
 3. Tap **Run model**. It takes a few seconds.
 
@@ -187,11 +200,18 @@ The same start, the same map: the smallest of the 30 runs and the largest. In a 
 
 Under the results, the rest is folded away so the page does not become one long scroll. A closed pill shows its first line. Tap a pill to open it, tap again to close it.
 
+![The detail pills, closed](screenshots/11a_pills_closed.png)
+
 ![Where it goes, open](screenshots/11_where_it_goes_open.png)
 
 - **Where it goes:** each time step in words, with embers, crown fire and the buildings reached.
 - **About Predicted Fire Size:** what the picker is.
+
+![About Predicted Fire Size, open](screenshots/35_about_size.png)
+
 - **Burn behavior:** flame length and fireline intensity, with what a hand crew can hold, and what the run does not mean.
+
+![Burn behavior, open](screenshots/34_burn_behavior.png)
 
 ![What went in, open](screenshots/12_what_went_in_open.png)
 
@@ -200,6 +220,8 @@ Under the results, the rest is folded away so the page does not become one long 
 **Rerun** on the top line runs the selected run again from its own start with fresh weather, and **Send run** shares it as one file through ATAK's Send dialog.
 
 ### Runs on the map
+
+![Runs on the map](screenshots/33_runs_on_the_map.png)
 
 Each run is listed with its time, fuel, wind and area; the one the page shows has the arrow and is in cyan. Tap a run to show it. **ON** and **OFF** show or hide it on the map. **Delete** removes it. Runs are kept on the device.
 
@@ -212,6 +234,12 @@ Each run is listed with its time, fuel, wind and area; the one the page shows ha
 Under **Models** on the pane: **FIRIS Model Runs** shows the spread runs that California's fire analysts publish for ATAK. **PyreCast Forecasts** shows the ELMFIRE forecasts PyreCast (CloudFire, Inc.) publishes for large fires across the country, shown with their permission, with their logo and a link to pyrecast.com. Each is a switch. Long press a layer's switch for its list, and pick a fire to put its time slider on it. Tap the run's name above its slider and the map goes to it.
 
 A FIRIS run also counts what it reaches, from the same FEMA building inventory as FireCast's own runs: *6 structures (6 homes), up to 30 people*, by the slider's hour, and schools, hospitals and the like by name. The count is made once and kept on the device.
+
+![The FIRIS list](screenshots/37_firis_list.png)
+
+![A FIRIS run's slider with its structure count](screenshots/36_firis_slider.png)
+
+![A FIRIS run on the map](screenshots/38_firis_on_map.png)
 
 ![The PyreCast list](screenshots/14b_pyrecast_list.png)
 
