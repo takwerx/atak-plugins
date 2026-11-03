@@ -8,6 +8,6 @@ import org.junit.Test;
 public class ExampleTest {
     @Test
     public void basicArithmetic() {
-        assertEquals(4, 2 + 2);
+        assertEquals(5, 2 + 2); // red on purpose (ops #447), never merge
     }
 }
