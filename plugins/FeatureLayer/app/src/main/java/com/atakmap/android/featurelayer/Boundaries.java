@@ -61,8 +61,13 @@ public final class Boundaries {
      */
     public static final String KIND_RESPONSIBILITY = "responsibility", KIND_DPA = "dpa", KIND_OWNERSHIP = "ownership",
             KIND_PUBLIC_LAND = "publicland", KIND_ACCESS = "access";
+    /**
+     * CAL FIRE's administrative units, LNU, CZU and the rest (operator, 2026-11-02: "add cal
+     * fire units"). Named outlines like the counties, all 27 fetched once for the state.
+     */
+    public static final String KIND_UNITS = "units";
     public static final String[] KINDS = { KIND_COUNTIES, KIND_CITIES, KIND_COMMUNITIES, KIND_TRIBAL,
-            KIND_RESPONSIBILITY, KIND_DPA, KIND_OWNERSHIP, KIND_PUBLIC_LAND, KIND_ACCESS };
+            KIND_RESPONSIBILITY, KIND_DPA, KIND_UNITS, KIND_OWNERSHIP, KIND_PUBLIC_LAND, KIND_ACCESS };
 
     /** CAL FIRE FRAP's Responsibility Areas: SRA, LRA, FRA, the whole state. */
     static final String CA_RESPONSIBILITY = "https://services1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/State_Responsibility_Area/FeatureServer";
@@ -70,6 +75,8 @@ public final class Boundaries {
     static final String CA_DPA = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/CA_WF_Direct_Protection_Areas_Public/FeatureServer";
     /** CAL FIRE FRAP's Public Land Ownership, the public view on the CAL FIRE org. */
     static final String CA_OWNERSHIP = "https://jUJYIo9tSA7EHvfZ.svcs1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/Public_Land_Ownership_view/FeatureServer";
+    /** CAL FIRE's administrative units, on CAL FIRE's own ArcGIS organization (2023 lines). */
+    static final String CA_UNITS = "https://services1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/cdfadmin19_1/FeatureServer";
     /** USGS PAD-US federal fee managers, nationwide, by managing agency. */
     static final String PADUS_MANAGERS = "https://services.arcgis.com/v01gqwM5QqNysAAi/arcgis/rest/services/Federal_Fee_Managers_Authoritative_PADUS/FeatureServer";
     /** USGS PAD-US public access: open, restricted, closed. */
@@ -88,7 +95,13 @@ public final class Boundaries {
 
     /** Whether a kind exists only for California (CAL FIRE's layers). */
     static boolean californiaOnly(String kind) {
-        return KIND_RESPONSIBILITY.equals(kind) || KIND_DPA.equals(kind) || KIND_OWNERSHIP.equals(kind);
+        return KIND_RESPONSIBILITY.equals(kind) || KIND_DPA.equals(kind) || KIND_OWNERSHIP.equals(kind)
+                || KIND_UNITS.equals(kind);
+    }
+
+    /** Whether Which can pick a kind's boundaries by name: the Census kinds, which carry a GEOID. */
+    public static boolean pickable(String kind) {
+        return !mosaic(kind) && !KIND_UNITS.equals(kind);
     }
 
     /** The kinds the picked states can have: CAL FIRE's three only when California is among them. */
@@ -143,7 +156,8 @@ public final class Boundaries {
     public static final String CREDIT = "Sources found with the help of Joseph Elfelt, mappingsupport.com";
 
     /** One outline color per kind, so two boundary layers on one ground can be told apart. */
-    public static final int COUNTY_RGB = 0xB040FF, CITY_RGB = 0x2962FF, COMMUNITY_RGB = 0xFFD600, TRIBAL_RGB = 0xFF4FA3;
+    public static final int COUNTY_RGB = 0xB040FF, CITY_RGB = 0x2962FF, COMMUNITY_RGB = 0xFFD600, TRIBAL_RGB = 0xFF4FA3,
+            UNIT_RGB = 0xFF9100;
 
     static final double MILE = 1609.344;
     /** Counties and tribal lands label from the 20-mile scale, cities and communities from the 5-mile scale. */
@@ -288,6 +302,8 @@ public final class Boundaries {
                 return "Responsibility Areas";
             case KIND_DPA:
                 return "Protection Areas";
+            case KIND_UNITS:
+                return "CAL FIRE Units";
             case KIND_OWNERSHIP:
                 return "Land Ownership";
             case KIND_PUBLIC_LAND:
@@ -312,6 +328,8 @@ public final class Boundaries {
                 return "Who has fire protection responsibility: state (SRA), local (LRA) or federal (FRA), from CAL FIRE";
             case KIND_DPA:
                 return "Direct Protection Areas: which agency answers a wildland fire, CAL FIRE, USFS, BLM and the rest";
+            case KIND_UNITS:
+                return "CAL FIRE's administrative units: LNU, CZU, BEU and the rest";
             case KIND_OWNERSHIP:
                 return "Public land by owner, federal, state and local, from CAL FIRE; private land is what stays uncolored";
             case KIND_PUBLIC_LAND:
@@ -355,6 +373,8 @@ public final class Boundaries {
                 return COMMUNITY_RGB;
             case KIND_TRIBAL:
                 return TRIBAL_RGB;
+            case KIND_UNITS:
+                return UNIT_RGB;
             default:
                 return COUNTY_RGB;
         }
@@ -372,6 +392,8 @@ public final class Boundaries {
                 return CA_RESPONSIBILITY;
             case KIND_DPA:
                 return CA_DPA;
+            case KIND_UNITS:
+                return CA_UNITS;
             case KIND_OWNERSHIP:
                 return CA_OWNERSHIP;
             case KIND_PUBLIC_LAND:
@@ -394,6 +416,8 @@ public final class Boundaries {
                 return new int[] { 5 }; // Census Designated Places
             case KIND_TRIBAL:
                 return has(states, "15") ? new int[] { 2, 3, 4, 5 } : new int[] { 2, 3, 4 };
+            case KIND_UNITS:
+                return new int[] { 0 };
             default:
                 return new int[] { 1 };
         }
@@ -409,6 +433,8 @@ public final class Boundaries {
             case KIND_TRIBAL:
                 return layerId == 3 ? "Trust land" : layerId == 4 ? "State reservation"
                         : layerId == 5 ? "Hawaiian home land" : "Federal reservation";
+            case KIND_UNITS:
+                return "CAL FIRE Unit";
             default:
                 return "County";
         }
@@ -451,6 +477,7 @@ public final class Boundaries {
                     : KIND_TRIBAL.equals(s.kind)
                     ? (id == 3 ? "Land held in trust off a reservation" : id == 4 ? "Reservations a state recognizes"
                             : id == 5 ? "Hawaiian Homes Commission lands" : "Reservations the federal government recognizes")
+                    : KIND_UNITS.equals(s.kind) ? "Each unit by name and its three-letter code"
                     : "Counties, parishes, boroughs and independent cities");
             s.setKind.put(n, "polygon");
         }
@@ -567,6 +594,7 @@ public final class Boundaries {
         switch (kind == null ? "" : kind) {
             case KIND_RESPONSIBILITY:
             case KIND_OWNERSHIP:
+            case KIND_UNITS:
                 return "CAL FIRE";
             case KIND_DPA:
                 return "NIFC";
@@ -643,6 +671,8 @@ public final class Boundaries {
             }
             return ab.isEmpty() ? floor : floor + " AND State_Nm IN (" + list(ab.toArray(new String[0])) + ")";
         }
+        if (KIND_UNITS.equals(s.kind))
+            return "1=1";
         if (s.picks != null && s.picks.length > 0)
             return "GEOID IN (" + list(s.picks) + ")";
         if (KIND_TRIBAL.equals(s.kind))
@@ -875,6 +905,12 @@ public final class Boundaries {
 
     /** The name on the map: "Elko County" for a county; the bare name ("Reno") for a city or a tribal land. */
     public static String label(String kind, JSONObject p) {
+        if (KIND_UNITS.equals(kind)) {
+            // "Sonoma-Lake Napa Unit (LNU)": the name a crew reads, the code it says on the radio.
+            final String unit = Esri.firstNonEmpty(p.optString("UNIT", null));
+            final String code = Esri.firstNonEmpty(p.optString("UNITCODE", null));
+            return unit == null ? code : code == null ? unit : unit + " (" + code + ")";
+        }
         final String base = Esri.firstNonEmpty(p.optString("BASENAME", null));
         final String name = Esri.firstNonEmpty(p.optString("NAME", null));
         if (KIND_COUNTIES.equals(kind))
@@ -951,6 +987,14 @@ public final class Boundaries {
                     put(a, "Manager", p, "MngNm_Desc");
                     break;
             }
+            return a;
+        }
+        if (KIND_UNITS.equals(kind)) {
+            put(a, "Unit", p, "UNIT");
+            put(a, "Code", p, "UNITCODE");
+            final String region = p.isNull("REGION") ? "" : p.optString("REGION", "").trim();
+            if (!region.isEmpty())
+                a.setAttribute("Region", region.endsWith("Region") ? region : region + " Region");
             return a;
         }
         final String fips = stateOf(p);
@@ -1126,8 +1170,8 @@ public final class Boundaries {
     public static List<Named> names(String[] kinds, String[] states, final double lat, final double lon) throws Exception {
         final Map<String, Named> out = new LinkedHashMap<>();
         for (String kind : kinds) {
-            if (mosaic(kind))
-                continue; // a classification has no names to pick
+            if (!pickable(kind))
+                continue; // a classification, or CAL FIRE's 27 units, has no names to pick
             final String fields = "NAME,BASENAME,GEOID,INTPTLAT,INTPTLON" + (KIND_TRIBAL.equals(kind) ? "" : ",STATE");
             final Map<String, Named> mine = new LinkedHashMap<>();
             for (int layerId : layerIds(kind, states)) {

@@ -2153,7 +2153,8 @@ public class LoadedLayer {
                                 final String bn = Boundaries.label(spec.kind, props);
                                 if (bn != null)
                                     name = bn;
-                                title = Boundaries.KIND_COUNTIES.equals(spec.kind) ? name : name + " (" + target + ")";
+                                title = Boundaries.KIND_COUNTIES.equals(spec.kind) || Boundaries.KIND_UNITS.equals(spec.kind)
+                                        ? name : name + " (" + target + ")";
                                 style = Boundaries.style(spec, spec.fillFor(target));
                             }
                             if (NewStartsStyles.handles(spec) && isPointLayer) {

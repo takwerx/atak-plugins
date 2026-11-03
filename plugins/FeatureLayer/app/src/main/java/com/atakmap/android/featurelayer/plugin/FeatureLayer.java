@@ -1689,7 +1689,7 @@ public class FeatureLayer implements IPlugin {
             return;
         final List<String> kl = new java.util.ArrayList<>();
         for (String k : kindsOffered())
-            if (bKinds.contains(k) && !com.atakmap.android.featurelayer.Boundaries.mosaic(k))
+            if (bKinds.contains(k) && com.atakmap.android.featurelayer.Boundaries.pickable(k))
                 kl.add(k);
         if (kl.isEmpty()) {
             toast("Names are picked for counties, cities, communities and tribal lands; the land layers show what is in view");
@@ -1825,7 +1825,7 @@ public class FeatureLayer implements IPlugin {
             if (!bKinds.contains(kind))
                 continue;
             String[] geoids = null, names = null;
-            if (bPicks != null && !bPicks.isEmpty() && !com.atakmap.android.featurelayer.Boundaries.mosaic(kind)) {
+            if (bPicks != null && !bPicks.isEmpty() && com.atakmap.android.featurelayer.Boundaries.pickable(kind)) {
                 final List<String> g = new java.util.ArrayList<>(), n = new java.util.ArrayList<>();
                 for (com.atakmap.android.featurelayer.Boundaries.Named p : bPicks)
                     if (kind.equals(p.kind)) {
