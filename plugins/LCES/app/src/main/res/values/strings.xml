@@ -68,7 +68,7 @@
     <string name="show_section">Show this section</string>
 
     <!-- Search -->
-    <string name="search_hint">Search the IRPG</string>
+    <string name="search_hint">Search the IRPG and lessons</string>
     <string name="clear">Clear</string>
     <string name="results_some">%1$d pages in the IRPG match “%2$s”.</string>
     <plurals name="matches">
