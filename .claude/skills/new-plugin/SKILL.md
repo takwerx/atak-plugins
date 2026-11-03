@@ -59,7 +59,6 @@ no plugin on `main` is a new plugin and a misspelt existing one is refused.
 ~/GitHub/atak-plugins/scripts/worktree.sh new <Name> <name>-v0.1
 cd ~/GitHub/atak-plugins-<name>
 ./scripts/new-plugin.sh <Name> "<Display Name>"
-git rm -r --quiet plugins/<Name>/docs/user_manual        # see below
 git add plugins/<Name> && git commit -m "<Name> 0.1: scaffold from the SDK template"
 ```
 
@@ -68,11 +67,13 @@ git add plugins/<Name> && git commit -m "<Name> 0.1: scaffold from the SDK templ
 gives the new directory the main checkout's auto-memory (a worktree otherwise
 starts knowing none of it).
 
-**`git rm -r docs/user_manual` is not optional.** The SDK template ships a
-placeholder manual titled "Plugin Template 0.1" and `new-plugin.sh` copies it
-with everything else. Left in place, tak.gov compiles the template's manual
-into the plugin. FOBS caught it one zip from submission; Weather still carries
-it. Remove it now, and the plugin gets its own when it has one.
+**`new-plugin.sh` removes the template's manual itself.** The SDK template
+ships a placeholder manual titled "Plugin Template 0.1"; left in place, tak.gov
+compiles it into the plugin (FOBS caught it one zip from submission; Weather
+still carries it). This used to be a `git rm` step here, which fails on a fresh
+scaffold because nothing is tracked yet (LCES, 2026-11-02). Check that
+`plugins/<Name>/docs/user_manual` is absent before committing; the plugin gets
+its own manual when it has one.
 
 ## Step 4 — Open the PLAN in the notes repo
 
