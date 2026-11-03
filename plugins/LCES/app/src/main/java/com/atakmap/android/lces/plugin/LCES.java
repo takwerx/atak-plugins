@@ -1,27 +1,34 @@
-
 package com.atakmap.android.lces.plugin;
 
 import android.content.Context;
 
 import com.atak.plugins.impl.PluginContextProvider;
-import com.atak.plugins.impl.PluginLayoutInflater;
+import com.atakmap.android.lces.ui.LcesDropDown;
+import com.atakmap.android.lces.ui.LcesPane;
+import com.atakmap.android.maps.MapView;
+import com.atakmap.coremap.log.Log;
 
 import gov.tak.api.plugin.IPlugin;
 import gov.tak.api.plugin.IServiceController;
 import gov.tak.api.ui.IHostUIService;
-import gov.tak.api.ui.Pane;
-import gov.tak.api.ui.PaneBuilder;
 import gov.tak.api.ui.ToolbarItem;
 import gov.tak.api.ui.ToolbarItemAdapter;
 import gov.tak.platform.marshal.MarshalManager;
 
+/**
+ * Lookouts, Communications, Escape Routes, Safety Zones: the IRPG one tap away,
+ * and wildland fire lessons learned on the map.
+ */
 public class LCES implements IPlugin {
+
+    private static final String TAG = "LCES";
 
     IServiceController serviceController;
     Context pluginContext;
     IHostUIService uiService;
     ToolbarItem toolbarItem;
-    Pane templatePane;
+    LcesDropDown dropDown;
+    MapView mapView;
 
     public LCES(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -32,14 +39,10 @@ public class LCES implements IPlugin {
             pluginContext.setTheme(R.style.ATAKPluginTheme);
         }
 
-        // obtain the UI service
         uiService = serviceController.getService(IHostUIService.class);
 
-        // initialize the toolbar button for the plugin
-
-        // create the button and set the identifier to be well known
-        // if you fail to do this, the toolbar configuration will never
-        // be able to find it again after the user moves the icon.
+        // The identifier has to be well known, or the toolbar configuration cannot
+        // find the button again after the user moves it.
         toolbarItem = new ToolbarItem.Builder(
                 pluginContext.getString(R.string.app_name),
                 MarshalManager.marshal(
@@ -57,44 +60,35 @@ public class LCES implements IPlugin {
 
     @Override
     public void onStart() {
-        // the plugin is starting, add the button to the toolbar
-        if (uiService == null)
-            return;
-
-        uiService.addToolbarItem(toolbarItem);
+        if (uiService != null)
+            uiService.addToolbarItem(toolbarItem);
+        mapView = MapView.getMapView();
+        if (mapView == null)
+            Log.w(TAG, "no map view at start");
     }
 
     @Override
     public void onStop() {
-        // the plugin is stopping, remove the button from the toolbar
-        if (uiService == null)
-            return;
-
-        uiService.removeToolbarItem(toolbarItem);
+        // A pane whose buttons point at a stopped instance does nothing when tapped.
+        if (dropDown != null) {
+            dropDown.dispose();
+            dropDown = null;
+        }
+        if (uiService != null)
+            uiService.removeToolbarItem(toolbarItem);
     }
 
     private void showPane() {
-        // instantiate the plugin view if necessary
-        if(templatePane == null) {
-            // Remember to use the PluginLayoutInflator if you are actually inflating a custom view
-            // In this case, using it is not necessary - but I am putting it here to remind
-            // developers to look at this Inflator
-
-            templatePane = new PaneBuilder(PluginLayoutInflater.inflate(pluginContext,
-                    R.layout.main_layout, null))
-                    // relative location is set to default; pane will switch location dependent on
-                    // current orientation of device screen
-                    .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)
-                    // pane will take up 50% of screen width in landscape mode
-                    .setMetaValue(Pane.PREFERRED_WIDTH_RATIO, 0.5D)
-                    // pane will take up 50% of screen height in portrait mode
-                    .setMetaValue(Pane.PREFERRED_HEIGHT_RATIO, 0.5D)
-                    .build();
+        if (uiService == null)
+            return;
+        if (mapView == null)
+            mapView = MapView.getMapView();
+        if (mapView == null) {
+            Log.w(TAG, "no map view; the pane has nothing to show");
+            return;
         }
-
-        // if the plugin pane is not visible, show it!
-        if(!uiService.isPaneVisible(templatePane)) {
-            uiService.showPane(templatePane, null);
-        }
+        if (dropDown == null)
+            dropDown = new LcesDropDown(mapView, new LcesPane(mapView, pluginContext));
+        dropDown.show();
     }
 }

@@ -3,5 +3,43 @@
     <!-- App -->
     <string name="app_name">LCES</string>
     <!-- description -->
-    <string name="app_desc">LCES</string>
+    <string name="app_desc">Lookouts, Communications, Escape Routes, Safety Zones: the IRPG and wildland fire lessons learned on the map</string>
+
+    <string name="settings">Settings</string>
+    <string name="back">Back</string>
+    <!-- The pane size button names what a tap does, like Atmosphere's. -->
+    <string name="wide">Wide</string>
+    <string name="half">Half</string>
+    <string name="lessons">Lessons</string>
+    <string name="show_settings">Open or close</string>
+
+    <string name="tile_orders">10 Orders</string>
+    <string name="tile_watchouts">18 Watch Outs</string>
+    <string name="tile_lces">LCES</string>
+    <string name="tile_briefing">Briefing</string>
+    <string name="tile_denominators">Common Denominators</string>
+    <string name="tile_irpg">IRPG</string>
+
+    <string name="heading_irpg">From the IRPG</string>
+    <string name="status_no_layer">The Lessons Learned layer comes in a later build.</string>
+    <string name="settings_lessons_later">The Lessons Learned settings come with the layer.</string>
+    <string name="show_section">Show this section</string>
+
+    <!-- Search -->
+    <string name="search_hint">Search the IRPG</string>
+    <string name="clear">Clear</string>
+    <string name="results_some">%1$d pages in the IRPG match “%2$s”.</string>
+    <plurals name="matches">
+        <item quantity="one">%d match</item>
+        <item quantity="other">%d matches</item>
+    </plurals>
+    <string name="results_none">Nothing in the IRPG matches “%s”.</string>
+
+    <!-- Reading -->
+    <string name="previous">Previous</string>
+    <string name="next">Next</string>
+    <string name="continue_reading">Continue: %s</string>
+    <string name="text_size">Text size</string>
+    <string name="text_normal">Normal</string>
+    <string name="text_large">Large</string>
 </resources>
