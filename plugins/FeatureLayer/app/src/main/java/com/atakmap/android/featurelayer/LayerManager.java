@@ -282,8 +282,10 @@ public class LayerManager {
                     final LoadedLayer l = find(item.getMetaString("nifs_layer", ""));
                     // Fires and burns are tapped to be read: New Fire Starts, Ongoing Fires,
                     // and Fire History (operator, 2026-10-06: "clicking on these should go
-                    // to the details pane automatically").
-                    if (l == null || !(NewStartsStyles.handles(l.spec) || FireHistoryStyles.handles(l.spec)))
+                    // to the details pane automatically"). Boundaries and land layers too
+                    // (operator, 2026-11-02: "should go right to details pane").
+                    if (l == null || !(NewStartsStyles.handles(l.spec) || FireHistoryStyles.handles(l.spec)
+                            || Boundaries.handles(l.spec)))
                         return false;
                     details.show(item);
                     return true;
