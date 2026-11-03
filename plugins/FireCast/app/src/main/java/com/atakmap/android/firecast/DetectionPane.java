@@ -224,6 +224,8 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
         String from();
         String to(double lastH);
         String inputs();
+        /** Fits the map to the run. */
+        void goTo();
     }
 
     private final java.util.Map<Integer, String> sliderFor = new java.util.HashMap<>();
@@ -269,6 +271,14 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         title.setAllCaps(true);
         title.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        // The title takes the map to the run; padded so a gloved tap lands.
+        title.setPadding(0, (int) (12 * dp), 0, (int) (12 * dp));
+        title.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                r.goTo();
+            }
+        });
         head.addView(title);
         final Button close = (Button) PluginLayoutInflater.inflate(pluginContext, R.layout.source_button, null);
         close.setText("Close");
@@ -358,6 +368,11 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
             @Override
             public String title() {
                 return r.shortName() + ", run " + FirisModels.when(r.startMs);
+            }
+
+            @Override
+            public void goTo() {
+                firis.goTo(r);
             }
 
             @Override
@@ -595,6 +610,11 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
             @Override
             public String title() {
                 return f.name() + ", PyreCast run " + PyrecastForecasts.when(f.runMs);
+            }
+
+            @Override
+            public void goTo() {
+                pyrecast.goTo(f);
             }
 
             @Override
