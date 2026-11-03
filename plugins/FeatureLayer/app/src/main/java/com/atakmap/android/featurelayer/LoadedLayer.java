@@ -1247,6 +1247,10 @@ public class LoadedLayer {
         for (Pending pf : snapshot) {
             if (pf.setName.endsWith(" marks"))
                 continue;
+            // A type switched off is off the map, so it is out of the list too: FIRIS alone
+            // on CA Air Intel listed every source (operator, 2026-11-02).
+            if (!myFiresShown() && !spec.isOn(pf.setName))
+                continue;
             String title = pf.name, type = pf.setName;
             String inKey = null, inValue = null;
             long time = 0;
@@ -2479,7 +2483,8 @@ public class LoadedLayer {
                         // is; the layer's name was standing in (operator, 2026-09-18: "when i
                         // click on vehicle how come i dont get a sub type?").
                         final String dartType = history || bounds ? target : NewStartsStyles.handles(spec) ? NewStartsStyles.type(props)
-                                : (DartStyles.handles(spec) || FireGuardStyles.handles(spec)) && spec.setField != null
+                                : (DartStyles.handles(spec) || FireGuardStyles.handles(spec) || "ca-air-intel".equals(spec.id))
+                                        && spec.setField != null
                                 ? props.optString(spec.setField, "").trim() : "";
                         attrs.setAttribute("_type", !dartType.isEmpty() && !"null".equalsIgnoreCase(dartType) ? dartType
                                 : nwcg ? (cat != null ? cat : layerName)
