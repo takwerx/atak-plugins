@@ -59,6 +59,8 @@ public final class LessonsManager {
      * a later catalog brings in starts shown.
      */
     public static final String PREF_HIDDEN_CATS = "lces.lessons.hiddenCategories";
+    /** The Area before the operator picks one: 50 miles, or 50 km on metric. */
+    private static final int DEFAULT_AREA = 50;
     /** Area radius in meters; -1 for everything. */
     public static final String PREF_AREA_M = "lces.lessons.areaM";
     /** Measure from the map center instead of My Location. */
@@ -336,6 +338,10 @@ public final class LessonsManager {
 
     /** Meters, or -1 for everything. */
     public double areaMeters() {
+        // Until the operator picks one: within 50 of My Location, in the large unit
+        // they use, so the default is one of the Area tiles.
+        if (!prefs.contains(PREF_AREA_M))
+            return com.atakmap.android.lces.ui.Units.bigToMeters(DEFAULT_AREA);
         return prefs.getFloat(PREF_AREA_M, -1f);
     }
 
