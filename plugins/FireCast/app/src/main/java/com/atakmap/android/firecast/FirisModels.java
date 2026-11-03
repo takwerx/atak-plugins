@@ -205,6 +205,7 @@ public final class FirisModels {
 
     public void stop() {
         worker.shutdownNow();
+        counter.shutdownNow();
         synchronized (lock) {
             try {
                 if (layer != null)
@@ -656,6 +657,291 @@ public final class FirisModels {
     /** Lock held: the cyan edge comes back with the runs, after a restart or a fetch. */
     private void redrawAtLocked() {
         drawAtLocked(focus(), focusHours());
+    }
+
+    // ---- structures ------------------------------------------------------------------
+
+    /**
+     * What a run's fire reaches, hour by hour, from FEMA's building inventory, the same
+     * count our own runs make: a building counts once its centroid is inside the hour's
+     * isochrone. Kept on disk with the KML, so it comes back offline.
+     */
+    public static final class Reach {
+        public double[] hours;
+        public int[] structures, homes;
+        public double[] people;
+        /** The named places (school, hospital...) and the index of the first hour that reaches each. */
+        public final List<Object[]> critical = new ArrayList<>();
+        /** The inventory stopped at its cap, so the counts are a floor. */
+        public boolean floor;
+        /** Why there is no count, or null. */
+        public String problem;
+        /** When it was counted or failed, ms. */
+        long at = System.currentTimeMillis();
+
+        /** {structures, homes, people} by that hour, or null for an hour not counted. */
+        public double[] at(double h) {
+            for (int i = 0; hours != null && i < hours.length; i++)
+                if (hours[i] == h)
+                    return new double[] { structures[i], homes[i], people[i] };
+            return null;
+        }
+
+        /** "a school, 2 churches", the named places reached by that hour; empty when none. */
+        public String criticalBy(double h) {
+            final Map<String, Integer> n = new LinkedHashMap<>();
+            for (Object[] c : critical) {
+                final int i = (Integer) c[1];
+                if (hours != null && i < hours.length && hours[i] <= h)
+                    n.put((String) c[0], (n.containsKey(c[0]) ? n.get(c[0]) : 0) + 1);
+            }
+            final StringBuilder b = new StringBuilder();
+            for (Map.Entry<String, Integer> e : n.entrySet()) {
+                if (b.length() > 0)
+                    b.append(", ");
+                final String k = e.getKey().toLowerCase(Locale.US);
+                b.append(e.getValue() == 1 ? (k.matches("^[aeiou].*") ? "an " : "a ") + k
+                        : e.getValue() + " " + (k.endsWith("ch") || k.endsWith("s") ? k + "es" : k + "s"));
+            }
+            return b.toString();
+        }
+    }
+
+    private final Map<String, Reach> reach = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Set<String> counting = java.util.Collections.newSetFromMap(
+            new java.util.concurrent.ConcurrentHashMap<String, Boolean>());
+    private final java.util.concurrent.ExecutorService counter = Executors.newSingleThreadExecutor();
+    private volatile boolean reachLoaded;
+
+    /**
+     * The run's structure counts, or null while they are counted; the first ask starts
+     * the count, and the pane is told when it lands. Any thread.
+     */
+    public Reach reach(final Run r) {
+        if (r == null)
+            return null;
+        final String key = r.key();
+        final Reach have = reach.get(key);
+        // A failed count is tried again after two minutes, not at every repaint.
+        if (have != null && (have.problem == null || System.currentTimeMillis() - have.at < 120_000L))
+            return have;
+        if (!counting.add(key))
+            return have;
+        counter.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    loadReach();
+                    Reach got = reach.get(key);
+                    if (got == null || got.problem != null) {
+                        got = count(r);
+                        reach.put(key, got);
+                        if (got.problem == null)
+                            saveReach();
+                    }
+                } catch (Throwable t) {
+                    Log.w(TAG, "FIRIS structures", t);
+                    final Reach failed = new Reach();
+                    failed.problem = "the buildings could not be counted";
+                    reach.put(key, failed);
+                } finally {
+                    counting.remove(key);
+                    changed();
+                }
+            }
+        });
+        return have;
+    }
+
+    /** Counts the buildings each hour's isochrone holds. Counter thread. */
+    private static Reach count(Run r) {
+        final Reach out = new Reach();
+        out.hours = r.hours();
+        final int n = out.hours.length;
+        out.structures = new int[n];
+        out.homes = new int[n];
+        out.people = new double[n];
+        double s = 90, w = 180, no = -90, e = -180;
+        final List<double[]> boxes = new ArrayList<>();
+        for (Ring g : r.rings) {
+            final double[] b = bounds(g.geom);
+            boxes.add(b);
+            s = Math.min(s, b[0]);
+            w = Math.min(w, b[1]);
+            no = Math.max(no, b[2]);
+            e = Math.max(e, b[3]);
+        }
+        if (n == 0 || s > no)
+            return out;
+        final List<com.atakmap.android.firecast.model.Structures.Building> all;
+        try {
+            all = com.atakmap.android.firecast.model.Structures.within(s, w, no, e);
+        } catch (Exception ex) {
+            out.problem = "FEMA's building inventory did not answer";
+            return out;
+        }
+        out.floor = all.size() >= com.atakmap.android.firecast.model.Structures.MAX;
+        for (com.atakmap.android.firecast.model.Structures.Building b : all) {
+            int first = -1;
+            for (int i = 0; i < n && first < 0; i++)
+                for (int k = 0; k < r.rings.size(); k++) {
+                    final Ring g = r.rings.get(k);
+                    final double[] bx = boxes.get(k);
+                    if (g.hours == out.hours[i] && b.lat >= bx[0] && b.lat <= bx[2] && b.lon >= bx[1] && b.lon <= bx[3]
+                            && inside(g.geom, b.lat, b.lon)) {
+                        first = i;
+                        break;
+                    }
+                }
+            if (first < 0)
+                continue;
+            for (int i = first; i < n; i++) {
+                out.structures[i]++;
+                if (b.residential())
+                    out.homes[i]++;
+                out.people[i] += b.population;
+            }
+            final String kind = b.critical();
+            if (kind != null && out.critical.size() < 40)
+                out.critical.add(new Object[] { kind, first });
+        }
+        Log.d(TAG, "FIRIS structures: " + r.shortName() + ", " + all.size() + " in the box, "
+                + out.structures[n - 1] + " reached by " + hoursText(out.hours[n - 1]));
+        return out;
+    }
+
+    /** {south, west, north, east} of a geometry. */
+    private static double[] bounds(Geometry g) {
+        final double[] b = { 90, 180, -90, -180 };
+        if (g instanceof GeometryCollection) {
+            for (Geometry c : ((GeometryCollection) g).getGeometries()) {
+                final double[] x = bounds(c);
+                b[0] = Math.min(b[0], x[0]);
+                b[1] = Math.min(b[1], x[1]);
+                b[2] = Math.max(b[2], x[2]);
+                b[3] = Math.max(b[3], x[3]);
+            }
+        } else if (g instanceof Polygon) {
+            final LineString ls = ((Polygon) g).getExteriorRing();
+            for (int i = 0; ls != null && i < ls.getNumPoints(); i++) {
+                b[0] = Math.min(b[0], ls.getY(i));
+                b[1] = Math.min(b[1], ls.getX(i));
+                b[2] = Math.max(b[2], ls.getY(i));
+                b[3] = Math.max(b[3], ls.getX(i));
+            }
+        }
+        return b;
+    }
+
+    /** True when the point is inside a polygon of the geometry and outside its holes. */
+    static boolean inside(Geometry g, double lat, double lon) {
+        if (g instanceof GeometryCollection) {
+            for (Geometry c : ((GeometryCollection) g).getGeometries())
+                if (inside(c, lat, lon))
+                    return true;
+            return false;
+        }
+        if (!(g instanceof Polygon))
+            return false;
+        final Polygon p = (Polygon) g;
+        if (!inRing(p.getExteriorRing(), lat, lon))
+            return false;
+        for (LineString hole : p.getInteriorRings())
+            if (inRing(hole, lat, lon))
+                return false;
+        return true;
+    }
+
+    private static boolean inRing(LineString ls, double lat, double lon) {
+        if (ls == null)
+            return false;
+        boolean in = false;
+        final int n = ls.getNumPoints();
+        for (int i = 0, j = n - 1; i < n; j = i++) {
+            final double yi = ls.getY(i), yj = ls.getY(j), xi = ls.getX(i), xj = ls.getX(j);
+            if ((yi > lat) != (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi)
+                in = !in;
+        }
+        return in;
+    }
+
+    private File reachFile() {
+        return new File(root, "firis_structures.json");
+    }
+
+    /** The counts this device saved, once. Counter thread. */
+    private void loadReach() {
+        if (reachLoaded)
+            return;
+        reachLoaded = true;
+        final File f = reachFile();
+        if (!f.isFile() || f.length() > 4_000_000L)
+            return;
+        try {
+            final org.json.JSONObject o = new org.json.JSONObject(new String(
+                    FileSystemUtils.read(f), StandardCharsets.UTF_8));
+            final java.util.Iterator<String> keys = o.keys();
+            while (keys.hasNext()) {
+                final String k = keys.next();
+                final org.json.JSONObject a = o.getJSONObject(k);
+                final org.json.JSONArray h = a.getJSONArray("h"), st = a.getJSONArray("s"),
+                        ho = a.getJSONArray("homes"), pe = a.getJSONArray("p");
+                final Reach r = new Reach();
+                final int n = h.length();
+                if (st.length() != n || ho.length() != n || pe.length() != n)
+                    continue;
+                r.hours = new double[n];
+                r.structures = new int[n];
+                r.homes = new int[n];
+                r.people = new double[n];
+                for (int i = 0; i < n; i++) {
+                    r.hours[i] = h.getDouble(i);
+                    r.structures[i] = st.getInt(i);
+                    r.homes[i] = ho.getInt(i);
+                    r.people[i] = pe.getDouble(i);
+                }
+                final org.json.JSONArray c = a.optJSONArray("c");
+                for (int i = 0; c != null && i < c.length() && i < 40; i++) {
+                    final org.json.JSONArray e = c.getJSONArray(i);
+                    r.critical.add(new Object[] { e.getString(0), e.getInt(1) });
+                }
+                r.floor = a.optBoolean("floor", false);
+                reach.put(k, r);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "FIRIS structures file unreadable: " + e);
+        }
+    }
+
+    /** Every count held, for the runs still in the KML. Counter thread. */
+    private void saveReach() {
+        try {
+            final java.util.Set<String> live = new java.util.HashSet<>();
+            for (Run r : runs)
+                live.add(r.key());
+            final org.json.JSONObject o = new org.json.JSONObject();
+            for (Map.Entry<String, Reach> e : reach.entrySet()) {
+                final Reach r = e.getValue();
+                if (r.problem != null || !live.contains(e.getKey()))
+                    continue;
+                final org.json.JSONObject a = new org.json.JSONObject();
+                final org.json.JSONArray h = new org.json.JSONArray(), st = new org.json.JSONArray(),
+                        ho = new org.json.JSONArray(), pe = new org.json.JSONArray(), c = new org.json.JSONArray();
+                for (int i = 0; i < r.hours.length; i++) {
+                    h.put(r.hours[i]);
+                    st.put(r.structures[i]);
+                    ho.put(r.homes[i]);
+                    pe.put(Math.round(r.people[i]));
+                }
+                for (Object[] x : r.critical)
+                    c.put(new org.json.JSONArray().put(x[0]).put(x[1]));
+                a.put("h", h).put("s", st).put("homes", ho).put("p", pe).put("c", c).put("floor", r.floor);
+                o.put(e.getKey(), a);
+            }
+            SafeFile.write(reachFile(), o.toString());
+        } catch (Exception e) {
+            Log.w(TAG, "FIRIS structures not saved: " + e);
+        }
     }
 
     private void changed() {

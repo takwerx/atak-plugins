@@ -227,6 +227,7 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
     }
 
     private final java.util.Map<Integer, String> sliderFor = new java.util.HashMap<>();
+    private final java.util.Map<Integer, Runnable> relabel = new java.util.HashMap<>();
 
     /**
      * The same "where it is by" as our own model's page: a slider over the run's hours,
@@ -237,8 +238,14 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
         final LinearLayout box = header.findViewById(boxId);
         final String key = r == null ? null : r.key();
         final String was = sliderFor.get(boxId);
-        if (key == null ? was == null && box.getChildCount() == 0 : key.equals(was))
+        if (key == null ? was == null && box.getChildCount() == 0 : key.equals(was)) {
+            // Same run: only the words move, so counts that land show without a drag.
+            final Runnable again = relabel.get(boxId);
+            if (again != null && key != null)
+                again.run();
             return;
+        }
+        relabel.remove(boxId);
         sliderFor.put(boxId, key);
         box.removeAllViews();
         if (r == null) {
@@ -312,6 +319,12 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
             }
         });
         box.addView(bar);
+        relabel.put(boxId, new Runnable() {
+            @Override
+            public void run() {
+                label.setText(r.text(hs, bar.getProgress()));
+            }
+        });
         final LinearLayout ends = new LinearLayout(c);
         final TextView from = new TextView(c), to = new TextView(c);
         from.setText(r.from());
@@ -359,7 +372,7 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
 
             @Override
             public String text(double[] hs, int p) {
-                return firisAtText(r, hs, p);
+                return firisAtText(r, hs, p) + firisReachText(firis.reach(r), hs, p);
             }
 
             @Override
@@ -388,6 +401,35 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
                 return r.inputs.isEmpty() ? "" : "Run with: " + r.inputs;
             }
         };
+    }
+
+    /**
+     * "\n45 structures (38 homes), up to 90 people; a school." by the slider's hour, or
+     * how many by the last hour before the slider moves. FEMA's inventory, as our runs count it.
+     */
+    private static String firisReachText(FirisModels.Reach x, double[] hs, int p) {
+        if (x == null)
+            return "\nCounting the structures inside the run...";
+        if (x.problem != null)
+            return "\nStructures not counted: " + x.problem + ".";
+        final double h = hs[(p <= 0 ? hs.length : p) - 1];
+        final double[] n = x.at(h);
+        if (n == null)
+            return "";
+        final StringBuilder b = new StringBuilder("\n");
+        if (p <= 0)
+            b.append("By the last hour: ");
+        b.append(String.format(Locale.US, "%,d", (int) n[0])).append((int) n[0] == 1 ? " structure" : " structures");
+        if (n[1] > 0)
+            b.append(" (").append(String.format(Locale.US, "%,d", (int) n[1])).append((int) n[1] == 1 ? " home)" : " homes)");
+        if (n[2] >= 1)
+            b.append(", up to ").append(String.format(Locale.US, "%,d", Math.round(n[2]))).append(" people");
+        final String named = x.criticalBy(h);
+        if (!named.isEmpty())
+            b.append("; ").append(named);
+        b.append(x.floor ? ". The inventory stopped at " + com.atakmap.android.firecast.model.Structures.MAX
+                + " buildings, so these are a floor." : ".");
+        return b.toString();
     }
 
     /** "By 22:02, in 2 h: 340 acres." */
