@@ -1,5 +1,12 @@
 ATAK Plugin — UAS Flight Plan
 
+> **Retired. Use [AirAware](https://github.com/takwerx/air-aware) instead.**
+> Everything UAS Flight Plan did is now the UAS planner page in AirAware:
+> launch point, drawn area, terrain islands, both ceiling modes and FAA
+> obstacles, plus the FAA UAS Facility Map ceilings and LAANC. AirAware is
+> in the TAKwerx Market; UAS Flight Plan no longer is. Version 0.2 below
+> still works but will get no more updates.
+
 **Download UAS Flight Plan 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
 - **ATAK-CIV 5.6:** https://github.com/takwerx/uas-flight-plan/releases/download/v0.2/ATAK-Plugin-UASFlightPlan-0.2--5.6.0-civ-release.apk
