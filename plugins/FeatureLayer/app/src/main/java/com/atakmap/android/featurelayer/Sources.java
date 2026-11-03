@@ -394,8 +394,9 @@ public final class Sources {
     public static LayerSpec caAirIntel() {
         final LayerSpec s = new LayerSpec();
         s.id = "ca-air-intel";
-        s.title = "CA Air Intel perimeters";
-        s.subtitle = "FIRIS, CAL FIRE, USFS, NIFC, WFIGS";
+        // Just the name on the main page: the sources are its types, listed inside.
+        s.title = "CA Air Intel";
+        s.subtitle = "";
         s.portal = null;
         s.base = CA_AIR_INTEL;
         s.layerIds = new int[] { 0 };

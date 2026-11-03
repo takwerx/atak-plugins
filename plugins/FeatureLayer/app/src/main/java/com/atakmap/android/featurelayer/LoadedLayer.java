@@ -138,6 +138,8 @@ public class LoadedLayer {
     }
 
     public String displayName() {
+        if (spec.subtitle == null || spec.subtitle.isEmpty())
+            return spec.title;
         return spec.title + " (" + spec.subtitle + ")";
     }
 

@@ -1077,6 +1077,8 @@ public class LayerManager {
                 // Built-in public sources: the fixed parts follow the current definition.
                 if ("ca-air-intel".equals(spec.id)) {
                     final LayerSpec cur = Sources.caAirIntel();
+                    spec.title = cur.title;
+                    spec.subtitle = cur.subtitle;
                     spec.where = cur.where;
                     spec.activeWhere = cur.activeWhere;
                     spec.labelField = cur.labelField;
