@@ -28,6 +28,8 @@ import android.widget.TextView;
 
 import com.atak.plugins.impl.PluginLayoutInflater;
 import com.atakmap.android.lces.irpg.IrpgPages;
+import com.atakmap.android.lces.iwi.IwiPane;
+import com.atakmap.android.lces.iwi.TraumaManager;
 import com.atakmap.android.lces.lessons.Incident;
 import com.atakmap.android.lces.lessons.LessonsManager;
 import com.atakmap.android.lces.plugin.R;
@@ -47,8 +49,8 @@ import java.util.Set;
 /**
  * The pane: a main screen (the map switch, Settings, the search box, the IRPG
  * tiles, then the list of lessons nearest first), a Settings page, and a page being
- * read (an IRPG page or an incident), all in one view swapped by visibility. It
- * opens on the main screen every time.
+ * read (an IRPG page or an incident), and IWI's own pages ({@link IwiPane}), all in
+ * one view swapped by visibility. It opens on the main screen every time.
  *
  * <p>The pane never filters lessons: {@link LessonsManager} decides what is kept,
  * once, for the list and the map together, and this shows what it is handed.
@@ -95,8 +97,14 @@ public final class LcesPane implements PageView.Opener {
     /** The search whose words the page being read marks, or null. */
     private String highlight;
     private LessonsManager.Result lessonsResult;
+    /** IWI's pages, in their own block of this pane; null without a trauma manager. */
+    private final View iwiHost;
+    private final IwiPane iwi;
+    /** Settings was opened from the IWI page; its Back goes there. */
+    private boolean settingsFromIwi;
 
-    public LcesPane(MapView mapView, Context pluginContext, LessonsManager lessonsManager) {
+    public LcesPane(MapView mapView, Context pluginContext, LessonsManager lessonsManager,
+            TraumaManager traumaManager) {
         this.mapView = mapView;
         this.pluginContext = pluginContext;
         this.lessonsManager = lessonsManager;
@@ -117,6 +125,7 @@ public final class LcesPane implements PageView.Opener {
         readerTitle = root.findViewById(R.id.reader_title);
         readerBody = root.findViewById(R.id.reader_body);
         readerScroll = root.findViewById(R.id.reader_scroll);
+        iwiHost = root.findViewById(R.id.iwi_host);
 
         final View header = PluginLayoutInflater.inflate(pluginContext,
                 R.layout.main_header, null);
@@ -154,6 +163,7 @@ public final class LcesPane implements PageView.Opener {
         header.findViewById(R.id.btn_settings).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                settingsFromIwi = false;
                 refreshSettings();
                 show(settingsPage);
             }
@@ -201,8 +211,14 @@ public final class LcesPane implements PageView.Opener {
         tile(header, R.id.tile_briefing, "briefing");
         tile(header, R.id.tile_denominators, "denominators");
         tile(header, R.id.tile_irpg, IrpgPages.CONTENTS);
-        // Until IWI's own screens move in, the tile opens the book's report page.
-        tile(header, R.id.tile_iwi, "mir");
+        // IWI opens its report straight away (PLAN-LCES decision 9); the book's own
+        // Medical Incident Report page stays in the contents.
+        header.findViewById(R.id.tile_iwi).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openIwi();
+            }
+        });
 
         final View.OnClickListener backToMain = new View.OnClickListener() {
             @Override
@@ -253,6 +269,8 @@ public final class LcesPane implements PageView.Opener {
         pageView.setScale(scale);
         incidentPage.setScale(scale);
 
+        iwi = traumaManager == null ? null : buildIwi(traumaManager);
+
         final LinearLayout lessonsSettings = root.findViewById(R.id.lessons_settings);
         areaFold = new Fold(lessonsSettings, "area");
         typesFold = new Fold(lessonsSettings, "types");
@@ -266,6 +284,62 @@ public final class LcesPane implements PageView.Opener {
 
     void setHost(LcesDropDown host) {
         this.host = host;
+    }
+
+    /** IWI's pages into their block, its trauma center rows onto Settings. */
+    private IwiPane buildIwi(TraumaManager traumaManager) {
+        final View pages = PluginLayoutInflater.inflate(pluginContext, R.layout.iwi_layout,
+                null);
+        ((LinearLayout) iwiHost).addView(pages, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
+        final View settings = PluginLayoutInflater.inflate(pluginContext,
+                R.layout.iwi_settings, null);
+        ((LinearLayout) root.findViewById(R.id.iwi_settings_host)).addView(settings);
+        return new IwiPane(pluginContext, mapView, pages, settings, traumaManager,
+                new IwiPane.Exits() {
+                    @Override
+                    public void leaveIwi() {
+                        show(list);
+                        refresh();
+                    }
+
+                    @Override
+                    public void openSettings() {
+                        settingsFromIwi = true;
+                        refreshSettings();
+                        show(settingsPage);
+                    }
+
+                    @Override
+                    public void toggleWide() {
+                        if (host != null)
+                            host.toggleWide();
+                    }
+                });
+    }
+
+    /** The IWI tile, or a tap on this device's IWI marker: IWI's page, current. */
+    public void openIwi() {
+        if (iwi == null) {
+            // No trauma manager means no IWI state either; the book's report page.
+            read("mir");
+            return;
+        }
+        hideKeyboard();
+        settingsFromIwi = false;
+        show(iwiHost);
+        iwi.open();
+    }
+
+    /** The drop-down closed: an IWI map pick lets go of the map. */
+    void onClosed() {
+        if (iwi != null)
+            iwi.onClosed();
+    }
+
+    void dispose() {
+        if (iwi != null)
+            iwi.dispose();
     }
 
     /** The host changed size: the Wide buttons say what a tap will do now. */
@@ -282,6 +356,16 @@ public final class LcesPane implements PageView.Opener {
     boolean back() {
         if (list.getVisibility() == View.VISIBLE)
             return false;
+        if (iwi != null && iwiHost.getVisibility() == View.VISIBLE) {
+            iwi.back();
+            return true;
+        }
+        if (iwi != null && settingsFromIwi && settingsPage.getVisibility() == View.VISIBLE) {
+            settingsFromIwi = false;
+            show(iwiHost);
+            iwi.refreshSettings();
+            return true;
+        }
         if (fromContents && readerPage.getVisibility() == View.VISIBLE) {
             fromContents = false;
             highlight = null;
@@ -305,6 +389,7 @@ public final class LcesPane implements PageView.Opener {
     /** Called each time the pane is shown: back to the main screen, current state. */
     public void reset() {
         fromContents = false;
+        settingsFromIwi = false;
         show(list);
         refresh();
     }
@@ -481,6 +566,8 @@ public final class LcesPane implements PageView.Opener {
         final boolean large = prefs.getBoolean(PREF_TEXT_LARGE, false);
         textSize.setText(pluginContext.getString(R.string.text_size) + ": "
                 + pluginContext.getString(large ? R.string.text_large : R.string.text_normal));
+        if (iwi != null)
+            iwi.refreshSettings();
         if (lessonsManager == null)
             return;
         buildArea();
@@ -860,6 +947,7 @@ public final class LcesPane implements PageView.Opener {
         list.setVisibility(page == list ? View.VISIBLE : View.GONE);
         settingsPage.setVisibility(page == settingsPage ? View.VISIBLE : View.GONE);
         readerPage.setVisibility(page == readerPage ? View.VISIBLE : View.GONE);
+        iwiHost.setVisibility(page == iwiHost ? View.VISIBLE : View.GONE);
         if (page != list)
             hideKeyboard();
     }

@@ -13,10 +13,10 @@ import javax.net.ssl.HttpsURLConnection;
  * redirects.
  *
  * <p>IWI's (AirAware's before it), carried forward; shared helpers are copy-forward.
- * LCES uses it for one thing, the Lessons Learned catalog on our own depot, on the
- * manager's worker thread.
+ * LCES uses it for two things on our own depot, each on its manager's worker thread:
+ * the Lessons Learned catalog and IWI's trauma center pack.
  */
-final class Http {
+public final class Http {
 
     private static final int CONNECT_TIMEOUT_MS = 10_000;
     private static final int READ_TIMEOUT_MS = 30_000;
@@ -30,7 +30,7 @@ final class Http {
      * @param maxBytes the most this answer may be; more is not the file we asked for
      * @throws IOException with a message already phrased for a log
      */
-    static byte[] get(String url, int maxBytes) throws IOException {
+    public static byte[] get(String url, int maxBytes) throws IOException {
         final URL parsed = new URL(url);
         if (!"https".equalsIgnoreCase(parsed.getProtocol()))
             throw new IOException("refusing a non-https request");
@@ -81,5 +81,17 @@ final class Http {
             out.write(buf, 0, n);
         }
         return out.toByteArray();
+    }
+
+    /** What to put in front of an operator when a fetch fails (IWI's). */
+    public static String describe(Exception e) {
+        if (e instanceof java.net.SocketTimeoutException)
+            return "timed out";
+        if (e instanceof java.net.UnknownHostException)
+            return "no network";
+        if (e instanceof javax.net.ssl.SSLException)
+            return "TLS failed";
+        final String message = e.getMessage();
+        return message == null ? "network error" : message;
     }
 }

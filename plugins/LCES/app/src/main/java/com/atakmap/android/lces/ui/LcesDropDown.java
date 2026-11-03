@@ -108,6 +108,8 @@ public class LcesDropDown extends DropDownReceiver implements OnStateListener {
 
     @Override
     public void onDropDownClose() {
+        // An armed IWI map pick holds the map's tap listeners and must let go.
+        pane.onClosed();
     }
 
     @Override
@@ -116,5 +118,6 @@ public class LcesDropDown extends DropDownReceiver implements OnStateListener {
 
     @Override
     protected void disposeImpl() {
+        pane.dispose();
     }
 }

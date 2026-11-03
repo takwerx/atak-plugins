@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Three pages in one pane, swapped by visibility: the main screen (a list whose
-     header holds the controls), Settings, and a page being read. -->
+<!-- Four pages in one pane, swapped by visibility: the main screen (a list whose
+     header holds the controls), Settings, a page being read, and IWI (its own pages,
+     iwi_layout.xml, inflated into iwi_host). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -105,6 +106,12 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical" />
+                <!-- IWI's trauma center rows, iwi_settings.xml, under their own heading. -->
+                <LinearLayout
+                    android:id="@+id/iwi_settings_host"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
             </LinearLayout>
         </ScrollView>
     </LinearLayout>
@@ -186,4 +193,11 @@
                 android:textSize="13sp" />
         </LinearLayout>
     </LinearLayout>
+    <LinearLayout
+        android:id="@+id/iwi_host"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:visibility="gone" />
 </LinearLayout>
