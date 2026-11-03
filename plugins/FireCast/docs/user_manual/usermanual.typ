@@ -242,6 +242,43 @@ the fire is the usual reason.
 ]
 
 #tak-slide[
+= How it burns
+
+The engine is the Forest Service Fire Lab's Behave library, the same one inside
+BehavePlus, built into the plugin and run on the device:
+
+- *Surface fire:* Rothermel's spread model over the 40 Scott and Burgan fuel
+  models (grass, grass-shrub, shrub, timber understory, litter, slash).
+- *Crown fire:* Scott and Reinhardt; whether the fire stays on the ground,
+  torches single trees or runs through the crowns, from the canopy LANDFIRE maps.
+- *Embers:* Albini's spotting distance. Embers carry the fire across a road or
+  a block narrower than they fly.
+
+#v(6pt)
+
+The fire moves cell by cell over 30 m ground, each cell at its own fuel, slope,
+canopy and wind. Houses burn house to house at the rate measured in nine North
+American conflagrations (Moran, Seielstad and Pietruszka, 2025). From a
+perimeter with a start time, the run is first checked against what the fire
+already burned and its speed scaled to match, at most three times either way.
+]
+
+#tak-slide[
+= What is not in it
+
+- *Firefighting.* No line, no dozers, no aircraft. The run is the fire left alone.
+- *Wind the fire makes itself,* and wind bent by a canyon finer than the forecast.
+- *A fuel break narrower than 15 m.*
+- *Today's ground,* if it has changed since LANDFIRE mapped it: a recent burn,
+  a new subdivision, a cleared lot.
+
+#v(6pt)
+
+So read a run as a direction and an order of magnitude, and run it again when
+the wind changes.
+]
+
+#tak-slide[
 = Reading a result
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
