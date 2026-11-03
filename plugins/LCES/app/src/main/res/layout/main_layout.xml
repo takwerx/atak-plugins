@@ -57,14 +57,15 @@
                 android:textStyle="bold"
                 android:textColor="@color/white"
                 android:text="@string/settings" />
-            <Button
+            <ImageButton
                 android:id="@+id/btn_settings_wide"
-                style="@style/TakwerxButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                style="@style/TakwerxIconButton"
+                android:layout_weight="0"
+                android:layout_width="44dp"
+                android:layout_height="match_parent"
                 android:layout_marginLeft="6dp"
-                android:minWidth="90dp"
-                android:text="@string/wide" />
+                android:contentDescription="@string/iwi_wide_desc"
+                android:src="@drawable/ic_wide" />
         </LinearLayout>
         <!-- focusableInTouchMode + beforeDescendants: the scroller does not jump to a
              button that is rebuilt. -->
@@ -144,14 +145,15 @@
                 android:textSize="17sp"
                 android:textStyle="bold"
                 android:textColor="@color/white" />
-            <Button
+            <ImageButton
                 android:id="@+id/btn_reader_wide"
-                style="@style/TakwerxButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                style="@style/TakwerxIconButton"
+                android:layout_weight="0"
+                android:layout_width="44dp"
+                android:layout_height="match_parent"
                 android:layout_marginLeft="6dp"
-                android:minWidth="90dp"
-                android:text="@string/wide" />
+                android:contentDescription="@string/iwi_wide_desc"
+                android:src="@drawable/ic_wide" />
         </LinearLayout>
         <ScrollView
             android:id="@+id/reader_scroll"

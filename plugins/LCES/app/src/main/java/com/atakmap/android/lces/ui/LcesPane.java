@@ -84,8 +84,8 @@ public final class LcesPane implements PageView.Opener {
     private final EditText search;
     private final PageView pageView;
     private final IncidentPage incidentPage;
-    private final Button settingsWide;
-    private final Button readerWide;
+    private final View settingsWide;
+    private final View readerWide;
     private final RowAdapter rows;
     private final Fold areaFold, typesFold, catsFold, keyFold;
     private IrpgPages pages;
@@ -342,11 +342,8 @@ public final class LcesPane implements PageView.Opener {
             iwi.dispose();
     }
 
-    /** The host changed size: the Wide buttons say what a tap will do now. */
+    /** The host changed size. The wide buttons are IWI's icon, the same either way. */
     void onResized() {
-        final int label = host != null && host.isWide() ? R.string.half : R.string.wide;
-        settingsWide.setText(label);
-        readerWide.setText(label);
     }
 
     /**

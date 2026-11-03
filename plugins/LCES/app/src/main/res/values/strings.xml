@@ -8,8 +8,6 @@
     <string name="settings">Settings</string>
     <string name="back">Back</string>
     <!-- The pane size button names what a tap does, like Atmosphere's. -->
-    <string name="wide">Wide</string>
-    <string name="half">Half</string>
     <string name="lessons">Lessons Learned</string>
     <string name="show_settings">Open or close</string>
 
