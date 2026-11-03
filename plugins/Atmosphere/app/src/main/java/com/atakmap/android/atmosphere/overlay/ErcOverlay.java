@@ -60,6 +60,23 @@ public final class ErcOverlay extends OutlookOverlay {
         return new String[] { Erc.allUrl() };
     }
 
+    /**
+     * The whole country's areas, 118 KB compressed and 7 to 14 s from Esri on
+     * 2026-10-19: past the 15 s read limit on a phone, so Fire Danger timed out
+     * (S22, signed 0.18). The large lane waits 60 s, and gzip cuts the download.
+     */
+    @Override
+    protected boolean large(int index) {
+        return true;
+    }
+
+    @Override
+    protected java.util.Map<String, String> headers(int index) {
+        final java.util.Map<String, String> h = new java.util.HashMap<>();
+        h.put("Accept-Encoding", "gzip");
+        return h;
+    }
+
     @Override
     protected long pollMs() {
         return POLL_MS;

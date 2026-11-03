@@ -15,8 +15,8 @@ import java.util.TimeZone;
 import java.util.TreeMap;
 
 /**
- * The Iowa Environmental Mesonet (Iowa State University, {@code mesonet.agron.iastate.edu},
- * keyless, public domain): the archive of the NWS gauge feed (HADS) that the forecast
+ * The Iowa Environmental Mesonet (Iowa State University, keyless, public domain), read
+ * through takwerx's relay ({@link IemRelay}) since 0.18, never asked by the phone: the archive of the NWS gauge feed (HADS) that the forecast
  * offices' rainfall reports are written from. County flood-control gauges, RAWS, the
  * Forest Service's and the state's: about 960 gauges in a box around Southern
  * California against the ten the USGS keeps there (2026-10-13). And the airports' hourly
@@ -31,8 +31,7 @@ import java.util.TreeMap;
  */
 public final class Iem {
 
-    public static final String HOST = "mesonet.agron.iastate.edu";
-    private static final String ID = "[A-Z0-9]{3,10}";
+    static final String ID = "[A-Z0-9]{3,10}";
     private static final long HOUR = 3_600_000L;
     /** A gauge whose readings stop for longer than this inside a run has a gap. */
     private static final long MAX_GAP = 3 * HOUR;
@@ -76,11 +75,6 @@ public final class Iem {
     }
 
     // ---- network lists ---------------------------------------------------------------------
-
-    /** A state's gauges: "DCP" for the HADS gauges, "ASOS" for the airports. */
-    public static String networkUrl(String state, String kind) {
-        return "https://" + HOST + "/api/1/network/" + state + "_" + kind + ".geojson";
-    }
 
     /** Every gauge on line with a place; the archive lists retired ones too. */
     public static List<Station> parseNetwork(String geojson) {
@@ -142,12 +136,6 @@ public final class Iem {
 
     // ---- daily totals ----------------------------------------------------------------------
 
-    /** The HADS gauges' daily totals, the gauge's local calendar day, {@code start} to {@code end}. */
-    public static String dailyUrl(String state, List<String> ids, String start, String end) {
-        return "https://" + HOST + "/cgi-bin/request/daily.py?network=" + state + "_DCP&stations=" + join(ids)
-                + "&sts=" + start + "&ets=" + end + "&var=precip_in&format=csv&na=M";
-    }
-
     /** Gauge to day to inches; a day with no total ("M") is absent. */
     public static Map<String, TreeMap<String, Double>> parseDaily(String csv) {
         final Map<String, TreeMap<String, Double>> out = new LinkedHashMap<>();
@@ -176,12 +164,6 @@ public final class Iem {
     }
 
     // ---- a stretch of hours: the HADS readings ---------------------------------------------
-
-    /** The HADS gauges' readings from {@code startZ} to {@code endZ}, "2026-10-10T21:00Z". */
-    public static String hadsUrl(String state, List<String> ids, String startZ, String endZ) {
-        return "https://" + HOST + "/cgi-bin/request/hads.py?network=" + state + "_DCP&stations=" + join(ids)
-                + "&sts=" + startZ + "&ets=" + endZ;
-    }
 
     /**
      * Each gauge's rain from {@code startMs} to {@code endMs} (UTC): from its
@@ -224,6 +206,17 @@ public final class Iem {
             if (!Double.isNaN(h))
                 add(hourly, f[0], t, h);
         }
+        return hadsTotals(acc, hourly, startMs, endMs);
+    }
+
+    /**
+     * Each gauge's total from its readings, oldest first or not: {@code acc} the
+     * accumulator, {@code hourly} the hourly amounts, gauge to [millis, inches].
+     * {@link #parseHads} and the relay's copy of the same readings both end here.
+     */
+    static Map<String, Total> hadsTotals(Map<String, List<double[]>> acc, Map<String, List<double[]>> hourly,
+            long startMs, long endMs) {
+        final Map<String, Total> out = new LinkedHashMap<>();
         final java.util.Set<String> ids = new java.util.LinkedHashSet<>(acc.keySet());
         ids.addAll(hourly.keySet());
         for (String id : ids) {
@@ -290,13 +283,6 @@ public final class Iem {
 
     // ---- a stretch of hours: the airports --------------------------------------------------
 
-    /** Every airport's routine hourly reports in a state, with their places. */
-    public static String asosUrl(String state, String startZ, String endZ) {
-        return "https://" + HOST + "/cgi-bin/request/asos.py?network=" + state
-                + "_ASOS&stations=_ALL&data=p01i&tz=Etc/UTC&format=onlycomma&latlon=yes&report_type=3&missing=M"
-                + "&trace=T&sts=" + startZ + "&ets=" + endZ;
-    }
-
     /**
      * Each airport's rain from {@code startMs} to {@code endMs}: one report an hour,
      * the one nearest the top of it, so an automated station that reports the last
@@ -304,17 +290,12 @@ public final class Iem {
      * have a report.
      */
     public static Map<String, Total> parseAsos(String csv, long startMs, long endMs) {
-        final Map<String, Total> out = new LinkedHashMap<>();
+        final AsosHours hours = new AsosHours(startMs, endMs);
         if (csv == null || !csv.startsWith("station,valid"))
-            return out;
-        final Map<String, Map<Long, double[]>> byHour = new LinkedHashMap<>();
-        final Map<String, double[]> where = new HashMap<>();
+            return hours.totals();
         for (String line : lines(csv)) {
             final String[] f = line.split(",", -1);
-            if (f.length < 5 || !f[0].matches(ID))
-                continue;
-            final long t = utc(f[1]);
-            if (t <= startMs || t > endMs + 15 * 60_000L)
+            if (f.length < 5)
                 continue;
             final double v;
             if (f[4].equals("T"))
@@ -325,41 +306,67 @@ public final class Iem {
                 } catch (NumberFormatException e) {
                     continue;
                 }
-            if (Double.isNaN(v) || v < 0 || v > 10)
-                continue;
             try {
-                final double lon = Double.parseDouble(f[2]), lat = Double.parseDouble(f[3]);
-                if (placeable(lat, lon))
-                    where.put(f[0], new double[] { lat, lon });
+                hours.add(f[0], utc(f[1]), v, Double.parseDouble(f[3]), Double.parseDouble(f[2]));
             } catch (NumberFormatException e) {
-                continue;
+                // No place; the report cannot be drawn.
             }
+        }
+        return hours.totals();
+    }
+
+    /**
+     * The airports' reports, one an hour: {@link #parseAsos} and the relay's copy of
+     * the same reports both add them here.
+     */
+    static final class AsosHours {
+        private final long startMs, endMs;
+        private final Map<String, Map<Long, double[]>> byHour = new LinkedHashMap<>();
+        private final Map<String, double[]> where = new HashMap<>();
+
+        AsosHours(long startMs, long endMs) {
+            this.startMs = startMs;
+            this.endMs = endMs;
+        }
+
+        /** One report: inches in the hour it closes (a trace is 0). */
+        void add(String id, long t, double v, double lat, double lon) {
+            if (id == null || !id.matches(ID) || t <= startMs || t > endMs + 15 * 60_000L)
+                return;
+            if (Double.isNaN(v) || v < 0 || v > 10)
+                return;
+            if (placeable(lat, lon))
+                where.put(id, new double[] { lat, lon });
             // The hour this report closes: the nearest top of the hour.
             final long hour = ((t + HOUR / 2) / HOUR) * HOUR;
             if (hour <= startMs || hour > endMs)
-                continue;
-            Map<Long, double[]> hours = byHour.get(f[0]);
+                return;
+            Map<Long, double[]> hours = byHour.get(id);
             if (hours == null) {
                 hours = new HashMap<>();
-                byHour.put(f[0], hours);
+                byHour.put(id, hours);
             }
             final double[] have = hours.get(hour);
             final long off = Math.abs(t - hour);
             if (off <= 15 * 60_000L && (have == null || off < have[0]))
                 hours.put(hour, new double[] { off, v });
         }
-        final long wanted = Math.max(1, (endMs - startMs) / HOUR);
-        for (Map.Entry<String, Map<Long, double[]>> e : byHour.entrySet()) {
-            final double[] at = where.get(e.getKey());
-            if (at == null)
-                continue;
-            double sum = 0;
-            for (double[] h : e.getValue().values())
-                sum += h[1];
-            out.put(e.getKey(), new Total(e.getKey(), sum, e.getValue().size() * 10 >= wanted * 9,
-                    new TreeMap<String, Double>(), at[0], at[1]));
+
+        Map<String, Total> totals() {
+            final Map<String, Total> out = new LinkedHashMap<>();
+            final long wanted = Math.max(1, (endMs - startMs) / HOUR);
+            for (Map.Entry<String, Map<Long, double[]>> e : byHour.entrySet()) {
+                final double[] at = where.get(e.getKey());
+                if (at == null)
+                    continue;
+                double sum = 0;
+                for (double[] h : e.getValue().values())
+                    sum += h[1];
+                out.put(e.getKey(), new Total(e.getKey(), sum, e.getValue().size() * 10 >= wanted * 9,
+                        new TreeMap<String, Double>(), at[0], at[1]));
+            }
+            return out;
         }
-        return out;
     }
 
     // ---- holding a gauge against its neighbors ---------------------------------------------
@@ -402,7 +409,7 @@ public final class Iem {
         return Double.NaN;
     }
 
-    private static void add(Map<String, List<double[]>> m, String id, long t, double v) {
+    static void add(Map<String, List<double[]>> m, String id, long t, double v) {
         List<double[]> l = m.get(id);
         if (l == null) {
             l = new ArrayList<>();
@@ -452,17 +459,9 @@ public final class Iem {
         return f.format(new java.util.Date(millis));
     }
 
-    private static boolean placeable(double lat, double lon) {
+    static boolean placeable(double lat, double lon) {
         return !Double.isNaN(lat) && !Double.isNaN(lon) && !Double.isInfinite(lat) && !Double.isInfinite(lon)
                 && Math.abs(lat) <= 90 && Math.abs(lon) <= 180 && !(lat == 0 && lon == 0);
-    }
-
-    private static String join(List<String> ids) {
-        final StringBuilder b = new StringBuilder();
-        for (String id : ids)
-            if (id.matches(ID))
-                b.append(b.length() > 0 ? "," : "").append(id);
-        return b.toString();
     }
 
     /** The lines after the header, without building one array of the whole body. */

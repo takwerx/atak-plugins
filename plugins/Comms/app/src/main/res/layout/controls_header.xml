@@ -16,13 +16,10 @@
         android:text="@string/resync" />
 
     <TextView
+        style="@style/TakwerxSectionHeading"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Where"
-        android:textSize="10sp"
-        android:textAllCaps="true"
-        android:paddingTop="6dp"
-        android:alpha="0.6" />
+        android:text="Where" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -52,13 +49,10 @@
         android:layout_height="wrap_content" />
 
     <TextView
+        style="@style/TakwerxSectionHeading"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Draw on the map"
-        android:textSize="10sp"
-        android:textAllCaps="true"
-        android:paddingTop="6dp"
-        android:alpha="0.6" />
+        android:text="Draw on the map" />
 
     <TextView
         android:id="@+id/zoom_label"
@@ -89,13 +83,10 @@
     </LinearLayout>
 
     <TextView
+        style="@style/TakwerxSectionHeading"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Reach from here"
-        android:textSize="10sp"
-        android:textAllCaps="true"
-        android:paddingTop="6dp"
-        android:alpha="0.6" />
+        android:text="Reach from here" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -162,13 +153,10 @@
         android:alpha="0.8" />
 
     <TextView
+        style="@style/TakwerxSectionHeading"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Find a site, net, frequency or tone"
-        android:textSize="10sp"
-        android:textAllCaps="true"
-        android:paddingTop="2dp"
-        android:alpha="0.6" />
+        android:text="Find a site, net, frequency or tone" />
 
     <!-- Clear sits beside the box and is disabled while it is empty, so a live Clear
          button is the pane saying a search is filtering the list. -->
@@ -198,12 +186,9 @@
     </LinearLayout>
 
     <TextView
+        style="@style/TakwerxSectionHeading"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Sites, nearest first"
-        android:textSize="10sp"
-        android:textAllCaps="true"
-        android:paddingTop="8dp"
-        android:alpha="0.6" />
+        android:text="Sites, nearest first" />
 
 </LinearLayout>

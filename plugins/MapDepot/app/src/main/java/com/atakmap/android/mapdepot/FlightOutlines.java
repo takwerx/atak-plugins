@@ -120,8 +120,59 @@ public final class FlightOutlines {
 
     private static DrawingShape box(MapView mv, MapGroup g, Depot.Flight f,
             boolean visible) {
-        final double[] b = f.bounds(); // south, west, north, east
-        final DrawingShape s = new DrawingShape(mv, g, "mapdepot-flight-" + f.id);
+        return box(mv, g, "mapdepot-flight-" + f.id, f.name, f.id, f.bounds(), visible);
+    }
+
+    private static final String PREVIEW_GROUP = "Satellite Outline";
+
+    /**
+     * The box a satellite pass covers, drawn while the operator looks at it
+     * in the list and gone when the section closes. A streamed pass is boxed by
+     * ATAK as the whole world, so without this nothing on the map says how big
+     * it is. One box at a time, in a group of its own with no Overlay Manager
+     * row: it is a look, not a layer. Main thread.
+     */
+    public static void preview(Depot.Scene scene) {
+        final MapView mv = MapView.getMapView();
+        if (mv == null || scene.bounds() == null)
+            return;
+        try {
+            final MapGroup g = previewGroup(mv);
+            for (MapItem it : new ArrayList<>(g.getItems()))
+                g.removeItem(it);
+            final String title = (scene.place.isEmpty() ? "" : scene.place + " · ")
+                    + Depot.prettyDate(scene.date);
+            g.addItem(box(mv, g, "mapdepot-scene-preview", title, "scene-preview",
+                    scene.bounds(), true));
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not draw the pass outline: " + notThisBuild);
+        }
+    }
+
+    public static void clearPreview() {
+        final MapView mv = MapView.getMapView();
+        if (mv == null)
+            return;
+        try {
+            final MapGroup g = mv.getRootGroup().findMapGroup(PREVIEW_GROUP);
+            if (g != null)
+                for (MapItem it : new ArrayList<>(g.getItems()))
+                    g.removeItem(it);
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not clear the pass outline: " + notThisBuild);
+        }
+    }
+
+    private static MapGroup previewGroup(MapView mv) {
+        final MapGroup root = mv.getRootGroup();
+        final MapGroup g = root.findMapGroup(PREVIEW_GROUP);
+        return g != null ? g : root.addGroup(PREVIEW_GROUP);
+    }
+
+    private static DrawingShape box(MapView mv, MapGroup g, String uid,
+            String title, String key, double[] b, boolean visible) {
+        // b is south, west, north, east
+        final DrawingShape s = new DrawingShape(mv, g, uid);
         final List<GeoPointMetaData> pts = new ArrayList<>(5);
         pts.add(GeoPointMetaData.wrap(new GeoPoint(b[2], b[1])));
         pts.add(GeoPointMetaData.wrap(new GeoPoint(b[2], b[3])));
@@ -135,8 +186,8 @@ public final class FlightOutlines {
         s.setStrokeWeight(3.0d);
         s.addStyleBits(Shape.STYLE_STROKE_MASK | Polyline.STYLE_CLOSED_MASK);
         s.setAltitudeMode(Feature.AltitudeMode.ClampToGround);
-        s.setTitle(f.name);
-        s.setMetaString(FLIGHT_KEY, f.id);
+        s.setTitle(title);
+        s.setMetaString(FLIGHT_KEY, key);
         // A footprint, not a drawing: nothing to drag, edit or delete.
         s.setMetaBoolean("editable", false);
         s.setMetaBoolean("movable", false);
@@ -150,7 +201,7 @@ public final class FlightOutlines {
                 m.setTextColor(COLOR);
             }
         } catch (LinkageError | RuntimeException notThisBuild) {
-            Log.d(TAG, "no center marker for " + f.id + ": " + notThisBuild);
+            Log.d(TAG, "no center marker for " + key + ": " + notThisBuild);
         }
         s.setVisible(visible);
         return s;
