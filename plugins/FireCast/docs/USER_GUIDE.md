@@ -83,25 +83,23 @@ Tap **Run a Model**.
 
 ![The model page](screenshots/5_model_page.png)
 
+The top line is always there: **Back**, **Run model**, **Rerun** (the run you have selected again, from its own start, with the conditions set now) and **Clear all**. Under it, once there is a run, **Predicted Fire Size** and **Send run**. Below that the page folds into three boxes, each with a summary line when it is closed: **Start and conditions**, **Runs on the map** and **Timeline Slider**. Tap a box's bar to open or close it; the page remembers which are open.
+
 ### Start a run
 
-1. Tap **Start from** at the top and pick one:
+1. Open **Start and conditions** and tap **Start from**. Pick one:
    - **A point**: tap the map where the fire is. A marker labeled *Fire start* is placed. Drag it, or use Fine Adjust on its menu, to make it exact.
-   - **NASA satellite perimeter**: a list of the fires in the map view with a NASA outline from the last three days, biggest first, each with its county and state, acres, how long it has burned and how old the outline is. It follows the map as you pan and zoom; nothing is drawn until you tap one. The run then starts from every piece of that outline, with everything inside already burning.
    - **A perimeter you draw**: trace the fire's edge with ATAK's shape tool.
-   - **A shape already on the map**: tap it. A shape you drew earlier, one a contact sent, an imported KML, or a perimeter from another layer, such as a FIRIS perimeter in Feature Layer. Every piece of it starts burning. A line is refused; the outline has to be an area.
-   - **Remove the perimeter** when one is set.
+   - **A shape already on the map**: tap it. A shape you drew earlier, one a contact sent, an imported KML, or a perimeter from another layer, such as a FIRIS perimeter in Feature Layer. Every piece of it starts burning. A line is refused, in orange, and the start is cleared so nothing runs by mistake; the outline has to be an area.
 
-   The button then says what the run starts from: *Start from: a point*, *NASA perimeter*, *map shape* or *drawn perimeter*.
+   The button then says what the run starts from. To run from a NASA satellite perimeter, tap the perimeter on the map and use **Run from perimeter** on its detail (see section 2).
 
 ![Start the Run From](screenshots/25_how_the_fire_starts.png)
-
-![The NASA perimeter list](screenshots/26_nasa_perimeter_list.png)
 
 2. Set what you know:
    - **Conditions:** *As observed* at the weather station, *As observed but at the gust*, *Dry day*, or *Dry and 20 mph wind*. The last two are for planning what a bad day would do.
    - **Weather:** where the wind, temperature and humidity come from:
-     - *A weather station*: automatic picks a nearby station by distance and height, so a station on a ridge does not stand in for a valley; or pick one by name.
+     - *A weather station*: automatic picks a nearby station by distance and height, so a station on a ridge does not stand in for a valley; or pick one by name. The list is ready as soon as the start is placed, before any run: each station with its distance, height above or below the start, wind, humidity and the time of its reading. *HRRR wind* and *NWS forecast for this spot* are choices too. **OK** keeps what is ticked.
      - *My observation*: type in what you measured at the fire: wind speed, the direction it comes from (degrees, or N, SW and so on), gust, temperature, humidity, and the 1 h fuel moisture if you have it. Tick *eye level* for a hand-held meter; the model then takes it as the wind at the flames. Otherwise it is a 20 ft wind.
      - *From a Kestrel station on the map*: the stations the Kestrel Wx plugin shares to the team, with their reading and age. Pick one and the form opens filled in, to check or change before using it.
 
@@ -127,7 +125,7 @@ The fire moves over this in 15 m steps (30 m for three hours).
 
 **The wind.** Three sources, the best one there is:
 
-- a weather station near the fire, a RAWS fire weather station or a National Weather Service station, picked by distance *and* height, so a station on a ridge does not stand in for a valley. **Station** on the model page picks one by name;
+- a weather station near the fire, picked by distance *and* height, so a station on a ridge does not stand in for a valley: a RAWS fire weather station, a National Weather Service station, or in California a utility station (SCE, SDG&E, PG&E or HPWREN, through Cal OES), often the closest in the valleys. A utility station averages its wind over a minute or two rather than ten, so it reads a little higher for the same air, and its wind is taken as a 20 ft wind; both err toward more fire. Only a station that reported in the last three hours is picked. **Weather** on the model page picks one by name;
 - for the hours ahead, the National Weather Service hourly forecast at the start;
 - where it is available, the HRRR 3 km wind forecast from NOAA, which varies across the ground and hour by hour.
 
@@ -152,7 +150,7 @@ The fire moves over this in 15 m steps (30 m for three hours).
 
 ![A run's result](screenshots/7_run_result.png)
 
-- The line at the top says where the fire is by a time, with its area, how far it has gone and how many buildings.
+- **Timeline Slider** opens on the run. Its line says where the fire is by a time, with its area, how far it has gone and how many buildings.
 - The **time slider** moves the rings on the map between the start and the end of the run. The edge at the slider's time is drawn in cyan.
 - The **table** lists each time step with the area in acres, buildings and people reached (up to).
 
@@ -199,17 +197,21 @@ Under the results, the rest is folded away so the page does not become one long 
 
 - **What went in:** the fuel, slope and canopy, the wind and where it came from, and the moisture. Check this first when a run looks wrong: a station far from the fire is the usual reason.
 
-At the bottom, **Rerun from this start** runs it again with fresh weather, and **Send this run** shares the run as one file through ATAK's Send dialog.
+**Rerun** on the top line runs the selected run again from its own start with fresh weather, and **Send run** shares it as one file through ATAK's Send dialog.
 
 ### Runs on the map
 
-Each run is listed with its time, fuel, wind and area. **ON** and **OFF** show or hide it on the map. **Delete** removes it. Runs are kept on the device.
+Each run is listed with its time, fuel, wind and area; the one the page shows has the arrow and is in cyan. Tap a run to show it. **ON** and **OFF** show or hide it on the map. **Delete** removes it. Runs are kept on the device.
+
+**Show: In view** lists only the runs in the part of the map beside the pane, and says how many of all of them that is; tap it for **Show: All runs**. **Opacity** fades every run on the map, from 10% to 100%, so the ground under the rings can be read.
 
 ## 4. Other forecasts
 
 ![The PyreCast switch](screenshots/14_pyrecast_switch.png)
 
-Under **Models** on the pane: **FIRIS Model Runs** shows the spread runs that California's fire analysts publish for ATAK. **PyreCast Forecasts** shows the ELMFIRE forecasts PyreCast (CloudFire, Inc.) publishes for large fires across the country, shown with their permission, with their logo and a link to pyrecast.com. Each is a switch. Long press a layer's switch for its list, and pick a fire to put its time slider on it.
+Under **Models** on the pane: **FIRIS Model Runs** shows the spread runs that California's fire analysts publish for ATAK. **PyreCast Forecasts** shows the ELMFIRE forecasts PyreCast (CloudFire, Inc.) publishes for large fires across the country, shown with their permission, with their logo and a link to pyrecast.com. Each is a switch. Long press a layer's switch for its list, and pick a fire to put its time slider on it. Tap the run's name above its slider and the map goes to it.
+
+A FIRIS run also counts what it reaches, from the same FEMA building inventory as FireCast's own runs: *6 structures (6 homes), up to 30 people*, by the slider's hour, and schools, hospitals and the like by name. The count is made once and kept on the device.
 
 ![The PyreCast list](screenshots/14b_pyrecast_list.png)
 
@@ -225,7 +227,7 @@ PyreCast ranks its own runs by how much burned at the end of the forecast. FireC
 
 ## 5. Offline
 
-Everything FireCast has fetched or run stays on the device. After a restart of ATAK, or with no signal, your runs, the last detections, NASA's perimeters and the PyreCast forecasts come back, with their age on the pane. Switching a layer off only hides it. A failed fetch never empties what you already have, and a new run with no signal says what it could not reach, for example "Could not read the fuel and slope here", and leaves your other runs alone.
+Everything FireCast has fetched or run stays on the device. After a restart of ATAK, or with no signal, your runs, the last detections, NASA's perimeters, the FIRIS runs with their structure counts and the PyreCast forecasts come back, with their age on the pane. Switching a layer off only hides it. A failed fetch never empties what you already have, and a new run with no signal says what it could not reach, for example "Could not read the fuel and slope here", and leaves your other runs alone.
 
 ## 6. What to keep in mind
 

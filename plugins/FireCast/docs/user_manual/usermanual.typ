@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "FireCast",
-   plugin-version: "0.2",
+   plugin-version: "0.4",
    platform: "ATAK",
    platform-version: "5.7.0",
 )
@@ -154,12 +154,13 @@ perimeter* starts a run from that outline.
 #toolbox.side-by-side(columns: (6fr, 6fr))[
   #image("22.png", width: 96%)
 ][
-  Tap *Run a Model*, then *Start from*:
+  Tap *Run a Model*. The top line: *Back*, *Run model*, *Rerun*, *Clear all*.
+  Open *Start and conditions* and tap *Start from*:
 
   - *A point:* tap the map. Drag the marker to make it exact.
-  - *NASA satellite perimeter:* pick a fire in the map view.
   - *A perimeter you draw* with ATAK's shape tool.
-  - *A shape on the map:* tap one, drawn, sent, or a Feature Layer perimeter.
+  - *A shape already on the map:* tap one, drawn, sent, or a Feature Layer
+    perimeter.
 
   Then the settings:
 
@@ -175,7 +176,10 @@ perimeter* starts a run from that outline.
 #tak-slide[
 = Your own weather and the ignition
 
-*Weather* takes what you measured at the fire: wind, direction, gust,
+*Weather* lists the stations around the start as soon as it is placed:
+RAWS, National Weather Service and, in California, the utility stations (SCE,
+SDG&E, PG&E, HPWREN), each with its distance, height and reading. Automatic
+picks by distance and height. Or it takes what you measured at the fire: wind, direction, gust,
 temperature, humidity and the 1 h fuel moisture. An eye-level wind (a hand-held
 meter) is taken as the wind at the flames. *From a Kestrel station* lists the
 stations the Kestrel Wx plugin shares, ready to check and use. An observation
@@ -189,16 +193,17 @@ its rings is *now*.
 ]
 
 #tak-slide[
-= Start from a NASA perimeter
+= Start from a shape on the map
 
-#toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("23.png", width: 96%)
-][
-  The fires in the map view with a NASA outline from the last three days, with
-  county, acres, how long burning and how old the outline is. It follows the
-  map; nothing is drawn until you tap one. The run starts from every piece of
-  it, everything inside already burning.
-]
+*A shape already on the map* takes any area on the map: one you drew, one a
+contact sent, an imported KML, or a perimeter from another layer such as a FIRIS
+perimeter in Feature Layer. Every piece of it starts burning.
+
+#v(6pt)
+
+A line is refused in orange, and the start is cleared so nothing runs by
+mistake. A NASA satellite perimeter is run from its detail: tap it on the map,
+then *Run from perimeter*.
 ]
 
 #tak-slide[
@@ -220,8 +225,9 @@ its rings is *now*.
 = What the model uses
 
 The fuel, slope and canopy are the real ground from LANDFIRE, cell by cell. Wind
-comes from the nearest weather station and the National Weather Service
-forecast. How dry the fuels are comes from the national fuel moisture data.
+comes from the best weather station near the fire, a RAWS, a National Weather
+Service station or a California utility station, and the National Weather
+Service forecast. How dry the fuels are comes from the national fuel moisture data.
 
 #v(6pt)
 
@@ -241,8 +247,8 @@ the fire is the usual reason.
 #toolbox.side-by-side(columns: (6fr, 6fr))[
   #image("04.png", width: 96%)
 ][
-  - The top line says where the fire is by a time: area, how far it has gone,
-    how many buildings.
+  - *Timeline Slider* opens on the run. Its line says where the fire is by a
+    time: area, how far it has gone, how many buildings.
   - The *time slider* moves the rings on the map. The edge at the slider's
     time is drawn in cyan.
   - The *table* gives each time step: acres, buildings and people reached
@@ -344,9 +350,21 @@ the wind, the further apart they come.
 
   #v(4pt)
 
-  *Rerun from this start* runs it again with fresh weather. *Send this run*
-  shares it as one file through ATAK's Send dialog.
+  *Rerun* on the top line runs the selected run again from its own start.
+  *Send run* shares it as one file through ATAK's Send dialog.
 ]
+]
+
+#tak-slide[
+= Runs on the map
+
+Each run is listed with its time, fuel, wind and area. The one the page shows is
+in cyan. *ON* and *OFF* show or hide it; *Delete* removes it.
+
+#v(6pt)
+
+*Show: In view* lists only the runs beside the pane; tap it for all of them.
+*Opacity* fades the runs on the map so the ground under them can be read.
 ]
 
 #tak-slide[
@@ -360,7 +378,8 @@ their logo and a link to pyrecast.com.
 #v(6pt)
 
 Each is a switch in the pane. Long press a switch for its list, and pick a fire
-to put its time slider on it. PyreCast ranks its runs by what burned at the end
+to put its time slider on it; tap the run's name to go to it. A FIRIS run counts
+the structures, homes and people each hour reaches, from FEMA's inventory. PyreCast ranks its runs by what burned at the end
 of the forecast; FireCast shows the middle run unless you pick the smaller or
 larger end.
 ]
@@ -391,8 +410,8 @@ says where the fire is by then and how big.
 = Offline
 
 Everything FireCast has fetched or run stays on the device. After a restart of
-ATAK, or with no signal, your runs, the last detections and the PyreCast
-forecasts come back with their age on the pane.
+ATAK, or with no signal, your runs, the last detections, the FIRIS runs
+with their structure counts and the PyreCast forecasts come back with their age on the pane.
 
 #v(6pt)
 
