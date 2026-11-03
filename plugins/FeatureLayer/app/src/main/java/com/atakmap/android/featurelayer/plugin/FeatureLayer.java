@@ -2443,6 +2443,27 @@ public class FeatureLayer implements IPlugin {
             });
             container.addView(row);
         }
+        if (l.spec.activeWhere != null) {
+            // Active only: OFF brings back perimeters the service has marked inactive,
+            // for a fire that is out but still worth a look (or a model run from it).
+            final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.feature_row, null);
+            ((TextView) row.findViewById(R.id.feature_name)).setText("Perimeters");
+            final Button only = row.findViewById(R.id.feature_toggle);
+            final boolean on = l.spec.activeOnly;
+            only.setText("Active only " + (on ? "ON" : "OFF"));
+            only.setTextColor(on ? Color.parseColor("#4CAF50") : Color.parseColor("#F44336"));
+            row.findViewById(R.id.feature_fill).setVisibility(View.GONE);
+            only.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    final boolean next = !l.spec.activeOnly;
+                    only.setText("Active only " + (next ? "ON" : "OFF"));
+                    only.setTextColor(next ? Color.parseColor("#4CAF50") : Color.parseColor("#F44336"));
+                    manager.setActiveOnly(l, next);
+                }
+            });
+            container.addView(row);
+        }
         {
             // Zoom gate, Cam Depot's way: set it by example ("Use this zoom") or pick a
             // scale-bar reading; nothing in the layer draws further out than that.

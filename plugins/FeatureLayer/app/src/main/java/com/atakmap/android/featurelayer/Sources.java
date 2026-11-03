@@ -399,7 +399,9 @@ public final class Sources {
         s.portal = null;
         s.base = CA_AIR_INTEL;
         s.layerIds = new int[] { 0 };
-        s.where = "displayStatus = 'Active'"; // an inactive perimeter is yesterday's news
+        s.where = "1=1";
+        // An inactive perimeter is yesterday's news, but the Active only switch can show it.
+        s.activeWhere = "displayStatus = 'Active'";
         s.labelField = "incident_name";        // the service labels by mission number
         s.geojson = false;
         s.profile = LayerSpec.Profile.GENERIC;

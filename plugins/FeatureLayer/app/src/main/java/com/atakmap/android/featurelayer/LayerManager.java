@@ -467,6 +467,25 @@ public class LayerManager {
         });
     }
 
+    /** The Active only switch; the where clause changes, so this one refetches. */
+    public void setActiveOnly(final LoadedLayer l, final boolean on) {
+        l.spec.activeOnly = on;
+        save();
+        l.busy = true;
+        changed();
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    refreshNow(l);
+                } finally {
+                    l.busy = false;
+                    changed();
+                }
+            }
+        });
+    }
+
     /** The zoom gate for one layer; a store rewrite from memory, no network. */
     public void setGate(final LoadedLayer l, final double metersPerPixel) {
         l.spec.gateGsd = metersPerPixel;
@@ -1059,6 +1078,7 @@ public class LayerManager {
                 if ("ca-air-intel".equals(spec.id)) {
                     final LayerSpec cur = Sources.caAirIntel();
                     spec.where = cur.where;
+                    spec.activeWhere = cur.activeWhere;
                     spec.labelField = cur.labelField;
                     spec.setField = cur.setField;
                     spec.timeField = cur.timeField;

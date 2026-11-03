@@ -106,10 +106,19 @@ public class LayerSpec {
      * or fields separated by "|" tried in turn ("incident_name|mission"). Null = keep all.
      */
     public String[] latestBy;
+    /**
+     * The clause that keeps only what is happening now ("displayStatus = 'Active'"), applied
+     * while {@link #activeOnly} is on. Null = the layer has no such switch. From the source, not saved.
+     */
+    public String activeWhere;
+    /** The Active only switch: off shows every perimeter the service holds, active or not. */
+    public boolean activeOnly = true;
 
     /** The where clause to query with right now: the fixed one, plus the time window from the present. */
     public String whereNow() {
-        final String fixed = where == null || where.trim().isEmpty() ? "1=1" : where;
+        String fixed = where == null || where.trim().isEmpty() ? "1=1" : where;
+        if (activeWhere != null && activeOnly)
+            fixed = "(" + fixed + ") AND (" + activeWhere + ")";
         if (timeField == null || (sinceHours <= 0 && minAgeHours <= 0))
             return fixed;
         final long now = System.currentTimeMillis();
@@ -222,7 +231,7 @@ public class LayerSpec {
         o.put("id", id).put("title", title).put("subtitle", subtitle).put("portal", portal)
                 .put("base", base).put("where", where).put("geojson", geojson)
                 .put("profile", profile.name()).put("lat", finite(lat)).put("lon", finite(lon)).put("live", live).put("maxFeatures", maxFeatures).put("iconSet", iconSet).put("fillAlpha", fillAlpha).put("refreshMinutes", refreshMinutes).put("repairStatus", repairStatus).put("labels", labels)
-                .put("timeField", timeField).put("sinceHours", sinceHours).put("setField", setField).put("labelField", labelField).put("gateGsd", gateGsd == Double.MAX_VALUE ? -1 : gateGsd).put("orgName", orgName).put("labelGsd", labelGsd == Double.MAX_VALUE ? 0 : labelGsd);
+                .put("timeField", timeField).put("sinceHours", sinceHours).put("activeOnly", activeOnly).put("setField", setField).put("labelField", labelField).put("gateGsd", gateGsd == Double.MAX_VALUE ? -1 : gateGsd).put("orgName", orgName).put("labelGsd", labelGsd == Double.MAX_VALUE ? 0 : labelGsd);
         final JSONArray ids = new JSONArray();
         for (int i : layerIds)
             ids.put(i);
@@ -278,6 +287,7 @@ public class LayerSpec {
         s.labels = o.optBoolean("labels", true);
         s.timeField = o.isNull("timeField") ? null : o.optString("timeField", null);
         s.sinceHours = o.optInt("sinceHours", 0);
+        s.activeOnly = o.optBoolean("activeOnly", true);
         s.setField = o.isNull("setField") ? null : o.optString("setField", null);
         s.labelField = o.isNull("labelField") ? null : o.optString("labelField", null);
         s.orgName = o.isNull("orgName") ? null : o.optString("orgName", null);
