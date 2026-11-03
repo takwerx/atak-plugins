@@ -525,35 +525,79 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                 .show();
     }
 
+    /** Lists the stations around the start, fetching them first when the start is new. */
     private void chooseStation() {
-                final FireModel.Run r = model.last();
-                final java.util.List<Weather.Reading> list = r == null ? new java.util.ArrayList<Weather.Reading>() : r.stations;
-                final String[] labels = new String[1 + list.size()];
+        final GeoPoint p = model.startPoint();
+        if (p == null) {
+            new android.app.AlertDialog.Builder(getMapView().getContext())
+                    .setTitle("Weather station")
+                    .setMessage("Place the start first (Start from), then the stations around it are listed here.")
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+        final android.app.AlertDialog wait = new android.app.AlertDialog.Builder(getMapView().getContext())
+                .setTitle("Weather station")
+                .setMessage("Finding the stations around the start...")
+                .setNegativeButton("Cancel", null)
+                .show();
+        model.fetchNearby(p.getLatitude(), p.getLongitude(), new Runnable() {
+            @Override
+            public void run() {
+                if (!wait.isShowing())
+                    return;
+                wait.dismiss();
+                showStations();
+            }
+        });
+    }
+
+    private void showStations() {
+                final java.util.List<Weather.Reading> found = model.nearby();
+                final double[] at = model.nearbyAt();
+                final double startFt = at == null ? Double.NaN : at[2];
+                final java.util.List<Weather.Reading> list = new java.util.ArrayList<>();
+                if (found != null)
+                    list.addAll(found);
+                java.util.Collections.sort(list, new java.util.Comparator<Weather.Reading>() {
+                    @Override
+                    public int compare(Weather.Reading a, Weather.Reading b) {
+                        return Double.compare(a.distanceM, b.distanceM);
+                    }
+                });
+                final String[] labels = new String[3 + list.size()];
+                final String[] ids = new String[labels.length];
                 labels[0] = "Closest at about the start's height (automatic)";
-                int current = 0;
+                ids[0] = "";
+                labels[1] = "HRRR 3 km wind field (wind only; humidity from the forecast)";
+                ids[1] = "HRRR";
+                labels[2] = "NWS forecast for this spot";
+                ids[2] = "FORECAST";
                 for (int i = 0; i < list.size(); i++) {
                     final Weather.Reading s = list.get(i);
-                    labels[1 + i] = s.station + ("HRRR".equals(s.source) ? "" : " (" + s.source + ")")
-                            + ("NWS forecast".equals(s.source) || "HRRR".equals(s.source) ? "" : " · " + Units.format(s.distanceM))
-                            + (s.elevationFt > 0 && r != null && !Double.isNaN(r.startElevFt)
-                                    ? String.format(Locale.US, " · %+,.0f ft", s.elevationFt - r.startElevFt) : "")
-                            + String.format(Locale.US, " · %.0f mph from %s", s.windMph, Units.compass(s.windFromDeg))
+                    labels[3 + i] = s.station + " (" + s.source + ")"
+                            + " \u00B7 " + Units.format(s.distanceM)
+                            + (s.elevationFt > 0 && !Double.isNaN(startFt)
+                                    ? String.format(Locale.US, " \u00B7 %+,.0f ft", s.elevationFt - startFt) : "")
+                            + String.format(Locale.US, " \u00B7 %.0f mph from %s", s.windMph, Units.compass(s.windFromDeg))
                             + (Double.isNaN(s.gustMph) || s.gustMph <= s.windMph ? "" : String.format(Locale.US, " gust %.0f", s.gustMph))
-                            + (Double.isNaN(s.relativeHumidity) ? "" : String.format(Locale.US, " · RH %.0f%%", s.relativeHumidity));
-                    if (s.wxId.equals(model.station()))
-                        current = 1 + i;
+                            + (Double.isNaN(s.relativeHumidity) ? "" : String.format(Locale.US, " \u00B7 RH %.0f%%", s.relativeHumidity))
+                            + (s.observedAt > 0 ? " \u00B7 " + clock(s.observedAt) : "");
+                    ids[3 + i] = s.wxId;
                 }
-                if (list.isEmpty())
-                    labels[0] = "Run once to list the stations near the start";
+                int current = 0;
+                for (int i = 0; i < ids.length; i++)
+                    if (ids[i].equals(model.station()))
+                        current = i;
                 final int[] picked = { current };
                 new android.app.AlertDialog.Builder(getMapView().getContext())
-                        .setTitle("Weather station")
+                        .setTitle(list.isEmpty() ? "Weather station (none answered near the start)" : "Weather station")
                         .setSingleChoiceItems(labels, current, new android.content.DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(android.content.DialogInterface dialog, int which) {
                                 picked[0] = which;
                                 dialog.dismiss();
-                                model.setStation(which == 0 ? "" : list.get(which - 1).wxId);
+                                model.setStation(ids[which]);
                                 render();
                             }
                         })
@@ -561,7 +605,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                         .setPositiveButton("OK", new android.content.DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(android.content.DialogInterface dialog, int which) {
-                                model.setStation(picked[0] == 0 ? "" : list.get(picked[0] - 1).wxId);
+                                model.setStation(ids[picked[0]]);
                                 render();
                             }
                         })
@@ -857,6 +901,15 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                 for (Weather.Reading s : r.stations)
                     if (s.wxId.equals(model.station()))
                         stationLabel = "Weather:\n" + s.station;
+            final java.util.List<Weather.Reading> near = model.nearby();
+            if (near != null)
+                for (Weather.Reading s : near)
+                    if (s.wxId.equals(model.station()))
+                        stationLabel = "Weather:\n" + s.station;
+            if ("HRRR".equals(model.station()))
+                stationLabel = "Weather:\nHRRR wind";
+            else if ("FORECAST".equals(model.station()))
+                stationLabel = "Weather:\nNWS forecast";
         }
         if (obs != null)
             stationLabel = obs.usable(System.currentTimeMillis())

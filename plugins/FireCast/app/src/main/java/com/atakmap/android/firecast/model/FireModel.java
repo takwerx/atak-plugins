@@ -807,6 +807,8 @@ public final class FireModel {
     public void place(GeoPoint p) {
         prefs.edit().putFloat(PREF_LAT, (float) p.getLatitude())
                 .putFloat(PREF_LON, (float) p.getLongitude()).apply();
+        // So Weather can list the stations before the run.
+        fetchNearby(p.getLatitude(), p.getLongitude(), null);
         if (marker == null) {
             marker = new Marker(p, MARKER_UID);
             marker.setType("b-m-p-s-m");
@@ -1060,6 +1062,7 @@ public final class FireModel {
             detachLocked();
         }
         worker.shutdownNow();
+        nearbyWorker.shutdownNow();
     }
 
     // ---- the tap ------------------------------------------------------------------
@@ -1167,6 +1170,97 @@ public final class FireModel {
         return true;
     }
 
+    /**
+     * The stations that read the weather near a point: RAWS within 50 miles, the NWS
+     * networks' best 10, California's utility stations' best 10, one entry per spot.
+     * Any one source failing leaves the others. Worker thread.
+     */
+    static java.util.List<Weather.Reading> stationsAround(double lat, double lon, double elevFt) {
+        java.util.List<Weather.Reading> list = new java.util.ArrayList<>();
+        try {
+            list = Weather.within(lat, lon, 50);
+        } catch (Exception e) {
+            Log.w(TAG, "RAWS failed", e);
+        }
+        try {
+            // The NWS networks: airports, utilities, citizens, in the valleys
+            // the RAWS are not. A RAWS already listed is left out by name.
+            for (Weather.Reading n : Weather.nwsNear(lat, lon, elevFt, 10)) {
+                boolean dup = false;
+                for (Weather.Reading s : list)
+                    if (s.station.equalsIgnoreCase(n.station)
+                            && com.atakmap.android.firecast.DetectionFeed.metersBetween(new double[] { s.latitude, s.longitude }, n.latitude, n.longitude) < 1500)
+                        dup = true;
+                if (!dup)
+                    list.add(n);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "NWS stations failed", e);
+        }
+        try {
+            // California's utility stations, often the closest; a RAWS or NWS
+            // station already listed at the same spot is not counted twice.
+            for (Weather.Reading u : Weather.utilityNear(lat, lon, 25, elevFt, 10)) {
+                boolean dup = false;
+                for (Weather.Reading s : list)
+                    if (com.atakmap.android.firecast.DetectionFeed.metersBetween(new double[] { s.latitude, s.longitude }, u.latitude, u.longitude) < 200)
+                        dup = true;
+                if (!dup)
+                    list.add(u);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "utility stations failed: " + e);
+        }
+        return list;
+    }
+
+    /** The stations around the start, fetched before any run so Weather can list them. */
+    private volatile java.util.List<Weather.Reading> nearby;
+    private volatile double[] nearbyAt;
+    private final ExecutorService nearbyWorker = Executors.newSingleThreadExecutor();
+
+    /** The stations last fetched around the start, or null; with {@link #nearbyAt()} for where. */
+    public java.util.List<Weather.Reading> nearby() {
+        return nearby;
+    }
+
+    /** {lat, lon, elevation ft, fetched at ms} of {@link #nearby()}, or null. */
+    public double[] nearbyAt() {
+        return nearbyAt;
+    }
+
+    /**
+     * Fetches the stations around a point, unless what is held is within 500 m of it and
+     * under 10 minutes old, then runs {@code done} on the main thread. Any thread.
+     */
+    public void fetchNearby(final double lat, final double lon, final Runnable done) {
+        final double[] at = nearbyAt;
+        if (nearby != null && at != null && System.currentTimeMillis() - (long) at[3] < 600_000L
+                && com.atakmap.android.firecast.DetectionFeed.metersBetween(new double[] { at[0], at[1] }, lat, lon) < 500) {
+            if (done != null)
+                mapView.post(done);
+            return;
+        }
+        nearbyWorker.execute(new Runnable() {
+            @Override
+            public void run() {
+                double elevFt = Double.NaN;
+                try {
+                    final double hae = com.atakmap.map.elevation.ElevationManager.getElevation(lat, lon, null);
+                    if (!Double.isNaN(hae))
+                        elevFt = hae / FT_TO_M;
+                } catch (Throwable t) {
+                    Log.w(TAG, "no terrain height at the start: " + t);
+                }
+                final java.util.List<Weather.Reading> list = stationsAround(lat, lon, elevFt);
+                nearby = list;
+                nearbyAt = new double[] { lat, lon, elevFt, System.currentTimeMillis() };
+                if (done != null)
+                    mapView.post(done);
+            }
+        });
+    }
+
     /** Fetches the ground and the weather, runs the model, draws. Any thread. */
     public void run(final double lat, final double lon) {
         if (running)
@@ -1251,40 +1345,7 @@ public final class FireModel {
                     } catch (Throwable t) {
                         Log.w(TAG, "no terrain height at the start: " + t);
                     }
-                    try {
-                        r.stations = Weather.within(lat, lon, 50);
-                    } catch (Exception e) {
-                        Log.w(TAG, "RAWS failed", e);
-                    }
-                    try {
-                        // The NWS networks: airports, utilities, citizens, in the valleys
-                        // the RAWS are not. A RAWS already listed is left out by name.
-                        for (Weather.Reading n : Weather.nwsNear(lat, lon, r.startElevFt, 10)) {
-                            boolean dup = false;
-                            for (Weather.Reading s : r.stations)
-                                if (s.station.equalsIgnoreCase(n.station)
-                                        && com.atakmap.android.firecast.DetectionFeed.metersBetween(new double[] { s.latitude, s.longitude }, n.latitude, n.longitude) < 1500)
-                                    dup = true;
-                            if (!dup)
-                                r.stations.add(n);
-                        }
-                    } catch (Exception e) {
-                        Log.w(TAG, "NWS stations failed", e);
-                    }
-                    try {
-                        // California's utility stations, often the closest; a RAWS or NWS
-                        // station already listed at the same spot is not counted twice.
-                        for (Weather.Reading u : Weather.utilityNear(lat, lon, 25, r.startElevFt, 10)) {
-                            boolean dup = false;
-                            for (Weather.Reading s : r.stations)
-                                if (com.atakmap.android.firecast.DetectionFeed.metersBetween(new double[] { s.latitude, s.longitude }, u.latitude, u.longitude) < 200)
-                                    dup = true;
-                            if (!dup)
-                                r.stations.add(u);
-                        }
-                    } catch (Exception e) {
-                        Log.w(TAG, "utility stations failed: " + e);
-                    }
+                    r.stations = stationsAround(lat, lon, r.startElevFt);
                     final int hoursN = Math.max(1, (r.steps[r.steps.length - 1] + 59) / 60);
                     try {
                         final long[] times = new long[hoursN];
