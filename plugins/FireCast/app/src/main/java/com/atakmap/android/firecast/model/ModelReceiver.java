@@ -70,9 +70,62 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             loadFeds();
         }
     };
+    private static final String RUNS_FOLD = "Runs on the map";
+    private static final String TIMELINE_FOLD = "Timeline Slider", PREF_TIMELINE_OPEN = "model.timelineOpen";
+    private static final String SETTINGS_FOLD = "Start and conditions", PREF_SETTINGS_OPEN = "model.settingsOpen";
+    private static final String PREF_RUNS_ALL = "model.runsAll", PREF_RUNS_OPEN = "model.runsOpen";
+    /** The runs in view at the last redraw, so a pan redraws only when that changes. Main thread. */
+    private java.util.Set<String> listedInView = new java.util.HashSet<>();
+    /** GL thread: post only. The runs list follows the map while it shows In view. */
+    private final com.atakmap.map.AtakMapView.OnMapMovedListener runsMoved = new com.atakmap.map.AtakMapView.OnMapMovedListener() {
+        @Override
+        public void onMapMoved(com.atakmap.map.AtakMapView v, boolean animate) {
+            fedsMain.removeCallbacks(runsSettled);
+            fedsMain.postDelayed(runsSettled, 600);
+        }
+    };
+    private final Runnable runsSettled = new Runnable() {
+        @Override
+        public void run() {
+            if (!isVisible() || runsAll() || !OPEN_FOLDS.contains(RUNS_FOLD))
+                return;
+            if (!inViewIds(model.runs()).equals(listedInView))
+                render();
+        }
+    };
     private final LinearLayout body;
     /** The run whose details the page shows; the newest unless one was tapped. */
     private FireModel.Run shown;
+
+    private android.content.SharedPreferences prefs() {
+        return getMapView().getContext().getSharedPreferences("firecast", Context.MODE_PRIVATE);
+    }
+
+    private boolean runsAll() {
+        return prefs().getBoolean(PREF_RUNS_ALL, false);
+    }
+
+    /** A run is in view when its start or any point of its perimeter is in the map beside the pane. */
+    private boolean runInView(FireModel.Run x) {
+        final double[] b = viewBox();
+        if (b == null)
+            return true;
+        if (x.lat >= b[0] && x.lat <= b[2] && x.lon >= b[1] && x.lon <= b[3])
+            return true;
+        if (x.perimeter != null)
+            for (double[] p : x.perimeter)
+                if (p[0] >= b[0] && p[0] <= b[2] && p[1] >= b[1] && p[1] <= b[3])
+                    return true;
+        return false;
+    }
+
+    private java.util.Set<String> inViewIds(java.util.List<FireModel.Run> runs) {
+        final java.util.Set<String> ids = new java.util.HashSet<>();
+        for (FireModel.Run x : runs)
+            if (runInView(x))
+                ids.add(x.runId);
+        return ids;
+    }
 
     public ModelReceiver(MapView mapView, Context pluginContext, FireModel model, Runnable reopenPane) {
         super(mapView);
@@ -82,6 +135,27 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         this.view = PluginLayoutInflater.inflate(pluginContext, R.layout.model_panel, null);
         com.atakmap.android.firecast.DetectionFeed.coveredBy(view);
         this.body = view.findViewById(R.id.model_body);
+        if (prefs().getBoolean(PREF_TIMELINE_OPEN, true))
+            OPEN_FOLDS.add(TIMELINE_FOLD);
+        if (prefs().getBoolean(PREF_SETTINGS_OPEN, true))
+            OPEN_FOLDS.add(SETTINGS_FOLD);
+        final TextView settingsPill = view.findViewById(R.id.settings_pill);
+        stylePill(settingsPill);
+        settingsPill.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (!OPEN_FOLDS.remove(SETTINGS_FOLD))
+                    OPEN_FOLDS.add(SETTINGS_FOLD);
+                prefs().edit().putBoolean(PREF_SETTINGS_OPEN, OPEN_FOLDS.contains(SETTINGS_FOLD)).apply();
+                paintSettings();
+            }
+        });
+        if (prefs().getBoolean(PREF_RUNS_OPEN, true))
+            OPEN_FOLDS.add(RUNS_FOLD);
+        try {
+            mapView.addOnMapMovedListener(runsMoved);
+        } catch (Exception ignored) {
+        }
         view.findViewById(R.id.btn_back).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -100,6 +174,16 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             public void onClick(View v) {
                 if (model.perimeter() != null ? !model.runFromPerimeter() : !model.runFromStart())
                     return;
+                render();
+            }
+        });
+        // Rerun sits beside Run model: the run the page shows, again under today's settings.
+        view.findViewById(R.id.btn_rerun).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (shown == null)
+                    return;
+                model.rerun(shown);
                 render();
             }
         });
@@ -697,17 +781,15 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         d.show();
     }
 
-    /** Start the run from: a point, NASA's satellite perimeter, or one traced; and taking a perimeter off (operator's name, 2026-10-30). */
+    /** Start the run from: a point, a perimeter drawn, or a shape already on the map (operator's names, 2026-11-02). */
     private void chooseStart() {
         final GeoPoint start = model.startPoint();
-        final boolean hasPerimeter = model.perimeter() != null;
         final java.util.List<String> items = new java.util.ArrayList<>();
-        items.add("A point: tap the map");
-        items.add("NASA satellite perimeter: pick a fire in the map view");
-        items.add("A perimeter you draw on the map");
-        items.add("A shape already on the map: tap it (drawn, sent, or a Feature Layer perimeter)");
-        if (hasPerimeter)
-            items.add("Remove the perimeter");
+        // Three ways in, in the order a crew meets them; anything already on the map is a
+        // shape to tap, whatever brought it there (operator, 2026-11-02).
+        items.add("A point");
+        items.add("A perimeter you draw");
+        items.add("A shape already on the map");
         new android.app.AlertDialog.Builder(getMapView().getContext())
                 .setTitle("Start the Run From")
                 .setItems(items.toArray(new String[0]), new android.content.DialogInterface.OnClickListener() {
@@ -722,21 +804,14 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                                 model.pickStart();
                                 break;
                             case 1:
-                                openFeds();
-                                break;
-                            case 2:
                                 closeFeds();
                                 closeDropDown();
                                 model.drawPerimeter();
                                 break;
-                            case 3:
+                            default:
                                 closeFeds();
                                 closeDropDown();
                                 model.pickShape();
-                                break;
-                            default:
-                                model.clearPerimeter();
-                                render();
                         }
                     }
                 })
@@ -753,6 +828,10 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         final FireModel.Run r = shown;
         final com.atakmap.coremap.maps.coords.GeoPoint start = model.startPoint();
         ((Button) view.findViewById(R.id.btn_run)).setEnabled(!model.isRunning() && (start != null || model.perimeter() != null));
+        view.findViewById(R.id.btn_rerun).setEnabled(!model.isRunning() && r != null);
+        // Shown again below only for a run that has a result to size or send.
+        view.findViewById(R.id.run_actions).setVisibility(View.GONE);
+        view.findViewById(R.id.btn_size).setVisibility(View.GONE);
         ((Button) view.findViewById(R.id.btn_place)).setText(model.perimeter() != null
                 ? ("nasa".equals(model.perimeterKind()) ? "Start from: NASA perimeter"
                         : "shape".equals(model.perimeterKind()) ? "Start from: map shape" : "Start from: drawn perimeter")
@@ -774,27 +853,60 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                     ? "Weather:\n" + (obs.source.startsWith("Kestrel") ? obs.source : "my obs " + clock(obs.at))
                     : "Weather:\nobs too old";
         ((Button) view.findViewById(R.id.btn_station)).setText(stationLabel);
+        paintSettings();
         if (model.isRunning()) {
             section("Running", model.status());
             return;
         }
-        if (model.startNote() != null && !fedsOpen)
-            section("Start", model.startNote());
         if (fedsOpen)
             renderFeds();
         if (start == null && model.perimeter() == null) {
-            section("Fire model", "Tap Start from and choose: a point you tap on the map, NASA's satellite "
-                    + "perimeter of the fire, or a perimeter you draw; with a perimeter, say when it started and the run is scaled to what it has already done. Move the marker if it "
+            section("Fire model", "Tap Start from and choose: a point you tap on the map, a perimeter you draw, "
+                    + "or a shape already on the map; with a perimeter, say when it started and the run is scaled to what it has already done. Move the marker if it "
                     + "needs to be exact (drag it, or Fine Adjust on its menu), pick the conditions, then Run model. "
                     + "Where the fire is at 20, 40 and 60 minutes is drawn on the map, with everything the run assumed.");
             return;
         }
         if (!runs.isEmpty()) {
-            body.addView(headingView("Runs on the map"));
-            for (final FireModel.Run x : runs) {
+            // Behind a fold the operator can shut, and inside it only the runs in the map
+            // beside the pane unless All is picked: seven rows of last night's runs
+            // pushed the page down a screen (operator, 2026-11-02).
+            final boolean allRuns = runsAll();
+            final java.util.List<FireModel.Run> listed = new java.util.ArrayList<>();
+            int inView = 0;
+            for (FireModel.Run x : runs) {
+                final boolean in = runInView(x);
+                if (in)
+                    inView++;
+                if (allRuns || in || x == r)
+                    listed.add(x);
+            }
+            listedInView = inViewIds(runs);
+            beginFold(RUNS_FOLD);
+            foldSummary = runs.size() + (runs.size() == 1 ? " run, " : " runs, ") + inView + " in view";
+            final View filterRow = PluginLayoutInflater.inflate(pluginContext, R.layout.model_action_row, null);
+            final Button filter = filterRow.findViewById(R.id.action);
+            filter.setText(allRuns ? "Show: All runs (" + runs.size() + ")"
+                    : "Show: In view (" + inView + " of " + runs.size() + ")");
+            filter.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    prefs().edit().putBoolean(PREF_RUNS_ALL, !runsAll()).apply();
+                    render();
+                }
+            });
+            foldContent.addView(filterRow);
+            foldContent.addView(opacitySlider());
+            if (listed.isEmpty())
+                foldContent.addView(bodyView("None of the " + runs.size() + " runs is in the map beside the pane. "
+                        + "Pan to one, or tap Show for all of them."));
+            for (final FireModel.Run x : listed) {
                 final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.model_run_row, null);
                 final Button name = row.findViewById(R.id.run_name);
                 name.setText((x == r ? "\u25B8 " : "") + x.label());
+                // The run the page is showing reads cyan, like the plugin's own marks (operator, 2026-11-02).
+                if (x == r)
+                    name.setTextColor(0xFF00E5FF);
                 name.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
@@ -823,8 +935,9 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                         render();
                     }
                 });
-                body.addView(row);
+                foldContent.addView(row);
             }
+            endFold();
         }
         if (r == null) {
             section("Start placed", "Drag the marker or use Fine Adjust on its menu if it needs to be exact, "
@@ -837,9 +950,14 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             return;
         }
         final Behave.Result o = r.result;
-        body.addView(timeSlider(r));
+        // The slider and its table fold together, open until the operator shuts them.
+        beginFold(TIMELINE_FOLD);
+        final int lastStep = r.steps[r.steps.length - 1];
+        foldSummary = timeText(r, r.atMinutes > 0 ? r.atMinutes : lastStep);
+        foldContent.addView(timeSlider(r));
         if (r.ground != null)
-            body.addView(stepTable(r));
+            foldContent.addView(stepTable(r));
+        endFold();
         final StringBuilder goes = new StringBuilder();
         if (r.originAt > 0)
             goes.append("Ignition set to ").append(clock(r.originAt)).append(", ").append(r.nowMinutes())
@@ -932,8 +1050,8 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                     + " runs of this fire, with the wind's speed and direction and the dead fuel moisture nudged"
                     + " the way a forecast misses. The rings, the slider, the acres and the buildings on this page"
                     + " are that run.");
-            final View sizeRow = PluginLayoutInflater.inflate(pluginContext, R.layout.model_action_row, null);
-            final Button pick = sizeRow.findViewById(R.id.action);
+            final Button pick = view.findViewById(R.id.btn_size);
+            pick.setVisibility(View.VISIBLE);
             pick.setText("Predicted Fire Size: " + name);
             pick.setEnabled(!model.isRunning());
             pick.setOnClickListener(new View.OnClickListener() {
@@ -971,7 +1089,6 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                             .show();
                 }
             });
-            body.addView(sizeRow);
         }
         beginFold("Where it goes");
         section("Where it goes", goes.toString());
@@ -1069,21 +1186,9 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                         + "; ATAK does not confirm who sent it. Drawn here from the file's inputs with this phone's own "
                         + "engine, ground and building count."));
         endFold();
-        final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.model_action_row, null);
-        final Button act = row.findViewById(R.id.action);
-        act.setEnabled(!model.isRunning());
-        act.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                model.rerun(r);
-                render();
-            }
-        });
-        body.addView(row);
         // The run as one file, through ATAK's own send dialog: a contact, a feed, another app.
-        final View sendRow = PluginLayoutInflater.inflate(pluginContext, R.layout.model_action_row, null);
-        final Button send = sendRow.findViewById(R.id.action);
-        send.setText("Send this run");
+        view.findViewById(R.id.run_actions).setVisibility(View.VISIBLE);
+        final Button send = view.findViewById(R.id.btn_send);
         send.setEnabled(r.result != null && r.problem == null);
         send.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -1091,7 +1196,6 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                 model.send(r);
             }
         });
-        body.addView(sendRow);
     }
 
     private static String clock(long t) {
@@ -1107,7 +1211,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
     }
 
     /**
-     * "Where it is by": a slider from the run to its last step in five-minute notches.
+     * "Timeline Slider": a slider from the run to its last step in five-minute notches.
      * The fire's edge at that moment is drawn on the map in cyan as it moves, and the
      * line above it says the clock, acres, reach and buildings. A plain ScrollView
      * page, no pager, so the bar keeps sideways drags and the page keeps vertical ones.
@@ -1115,7 +1219,6 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
     private View timeSlider(final FireModel.Run r) {
         final LinearLayout wrap = new LinearLayout(view.getContext());
         wrap.setOrientation(LinearLayout.VERTICAL);
-        wrap.addView(headingView("Where it is by"));
         final TextView label = bodyView(timeText(r, r.atMinutes));
         wrap.addView(label);
         final int last = r.steps[r.steps.length - 1];
@@ -1163,6 +1266,42 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         ends.addView(from);
         ends.addView(to);
         wrap.addView(ends);
+        return wrap;
+    }
+
+    /** How solid the runs draw over the map, 10-100 %; applied when the thumb is let go. */
+    private View opacitySlider() {
+        final LinearLayout wrap = new LinearLayout(view.getContext());
+        wrap.setOrientation(LinearLayout.VERTICAL);
+        wrap.setPadding(0, dp(6), 0, 0);
+        final TextView label = bodyView("Opacity: " + model.opacity() + "%");
+        wrap.addView(label);
+        final android.widget.SeekBar bar = new android.widget.SeekBar(view.getContext());
+        bar.setMax(9);
+        bar.setProgress(model.opacity() / 10 - 1);
+        bar.setPadding(dp(18), dp(12), dp(18), dp(12));
+        bar.setMinimumHeight(dp(48));
+        final android.content.res.ColorStateList white = android.content.res.ColorStateList.valueOf(Color.WHITE);
+        bar.setThumbTintList(white);
+        bar.setProgressTintList(white);
+        bar.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        bar.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(android.widget.SeekBar sb, int progress, boolean fromUser) {
+                label.setText("Opacity: " + (progress + 1) * 10 + "%");
+            }
+
+            @Override
+            public void onStartTrackingTouch(android.widget.SeekBar sb) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(android.widget.SeekBar sb) {
+                model.setOpacity((sb.getProgress() + 1) * 10);
+            }
+        });
+        wrap.addView(bar);
         return wrap;
     }
 
@@ -1310,16 +1449,33 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         lp.topMargin = dp(10);
         foldPill.setLayoutParams(lp);
-        foldPill.setMinHeight(dp(44));
-        foldPill.setGravity(Gravity.CENTER_VERTICAL);
-        foldPill.setPadding(dp(14), dp(6), dp(14), dp(6));
+        stylePill(foldPill);
+        body.addView(foldPill);
+        body.addView(foldContent);
+    }
+
+    private void stylePill(TextView pill) {
+        pill.setMinHeight(dp(44));
+        pill.setGravity(Gravity.CENTER_VERTICAL);
+        pill.setPadding(dp(14), dp(6), dp(14), dp(6));
         final android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
         bg.setColor(0xFF1E2430);
         bg.setCornerRadius(dp(22));
         bg.setStroke(dp(1), 0xFF3A4458);
-        foldPill.setBackground(bg);
-        body.addView(foldPill);
-        body.addView(foldContent);
+        pill.setBackground(bg);
+    }
+
+    /** The Start and conditions bar: what the next run will use, in one line when shut. */
+    private void paintSettings() {
+        final TextView note = view.findViewById(R.id.start_note);
+        final String start = model.startNote();
+        note.setText(start == null ? "" : start);
+        note.setVisibility(start == null || fedsOpen ? View.GONE : View.VISIBLE);
+        final String from = ((Button) view.findViewById(R.id.btn_place)).getText().toString()
+                .replace("Start from: ", "");
+        paintFold((TextView) view.findViewById(R.id.settings_pill), (LinearLayout) view.findViewById(R.id.settings_box),
+                SETTINGS_FOLD, from + " \u00B7 " + FireModel.conditionsLabel(model.conditions()) + " \u00B7 "
+                        + (model.horizonMinutes() >= 180 ? "3 hours" : "1 hour"));
     }
 
     private void endFold() {
@@ -1335,6 +1491,10 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             public void onClick(View v) {
                 if (!OPEN_FOLDS.remove(title))
                     OPEN_FOLDS.add(title);
+                if (RUNS_FOLD.equals(title))
+                    prefs().edit().putBoolean(PREF_RUNS_OPEN, OPEN_FOLDS.contains(title)).apply();
+                else if (TIMELINE_FOLD.equals(title))
+                    prefs().edit().putBoolean(PREF_TIMELINE_OPEN, OPEN_FOLDS.contains(title)).apply();
                 paintFold(pill, content, title, summary);
             }
         });
@@ -1420,6 +1580,11 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
     @Override
     protected void disposeImpl() {
         closeFeds();
+        fedsMain.removeCallbacks(runsSettled);
+        try {
+            getMapView().removeOnMapMovedListener(runsMoved);
+        } catch (Exception ignored) {
+        }
         fedsWorker.shutdownNow();
         placeWorker.shutdownNow();
     }

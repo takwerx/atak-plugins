@@ -2061,6 +2061,44 @@ public final class FireModel {
             r.ground = m;
     }
 
+    private static final String PREF_OPACITY = "model.opacity";
+
+    /** The runs' opacity, 10-100 %; 100 unless the operator changed it. */
+    public int opacity() {
+        return Math.max(10, Math.min(100, prefs.getInt(PREF_OPACITY, 100)));
+    }
+
+    private final java.util.concurrent.atomic.AtomicBoolean opacityQueued = new java.util.concurrent.atomic.AtomicBoolean();
+
+    /**
+     * Redraws every run at a new opacity. The style lives with each feature in the store,
+     * so the sets are written again; once per slider release, the latest value wins.
+     */
+    public void setOpacity(int pct) {
+        prefs.edit().putInt(PREF_OPACITY, Math.max(10, Math.min(100, pct))).apply();
+        if (!opacityQueued.compareAndSet(false, true))
+            return;
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                opacityQueued.set(false);
+                try {
+                    synchronized (lock) {
+                        for (Run r : runs()) {
+                            if (r.fsid <= 0)
+                                continue;
+                            dropLocked(r);
+                            drawLocked(r);
+                        }
+                    }
+                } catch (Throwable t) {
+                    Log.w(TAG, "opacity change failed: " + t);
+                }
+                changed();
+            }
+        });
+    }
+
     /** Shows another Predicted Fire Size for a run: redrawn, buildings counted again, kept. */
     public void setSize(final Run r, final int pct) {
         if (running)
@@ -2569,9 +2607,12 @@ public final class FireModel {
                 // Largest first so the first ring draws on top of the last.
                 for (int i = r.steps.length - 1; i >= 0; i--) {
                     final int color = stepColor(i, r.steps.length);
+                    // The operator's opacity scales fill and outline together; 100% is the
+                    // look the rings always had.
+                    final int pct = opacity();
                     final Style style = new CompositeStyle(new Style[] {
-                            new BasicFillStyle((0x30 << 24) | color),
-                            new BasicStrokeStyle(0xFF000000 | color, 3f) });
+                            new BasicFillStyle(((0x30 * pct / 100) << 24) | color),
+                            new BasicStrokeStyle(((0xFF * pct / 100) << 24) | color, 3f) });
                     final List<Polygon> shapes = new ArrayList<>();
                     if (r.ground != null)
                         shapes.addAll(r.ground.rings(r.steps[i]));
