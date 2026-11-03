@@ -37,3 +37,7 @@ captures/
 # Submission zips
 dist/
 *.zip
+
+# Python bytecode from the tools
+__pycache__/
+*.pyc
