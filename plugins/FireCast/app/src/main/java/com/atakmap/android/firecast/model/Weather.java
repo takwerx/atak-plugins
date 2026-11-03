@@ -163,6 +163,90 @@ public final class Weather {
     }
 
     /**
+     * California's utility weather stations (SCE, SDG&amp;E, PG&amp;E) and HPWREN's, from
+     * Cal OES's public extract of Synoptic Data, rewritten every five minutes. The same
+     * service Atmosphere reads (copied forward from its {@code UtilityStations}). They
+     * are often the closest station, low in the valleys and along the lines. Their wind
+     * is a one or two minute average, higher than a RAWS's ten for the same air, and it
+     * is taken as a 20 ft wind, not scaled down from 10 m: both err toward more fire.
+     * Empty outside California. Worker thread; throws when the service does not answer.
+     */
+    public static java.util.List<Reading> utilityNear(double lat, double lon, double miles, final double pointElevFt, int max)
+            throws Exception {
+        final java.util.List<Reading> out = new java.util.ArrayList<>();
+        if (lat < 32.0 || lat > 42.5 || lon < -125.0 || lon > -113.5)
+            return out;
+        final String url = UTILITY_LAYER + "/query?f=json&returnGeometry=false&outFields=" + UTILITY_FIELDS
+                + "&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects"
+                + "&units=esriSRUnit_StatuteMile&distance=" + String.format(Locale.US, "%.1f", miles)
+                + "&geometry=" + String.format(Locale.US, "%.5f,%.5f", lon, lat)
+                + "&where=" + Esri.enc("MNET_ID IN (231,139,229,81)");
+        final JSONArray feats = new JSONObject(Esri.get(url)).optJSONArray("features");
+        for (int i = 0; feats != null && i < feats.length(); i++) {
+            final JSONObject a = feats.getJSONObject(i).optJSONObject("attributes");
+            if (a == null)
+                continue;
+            final String network = utilityNetwork((int) a.optDouble("MNET_ID", -1));
+            final String stid = str(a, "STID");
+            final double slat = a.optDouble("LATITUDE", Double.NaN), slon = a.optDouble("LONGITUDE", Double.NaN);
+            if (network.isEmpty() || stid.isEmpty() || Double.isNaN(slat) || Double.isNaN(slon) || (slat == 0 && slon == 0))
+                continue;
+            long at = a.optLong("WIND_SPEED_OBSERVED_DATETIME", 0L);
+            if (at <= 0)
+                at = a.optLong("AIR_TEMP_OBSERVED_DATETIME", 0L);
+            final double elev = number(a.optString("ELEV_DEM", ""));
+            String name = str(a, "NAME");
+            if (!name.toUpperCase(Locale.US).startsWith(network.toUpperCase(Locale.US)))
+                name = name.isEmpty() ? network : network + " " + name;
+            final Reading r = new Reading("utility station, 1-2 min wind", "U:" + stid, name, slat, slon,
+                    Double.isNaN(elev) ? 0 : (int) Math.round(elev), at,
+                    num(a, "WIND_SPEED"), num(a, "WIND_GUST"), num(a, "WIND_DIRECTION"),
+                    num(a, "RELATIVE_HUMIDITY"), num(a, "AIR_TEMP"), false);
+            if (!r.hasWind())
+                continue;
+            r.distanceM = com.atakmap.coremap.maps.coords.GeoCalculations.distanceTo(
+                    new com.atakmap.coremap.maps.coords.GeoPoint(lat, lon),
+                    new com.atakmap.coremap.maps.coords.GeoPoint(slat, slon));
+            out.add(r);
+        }
+        // Hundreds within 25 miles of a city: keep the best few by distance and height.
+        java.util.Collections.sort(out, new java.util.Comparator<Reading>() {
+            @Override
+            public int compare(Reading a, Reading b) {
+                return Double.compare(score(a, pointElevFt), score(b, pointElevFt));
+            }
+        });
+        return out.size() > max ? new java.util.ArrayList<>(out.subList(0, max)) : out;
+    }
+
+    private static final String UTILITY_LAYER = "https://services.arcgis.com/BLN4oKB0N1YSgvY8/arcgis/rest/services/"
+            + "Synoptic_WeatherStations_Current_view/FeatureServer/0";
+    private static final String UTILITY_FIELDS = "STID,NAME,MNET_ID,LATITUDE,LONGITUDE,ELEV_DEM,"
+            + "AIR_TEMP,RELATIVE_HUMIDITY,WIND_SPEED,WIND_GUST,WIND_DIRECTION,"
+            + "WIND_SPEED_OBSERVED_DATETIME,AIR_TEMP_OBSERVED_DATETIME";
+
+    /** Synoptic's network ids, as a crew names them. */
+    private static String utilityNetwork(int mnetId) {
+        switch (mnetId) {
+            case 231:
+                return "SCE";
+            case 139:
+                return "SDG&E";
+            case 229:
+                return "PG&E";
+            case 81:
+                return "HPWREN";
+            default:
+                return "";
+        }
+    }
+
+    /** A number field, NaN when missing or null. */
+    private static double num(JSONObject a, String key) {
+        return a.isNull(key) ? Double.NaN : a.optDouble(key, Double.NaN);
+    }
+
+    /**
      * The NWS forecast grid's values at the point for a moment: 10 m wind, gust,
      * humidity and temperature from the 2.5 km grid the local office edits. Two
      * requests: the point, then the grid it names. A 20 ft wind sits in the grid
@@ -238,6 +322,12 @@ public final class Weather {
             }
         }
         return best;
+    }
+
+    /** Miles away, plus a mile for every 100 ft of height between the station and the point. */
+    static double score(Reading r, double pointElevFt) {
+        return r.distanceM / 1609.344d
+                + (Double.isNaN(pointElevFt) || r.elevationFt <= 0 ? 0 : Math.abs(r.elevationFt - pointElevFt) / 100d);
     }
 
     /** "PT5H", "PT30M", "P1DT6H" to milliseconds. */
@@ -325,8 +415,7 @@ public final class Weather {
         Reading best = null;
         double bestScore = Double.MAX_VALUE;
         for (Reading r : list) {
-            final double score = r.distanceM / 1609.344d
-                    + (Double.isNaN(pointElevFt) || r.elevationFt <= 0 ? 0 : Math.abs(r.elevationFt - pointElevFt) / 100d);
+            final double score = score(r, pointElevFt);
             if (score < bestScore) {
                 bestScore = score;
                 best = r;

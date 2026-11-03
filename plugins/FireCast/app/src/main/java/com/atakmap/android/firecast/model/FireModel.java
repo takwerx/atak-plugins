@@ -1271,6 +1271,20 @@ public final class FireModel {
                     } catch (Exception e) {
                         Log.w(TAG, "NWS stations failed", e);
                     }
+                    try {
+                        // California's utility stations, often the closest; a RAWS or NWS
+                        // station already listed at the same spot is not counted twice.
+                        for (Weather.Reading u : Weather.utilityNear(lat, lon, 25, r.startElevFt, 10)) {
+                            boolean dup = false;
+                            for (Weather.Reading s : r.stations)
+                                if (com.atakmap.android.firecast.DetectionFeed.metersBetween(new double[] { s.latitude, s.longitude }, u.latitude, u.longitude) < 200)
+                                    dup = true;
+                            if (!dup)
+                                r.stations.add(u);
+                        }
+                    } catch (Exception e) {
+                        Log.w(TAG, "utility stations failed: " + e);
+                    }
                     final int hoursN = Math.max(1, (r.steps[r.steps.length - 1] + 59) / 60);
                     try {
                         final long[] times = new long[hoursN];

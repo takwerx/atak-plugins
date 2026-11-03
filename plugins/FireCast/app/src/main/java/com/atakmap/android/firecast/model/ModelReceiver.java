@@ -545,13 +545,23 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                 }
                 if (list.isEmpty())
                     labels[0] = "Run once to list the stations near the start";
+                final int[] picked = { current };
                 new android.app.AlertDialog.Builder(getMapView().getContext())
                         .setTitle("Weather station")
                         .setSingleChoiceItems(labels, current, new android.content.DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(android.content.DialogInterface dialog, int which) {
+                                picked[0] = which;
                                 dialog.dismiss();
                                 model.setStation(which == 0 ? "" : list.get(which - 1).wxId);
+                                render();
+                            }
+                        })
+                        // OK keeps what is ticked: tapping the ticked row did not read as a way out.
+                        .setPositiveButton("OK", new android.content.DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(android.content.DialogInterface dialog, int which) {
+                                model.setStation(picked[0] == 0 ? "" : list.get(picked[0] - 1).wxId);
                                 render();
                             }
                         })
