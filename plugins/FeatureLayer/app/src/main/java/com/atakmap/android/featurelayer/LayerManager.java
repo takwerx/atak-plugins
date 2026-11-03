@@ -52,12 +52,6 @@ public class LayerManager {
      * own store and lock, so their refreshes do not touch each other.
      */
     private final ExecutorService landPool = Executors.newFixedThreadPool(5);
-    /**
-     * A land layer's map tiles, fetched side by side under its refresh on the land pool.
-     * Its own pool, never the land pool: a refresh waiting on tiles queued behind other
-     * refreshes would wait forever. Eight requests at once across the five layers.
-     */
-    private final ExecutorService tilePool = Executors.newFixedThreadPool(8);
     private final File root, iconDir, legacyIconDir, layersDir, stateFile;
     private final Map<String, String> nwcgIcons = new HashMap<>();
     private final Map<String, String> sarcopIcons = new HashMap<>();
@@ -330,7 +324,6 @@ public class LayerManager {
         }
         worker.shutdownNow();
         landPool.shutdownNow();
-        tilePool.shutdownNow();
     }
 
     // ---- layers -------------------------------------------------------------------
@@ -342,7 +335,6 @@ public class LayerManager {
         if (existing == null) {
             existing = new LoadedLayer(spec, mapView, pluginContext, new File(layersDir, spec.fileKey() + ".sqlite"),
                     iconDir, nwcgIcons, sarcopIcons, lineGlyph, polygonGlyph, 0);
-            existing.useTilePool(tilePool);
             try {
                 existing.attach();
             } catch (Exception e) {
@@ -918,8 +910,6 @@ public class LayerManager {
                 if (!Boundaries.handles(o.spec) || !Boundaries.mosaic(o.spec.kind) || !key.equals(Boundaries.groupKey(o.spec)))
                     continue;
                 o.spec.scopeBox = box.clone();
-                // In tiles: every tile the view wants is asked for again, held or not.
-                o.forceTiles();
                 // A hidden one takes the new square and fetches when it is switched on.
                 if (o == l || o.isVisible())
                     refresh(o);
@@ -1098,7 +1088,6 @@ public class LayerManager {
                 final LoadedLayer l = new LoadedLayer(spec, mapView, pluginContext,
                         new File(layersDir, spec.fileKey() + ".sqlite"), iconDir, nwcgIcons, sarcopIcons,
                         lineGlyph, polygonGlyph, o.optLong("lastRefresh", 0));
-                l.useTilePool(tilePool);
                 try {
                     startLog("restore: attaching " + spec.id);
                     l.attach();

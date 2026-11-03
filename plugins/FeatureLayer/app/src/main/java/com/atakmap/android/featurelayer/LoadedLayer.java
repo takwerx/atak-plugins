@@ -133,8 +133,6 @@ public class LoadedLayer {
         this.lineGlyph = lineGlyph;
         this.polygonGlyph = polygonGlyph;
         this.lastRefresh = lastRefresh;
-        if (spec.tiles != null)
-            heldTiles = java.util.Collections.unmodifiableSet(new HashSet<>(Arrays.asList(spec.tiles)));
     }
 
     public String displayName() {
@@ -177,9 +175,6 @@ public class LoadedLayer {
     private void attachLocked() throws Exception {
         closed = false;
         store = new FeatureSetDatabase2(storeFile);
-        // Tiles the saved list calls held, over a store with nothing in it: fetched again.
-        if (!heldTiles.isEmpty() && storedFeatures() == 0)
-            heldTiles = java.util.Collections.emptySet();
         // Visible features only: with the plain constructor the renderer kept drawing the
         // labels of hidden sets on the XCover.
         final FeatureDataStore2.FeatureQueryParameters visibleOnly = new FeatureDataStore2.FeatureQueryParameters();
@@ -522,8 +517,6 @@ public class LoadedLayer {
         // A land layer switched on where its square no longer reaches: it shows what it
         // holds at once and fetches the square here (scope() re-boxes it).
         if (v && "box".equals(spec.scopeKind) && Boundaries.handles(spec) && Boundaries.mosaic(spec.kind)) {
-            if (tileMode())
-                return tilesForced || tilesStale();
             try {
                 final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
                 return b != null && (spec.scopeBox == null || !Boundaries.coversWithRoom(spec.scopeBox, b));
@@ -563,10 +556,8 @@ public class LoadedLayer {
                     // The kind's own zoom default, never the store's number: the store holds
                     // the gate-capped value, and rebuilding from it made the cap permanent
                     // (Plaskett gated at level 14 on every type, perimeter included, 2026-09-09).
-                    final Pending pf = new Pending(setName, kindGsd(setName, f.getGeometry()), f.getName(), f.getGeometry(),
-                            f.getStyle(), f.getAttributes());
-                    pf.fid = f.getId();
-                    loaded.add(pf);
+                    loaded.add(new Pending(setName, kindGsd(setName, f.getGeometry()), f.getName(), f.getGeometry(),
+                            f.getStyle(), f.getAttributes()));
                 }
             } finally {
                 c.close();
@@ -594,32 +585,6 @@ public class LoadedLayer {
 
     /** Everything fetched last time, shown or not; the store holds only the shown part. */
     private List<Pending> cache = new ArrayList<>();
-
-    /**
-     * Land layers come in map tiles at zoom 8, about 80 miles a side in California. Tiles
-     * are not clipped, so a shape is downloaded once per tile it touches, and measured from
-     * the Mac on 2026-10-16 (Los Angeles, all five layers, gzipped): zoom 9 for a zoomed-in
-     * view was ten times the bytes of the square it replaced (SRA's big shapes in all nine
-     * tiles), zoom 7 four times the ground. Zoom 8 for every view, so every phone in the
-     * fleet asks for the same tiles and the CDN holds one copy of each.
-     */
-    static final int TILE_Z = 8;
-    /** The detail a tile is simplified and quantized to: about 400 m, what the square was fetched at. */
-    static final double TILE_TOLERANCE_DEG = Boundaries.AREA_OFFSET_DEG;
-    /** A land feature's object ID, which tiles merge on; "_" keeps it off the details page. */
-    static final String ATTR_OID = "_oid";
-    /** Where a land layer's tiles are fetched, side by side; null until LayerManager gives one. */
-    private volatile java.util.concurrent.ExecutorService tilePool;
-    /** A service that answered a tile query with an error: this session it gets the square. */
-    private volatile boolean tilesRefused;
-    /** Refresh pressed: every tile the view wants is asked for again, held or not. */
-    private volatile boolean tilesForced;
-    /** The tiles whose features the store holds. */
-    private volatile Set<String> heldTiles = java.util.Collections.emptySet();
-    /** What {@link #heldTiles} becomes once the fetch now running is written; null for a fetch without tiles. */
-    private Set<String> nextTiles;
-    /** Tiles the fetch now running could not get (network): asked again when the map moves. */
-    private int tileFailures;
     /** Rings of the fire perimeter polygons seen in the current fetch, lon/lat pairs. */
     private final List<double[]> perimeterRings = new ArrayList<>();
     /** Holes (unburned islands) in those polygons; a point in a hole is outside the fire. */
@@ -849,9 +814,6 @@ public class LoadedLayer {
                     : new ArrayList<DartMarkers.Row>();
             final Map<String, Long> twins = new HashMap<>();
             int written = 0;
-            // Every feature is written anew: the ids it had go with the old sets.
-            for (Pending pf : cache)
-                pf.fid = -1;
             for (Pending pf : drawOrder(cache)) {
                 // Every type is written, a switched-off one into a hidden set, so it is on
                 // the phone when it is switched on again, network or not.
@@ -880,7 +842,6 @@ public class LoadedLayer {
                     drawn = FireHistoryStyles.mine(drawn);
                 final long fid = store.insertFeature(new Feature(fsid, pf.name, pf.geometry,
                         drawn, pf.attrs, Feature.AltitudeMode.ClampToGround, 0d));
-                pf.fid = fid;
                 written++;
                 if (split) {
                     Long tid = twins.get(pf.setName);
@@ -926,86 +887,6 @@ public class LoadedLayer {
             if (bulk)
                 store.releaseModifyLock();
         }
-    }
-
-    /**
-     * Brings the store to the memory copy by what changed instead of writing it whole:
-     * features whose tiles were let go are deleted by id, the new ones are inserted into
-     * their type's set. A whole rewrite costs about a millisecond a feature, and a land
-     * layer in tiles holds two or three times the features its square did: 1.7 to 3.2 s
-     * after every pan on dev 2 (2026-10-16), for a pan that changed a third of it or
-     * nothing. A rewrite also leaves the old sets' attribute and style rows behind in the
-     * file every time; a merge leaves only the deleted features'.
-     *
-     * Features that stay are matched by store id to the memory copy's own objects, so a
-     * restyle since the fetch began is kept. False, with nothing to undo, when the copy
-     * holds a feature the store cannot be asked about by id, or a new feature would need
-     * a label twin; the caller then rewrites. Lock held.
-     */
-    private boolean mergeStore(List<Pending> before, List<Pending> after) {
-        final long t0 = System.currentTimeMillis();
-        final Map<Long, Pending> was = new HashMap<>();
-        for (Pending pf : before) {
-            if (pf.fid < 0)
-                return false;
-            was.put(pf.fid, pf);
-        }
-        final Set<Long> stays = new HashSet<>();
-        final List<Pending> fresh = new ArrayList<>();
-        for (int i = 0; i < after.size(); i++) {
-            final Pending pf = after.get(i);
-            if (pf.fid >= 0) {
-                final Pending cur = was.get(pf.fid);
-                if (cur == null)
-                    return false;
-                after.set(i, cur);
-                stays.add(pf.fid);
-            } else {
-                if (pf.geometry instanceof com.atakmap.map.layer.feature.geometry.Point || centerLabelled(pf.geometry))
-                    return false;
-                fresh.add(pf);
-            }
-        }
-        final List<Long> gone = new ArrayList<>();
-        for (Long fid : was.keySet())
-            if (!stays.contains(fid))
-                gone.add(fid);
-        if (gone.isEmpty() && fresh.isEmpty()) {
-            Log.d(TAG, spec.id + ": store unchanged, " + after.size() + " features");
-            return true;
-        }
-        final Map<String, Long> sets = new HashMap<>();
-        for (SetInfo si : rawSetsLocked())
-            if (!sets.containsKey(si.name))
-                sets.put(si.name, si.id);
-        boolean bulk = false;
-        try {
-            store.acquireModifyLock(true);
-            bulk = true;
-            for (Long fid : gone)
-                store.deleteFeature(fid);
-            for (Pending pf : fresh) {
-                Long fsid = sets.get(pf.setName);
-                if (fsid == null) {
-                    fsid = newSet(store, pf.setName, Math.min(pf.minGsd, spec.gateGsd), 0d, shows(pf.setName));
-                    sets.put(pf.setName, fsid);
-                }
-                pf.fid = store.insertFeature(new Feature(fsid, pf.name, pf.geometry, drawnForm(pf, false, spec.labels),
-                        pf.attrs, Feature.AltitudeMode.ClampToGround, 0d));
-            }
-            count = countFeatures();
-        } catch (Exception e) {
-            // Half done is still a store the rewrite can replace: it writes every feature
-            // into new sets and drops every old one.
-            Log.w(TAG, spec.id + ": store merge failed, writing it whole", e);
-            return false;
-        } finally {
-            if (bulk)
-                store.releaseModifyLock();
-        }
-        Log.d(TAG, spec.id + ": store merged, " + gone.size() + " deleted, " + fresh.size() + " inserted, holds "
-                + count + " (" + (System.currentTimeMillis() - t0) + " ms)");
-        return true;
     }
 
     /** Frames the whole incident, with a margin; falls back to a pan when no extent is known. */
@@ -1454,8 +1335,6 @@ public class LoadedLayer {
         /** The same feature with its Repair Status drawn, when it has one; written instead of {@link #style} on request. */
         Style alt;
         final AttributeSet attrs;
-        /** The store's id for this feature once written, -1 before; what a merge deletes by. */
-        long fid = -1;
 
         Pending(String setName, double minGsd, String name, Geometry geometry, Style style, AttributeSet attrs) {
             this.setName = setName;
@@ -1521,46 +1400,6 @@ public class LoadedLayer {
         return p;
     }
 
-    /** Gives a land layer the pool its tiles are fetched on; without one it asks for its square as before. */
-    void useTilePool(java.util.concurrent.ExecutorService pool) {
-        tilePool = pool;
-    }
-
-    /** The next fetch asks again for every tile the view wants, held or not: the row's Refresh. */
-    void forceTiles() {
-        tilesForced = true;
-    }
-
-    /** Whether this layer loads in map tiles: a land layer, with a pool, on a service that has not refused them. */
-    private boolean tileMode() {
-        return tilePool != null && !tilesRefused && "box".equals(spec.scopeKind) && Boundaries.handles(spec)
-                && Boundaries.mosaic(spec.kind);
-    }
-
-    /**
-     * The tiles a view wants: those under the square a land layer has always loaded for it
-     * (the view plus a margin, 25 to 75 miles each way, {@link Boundaries#boxFor}).
-     */
-    private static List<Esri.Tile> wantTiles(com.atakmap.coremap.maps.coords.GeoBounds b) {
-        return Esri.tilesFor(Boundaries.boxFor(b), TILE_Z);
-    }
-
-    /** Whether the view wants a tile the store does not hold. Any thread; reads the map's bounds. */
-    private boolean tilesStale() {
-        try {
-            final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
-            if (b == null)
-                return false;
-            final Set<String> held = heldTiles;
-            for (Esri.Tile t : wantTiles(b))
-                if (!held.contains(t.key()))
-                    return true;
-            return false;
-        } catch (RuntimeException e) {
-            return false;
-        }
-    }
-
     /**
      * Whether the map or the operator has moved far enough since the last fetch that
      * what is drawn no longer answers the scope. Judged on the main thread by
@@ -1573,8 +1412,6 @@ public class LoadedLayer {
     boolean landSquareStale() {
         if (!layerOn || !"box".equals(spec.scopeKind) || !Boundaries.handles(spec) || !Boundaries.mosaic(spec.kind))
             return false;
-        if (tileMode())
-            return tilesStale();
         try {
             final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
             return b != null && spec.scopeBox != null && !Boundaries.coversWithRoom(spec.scopeBox, b);
@@ -1593,9 +1430,6 @@ public class LoadedLayer {
             // fetched again on every pan (2026-10-16). It catches up when switched on.
             if (!layerOn)
                 return false;
-            // In tiles: a fetch only when the view wants a tile the store does not hold.
-            if (tileMode())
-                return tilesStale();
             try {
                 final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
                 return b != null && spec.scopeBox != null && !Boundaries.coversWithRoom(spec.scopeBox, b);
@@ -1782,12 +1616,6 @@ public class LoadedLayer {
     public void refresh(String token, Runnable progress) {
         if (store == null || closed || refreshing)
             return;
-        // A land layer that holds every tile the view wants has nothing to ask for: no
-        // request, no store write, no "refreshing" on its row.
-        if (tileMode() && !tilesForced && spec.styleVersion == STYLE_VERSION && !tilesStale())
-            return;
-        nextTiles = null;
-        tileFailures = 0;
         final long startedAt = System.currentTimeMillis();
         refreshing = true;
         this.progress = 0;
@@ -1883,30 +1711,19 @@ public class LoadedLayer {
             synchronized (lock) {
                 if (store == null || closed)
                     throw new IllegalStateException("layer closed");
-                final List<Pending> before = cache;
                 cache = pending;
                 spec.bounds = extentOf(pending);
-                // A land layer's tiles change the store by what came and went; anything
-                // else, and a land layer whose styles changed, is written whole.
-                final boolean merge = nextTiles != null && spec.styleVersion == STYLE_VERSION
-                        && dartLabels == null && !myFiresShown();
-                if (!merge || !mergeStore(before, pending))
-                    rewriteStore(true);
+                rewriteStore(true);
                 spec.styleVersion = STYLE_VERSION;
-                if (Boundaries.handles(spec) && Boundaries.mosaic(spec.kind))
-                    holdTiles(nextTiles);
                 // Where the time goes, so a slow layer can be blamed on the network or
                 // the store rather than guessed at (2026-10-16, ten-second redraws).
-                Log.d(TAG, spec.id + ": refresh done, " + pending.size() + " fetched, " + vertices(pending)
-                        + " vertices, store holds " + count
+                Log.d(TAG, spec.id + ": refresh done, " + pending.size() + " fetched, store holds " + count
                         + " (fetch " + (fetchedAt - startedAt) + " ms, store " + (System.currentTimeMillis() - fetchedAt) + " ms)");
             }
             lastRefresh = System.currentTimeMillis();
             stale = false;
             unnamedHidden = unnamedThisFetch;
             status = problems.isEmpty() ? "ok" : "partial: " + problems.get(0);
-            if (tileFailures > 0)
-                status = "partial: part of the area did not load; moving the map asks again";
             capped = spec.maxFeatures > 0 && pending.size() >= spec.maxFeatures * spec.layerIds.length;
             if (capped)
                 status = "capped at " + spec.maxFeatures + " per layer";
@@ -1919,33 +1736,6 @@ public class LoadedLayer {
             if (progress != null)
                 progress.run();
         }
-    }
-
-    /** Every vertex the features carry: what the store writes and the renderer tessellates. */
-    private static long vertices(List<Pending> features) {
-        long n = 0;
-        for (Pending pf : features)
-            n += vertices(pf.geometry);
-        return n;
-    }
-
-    private static long vertices(Geometry g) {
-        if (g instanceof LineString)
-            return ((LineString) g).getNumPoints();
-        if (g instanceof com.atakmap.map.layer.feature.geometry.Polygon) {
-            final com.atakmap.map.layer.feature.geometry.Polygon p = (com.atakmap.map.layer.feature.geometry.Polygon) g;
-            long n = vertices(p.getExteriorRing());
-            for (LineString r : p.getInteriorRings())
-                n += vertices(r);
-            return n;
-        }
-        if (g instanceof GeometryCollection) {
-            long n = 0;
-            for (Geometry c : ((GeometryCollection) g).getGeometries())
-                n += vertices(c);
-            return n;
-        }
-        return g == null ? 0 : 1;
     }
 
     /** The row's words when a fetch fails for want of a network: what is drawn is what the phone kept. */
@@ -2159,9 +1949,7 @@ public class LoadedLayer {
         Log.d(TAG, spec.id + ": layer " + layerId + " iconSet=" + spec.iconSet + " dart=" + DartStyles.handles(spec)
                 + " point=" + isPointLayer + " profile=" + spec.profile + " nwcg=" + nwcg);
         final int firstOfLayer = out.size();
-        // A land layer in tiles has no square: the tiles are its scope (fetchTiles).
-        final boolean tiled = tileMode();
-        Esri.Scope sc = tiled ? null : scope();
+        Esri.Scope sc = scope();
         if (spec.generalize && sc != null) {
             // Shapes simplified to about a pixel at the zoom they were fetched for; a
             // zoom well past it fetches again, finer (movedOutOfScope).
@@ -2182,7 +1970,8 @@ public class LoadedLayer {
                 : Math.min(spec.geojson ? 2000 : 1000, info.maxRecordCount);
         // And it comes as protobuf: the wire was most of a redraw (2026-10-16).
         final boolean pbf = bounds && Boundaries.mosaic(spec.kind);
-        final Esri.FeatureSink sink = new Esri.FeatureSink() {
+        Esri.query(base, layerId, where, sc, token, spec.geojson,
+                page, spec.maxFeatures, spec.outFields, pbf, new Esri.FeatureSink() {
                     @Override
                     public void feature(JSONObject props, Geometry g) throws Exception {
                         if (bounds && Boundaries.mosaic(spec.kind)) {
@@ -2451,13 +2240,6 @@ public class LoadedLayer {
                         // A boundary's details are five lines, not the Census row's thirty codes.
                         final AttributeSet attrs = bounds ? Boundaries.attributes(spec.kind, target, props)
                                 : Esri.toAttributes(props, dates);
-                        // A land feature's object ID: what tiles merge on, and which kept
-                        // features a later fetch finds in the memory copy.
-                        if (bounds && Boundaries.mosaic(spec.kind)) {
-                            final Object oid = props.opt(info.objectIdField);
-                            if (oid instanceof Number)
-                                attrs.setAttribute(ATTR_OID, ((Number) oid).longValue());
-                        }
                         if (history && copy != null) {
                             // Which fire this is, so My Fires can pick it out later.
                             final double[] bx = (double[]) copy[1];
@@ -2598,199 +2380,9 @@ public class LoadedLayer {
                         }
 
                     }
-                };
-        boolean done = false;
-        if (tiled) {
-            try {
-                fetchTiles(base, layerId, where, info, token, sink, out);
-                done = true;
-            } catch (Esri.TileRefused e) {
-                // Nothing reached the sink: the square takes over, now and for this session.
-                tilesRefused = true;
-                Log.w(TAG, spec.id + ": tile queries refused (" + e.getMessage() + "), loading the square instead");
-                sc = scope();
-            }
-        }
-        if (!done)
-            Esri.query(base, layerId, where, sc, token, spec.geojson, page, spec.maxFeatures, spec.outFields, pbf, sink);
+                });
         if (spec.latestBy != null && spec.latestBy.length > 0)
             keepLatest(out, firstOfLayer);
-    }
-
-    /**
-     * A land layer's fetch in map tiles: the tiles the view wants that the store does not
-     * hold are fetched side by side, the held ones near the view keep the features they
-     * brought, and tiles too far from it are let go. A pan asks only for the edge it
-     * uncovered, a pan back for nothing, and a tile any phone asked for in the last hour
-     * comes from ArcGIS Online's CDN.
-     *
-     * Tiles are not clipped, so a shape on a tile's edge arrives once per tile; the first
-     * copy of an object ID is kept and the rest are never styled. Features of kept tiles
-     * come from the memory copy, not a list of their own, so a restyle or a recolor since
-     * the last fetch stays. A tile the network could not deliver is left out and asked for
-     * again when the map moves; when none of the tiles came, the fetch fails and the layer
-     * keeps what it holds. A service that refuses tile queries throws {@link Esri.TileRefused}
-     * before anything reaches the sink.
-     */
-    private void fetchTiles(final String base, final int layerId, final String where, final Esri.LayerInfo info,
-            final String token, Esri.FeatureSink sink, List<Pending> out) throws Exception {
-        final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
-        if (b == null)
-            throw new IllegalStateException("the map has no extent yet");
-        final List<Esri.Tile> want = wantTiles(b);
-        final boolean forced = tilesForced || spec.styleVersion != STYLE_VERSION;
-        // Held tiles kept: the wanted ones, and a ring of one tile around them, so a pan
-        // back the way it came finds its tiles still in the store.
-        int x0 = Integer.MAX_VALUE, x1 = Integer.MIN_VALUE, y0 = Integer.MAX_VALUE, y1 = Integer.MIN_VALUE;
-        for (Esri.Tile t : want) {
-            x0 = Math.min(x0, t.x);
-            x1 = Math.max(x1, t.x);
-            y0 = Math.min(y0, t.y);
-            y1 = Math.max(y1, t.y);
-        }
-        final Set<String> keep = new HashSet<>();
-        final List<Esri.Tile> keptTiles = new ArrayList<>();
-        if (!forced) {
-            for (String k : heldTiles) {
-                final Esri.Tile t = Esri.Tile.parse(k);
-                if (t != null && t.z == TILE_Z && t.x >= x0 - 1 && t.x <= x1 + 1 && t.y >= y0 - 1 && t.y <= y1 + 1) {
-                    keep.add(k);
-                    keptTiles.add(t);
-                }
-            }
-        }
-        final List<Esri.Tile> need = new ArrayList<>();
-        for (Esri.Tile t : want)
-            if (!keep.contains(t.key()))
-                need.add(t);
-        // The kept tiles' features, from the memory copy (the store's, after a restart):
-        // each object once, and only those that reach a kept tile.
-        final List<Pending> held;
-        synchronized (lock) {
-            loadCacheLocked();
-            held = cache;
-        }
-        final Set<Long> seen = new HashSet<>();
-        final List<Pending> kept = new ArrayList<>();
-        for (Pending pf : held) {
-            final long oid = oidOf(pf);
-            if (oid < 0 || pf.geometry == null || !touches(pf.geometry, keptTiles) || !seen.add(oid))
-                continue;
-            kept.add(pf);
-        }
-        // The new tiles, side by side. The pool only fetches and decodes; the styling
-        // below runs here, one feature at a time, as it always has.
-        final String fields = spec.outFields == null || spec.outFields.isEmpty() ? info.objectIdField
-                : info.objectIdField + "," + spec.outFields;
-        final int pageSize = info.tileMaxRecordCount;
-        final java.util.concurrent.ExecutorService pool = tilePool;
-        final List<java.util.concurrent.Future<Esri.TileAnswer>> futures = new ArrayList<>();
-        for (final Esri.Tile t : need) {
-            futures.add(pool.submit(new java.util.concurrent.Callable<Esri.TileAnswer>() {
-                @Override
-                public Esri.TileAnswer call() throws Exception {
-                    return Esri.tile(base, layerId, where, fields, info.objectIdField, t, TILE_TOLERANCE_DEG, pageSize, token);
-                }
-            }));
-        }
-        final List<Esri.TileAnswer> got = new ArrayList<>();
-        final Set<String> next = new HashSet<>(keep);
-        Exception failure = null;
-        int failed = 0;
-        long wire = 0;
-        try {
-            for (int i = 0; i < need.size(); i++) {
-                final Esri.Tile t = need.get(i);
-                try {
-                    final Esri.TileAnswer a = futures.get(i).get();
-                    got.add(a);
-                    next.add(t.key());
-                    wire += a.wireBytes;
-                    Log.d(TAG, spec.id + ": tile " + t.key() + ": " + a.wireBytes + " bytes on the wire, " + a.bytes
-                            + " unpacked, " + a.ms + " ms, " + a.cache + ", " + a.rows + " rows"
-                            + (a.pages > 1 ? " in " + a.pages + " pages" : ""));
-                } catch (java.util.concurrent.ExecutionException e) {
-                    final Throwable c = e.getCause();
-                    if (c instanceof Esri.TileRefused)
-                        throw (Esri.TileRefused) c;
-                    failed++;
-                    if (failure == null)
-                        failure = c instanceof Exception ? (Exception) c : new Exception(c);
-                    Log.w(TAG, spec.id + ": tile " + t.key() + " not loaded: " + c);
-                }
-            }
-        } finally {
-            for (java.util.concurrent.Future<Esri.TileAnswer> f : futures)
-                f.cancel(true);
-        }
-        if (!need.isEmpty() && got.isEmpty())
-            throw failure;
-        out.addAll(kept);
-        int fresh = 0;
-        for (Esri.TileAnswer a : got) {
-            for (Esri.TileFeature f : a.features) {
-                if (spec.maxFeatures > 0 && out.size() >= spec.maxFeatures)
-                    break;
-                if (!seen.add(f.oid))
-                    continue; // another tile's copy
-                sink.feature(f.props, f.geometry);
-                fresh++;
-            }
-        }
-        nextTiles = next;
-        tileFailures = failed;
-        Log.d(TAG, spec.id + ": tiles: " + want.size() + " wanted, " + keep.size() + " held kept, " + got.size()
-                + " fetched" + (failed > 0 ? ", " + failed + " failed" : "") + ", " + (wire / 1024) + " KB on the wire; "
-                + kept.size() + " features kept, " + fresh + " new");
-    }
-
-    /** A land feature's object ID from its attributes, or -1 when it has none (fetched as a square). */
-    private static long oidOf(Pending pf) {
-        try {
-            return pf.attrs != null && pf.attrs.containsAttribute(ATTR_OID) ? pf.attrs.getLongAttribute(ATTR_OID) : -1;
-        } catch (Exception e) {
-            return -1;
-        }
-    }
-
-    /** Whether a geometry's envelope reaches any of the tiles. */
-    private static boolean touches(Geometry g, List<Esri.Tile> tiles) {
-        final com.atakmap.map.layer.feature.geometry.Envelope e = g.getEnvelope();
-        if (e == null || Double.isNaN(e.minX))
-            return false;
-        for (Esri.Tile t : tiles)
-            if (e.maxX >= t.west() && e.minX <= t.east() && e.maxY >= t.south() && e.minY <= t.north())
-                return true;
-        return false;
-    }
-
-    /**
-     * Records the tiles the store holds after a write, saved with the layer; null (a
-     * fetch of the square) holds none. The square they make is the layer's scope box, so
-     * the row's "loaded here" and a fallback to the square start from what is held.
-     * Lock held.
-     */
-    private void holdTiles(Set<String> next) {
-        tilesForced = false;
-        if (next == null) {
-            heldTiles = java.util.Collections.emptySet();
-            spec.tiles = null;
-            return;
-        }
-        heldTiles = java.util.Collections.unmodifiableSet(new HashSet<>(next));
-        spec.tiles = next.toArray(new String[0]);
-        double s = 90, w = 180, n = -90, e = -180;
-        for (String k : next) {
-            final Esri.Tile t = Esri.Tile.parse(k);
-            if (t == null)
-                continue;
-            s = Math.min(s, t.south());
-            w = Math.min(w, t.west());
-            n = Math.max(n, t.north());
-            e = Math.max(e, t.east());
-        }
-        if (n > s && e > w)
-            spec.scopeBox = new double[] { s, w, n, e };
     }
 
     /**
@@ -3363,11 +2955,8 @@ public class LoadedLayer {
                         continue;
                     }
                     final int rgb = (int) Long.parseLong(raw) & 0x00FFFFFF;
-                    // Restyled in place in the store, so the id stays the same.
-                    final Pending np = new Pending(pf.setName, pf.minGsd, pf.name, pf.geometry,
-                            refilled(pf.style, rgb, alpha), pf.attrs);
-                    np.fid = pf.fid;
-                    updated.add(np);
+                    updated.add(new Pending(pf.setName, pf.minGsd, pf.name, pf.geometry,
+                            refilled(pf.style, rgb, alpha), pf.attrs));
                 }
                 cache = updated;
                 Log.d(TAG, spec.id + ": restyled " + ids.size() + " " + setName + " at alpha " + alpha);
