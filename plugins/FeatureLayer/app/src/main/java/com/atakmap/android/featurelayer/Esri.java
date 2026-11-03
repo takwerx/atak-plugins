@@ -207,6 +207,8 @@ public final class Esri {
         public final Set<String> fields = new HashSet<>();
         public final Set<String> dateFields = new HashSet<>();
         public int maxRecordCount = 1000;
+        /** The page a tile query may fill, which ArcGIS sets apart from a plain query's. */
+        public int tileMaxRecordCount = 1000;
     }
 
     public static LayerInfo layerInfo(String base, int layerId, String token) throws Exception {
@@ -220,6 +222,7 @@ public final class Esri {
         i.objectIdField = m.optString("objectIdField", "OBJECTID");
         i.drawingInfo = m.optJSONObject("drawingInfo");
         i.maxRecordCount = Math.max(1, Math.min(2000, m.optInt("maxRecordCount", 1000)));
+        i.tileMaxRecordCount = Math.max(1, Math.min(4000, m.optInt("tileMaxRecordCount", i.maxRecordCount)));
         final JSONArray f = m.optJSONArray("fields");
         for (int k = 0; f != null && k < f.length(); k++) {
             final JSONObject fld = f.getJSONObject(k);
@@ -413,6 +416,281 @@ public final class Esri {
                 + (System.currentTimeMillis() - t2) + " ms, " + p.count + " rows");
         // The page's own row count drives the offset: it is what the server counts.
         return new int[] { p.count, p.exceededTransferLimit ? 1 : 0, geoms.size() };
+    }
+
+    // ---- tiles --------------------------------------------------------------------
+
+    /**
+     * One map tile of a layer, asked for the way ArcGIS Online's own web map asks
+     * ({@code resultType=tile}). A plain query is never cached ({@code x-cache:
+     * PRIVATE_NOSTORE}) and the server spent 3 to 5 s working out a land layer's square
+     * every time; a tile query's answer is public for an hour, so ArcGIS Online's CDN
+     * hands back a tile any phone asked for in that hour in a tenth of a second
+     * (measured 2026-10-16). The cache only matches the same characters: the URL is
+     * built from the tile and the layer alone, in one order with fixed digits, and it
+     * goes by GET, because a POST is never cached.
+     *
+     * A tile is a Web Mercator z/x/y square, asked for as its lat/lon envelope and
+     * quantized to that envelope at a tolerance in degrees, which is also the detail
+     * the server simplifies to. Shapes are NOT clipped to the tile: every shape that
+     * touches it comes back whole, so neighboring tiles repeat the shapes on their
+     * edges and the caller merges by object ID.
+     */
+    public static final class Tile {
+        public final int z, x, y;
+
+        public Tile(int z, int x, int y) {
+            this.z = z;
+            this.x = x;
+            this.y = y;
+        }
+
+        public String key() {
+            return z + "/" + x + "/" + y;
+        }
+
+        /** The tile a key names, or null for anything that is not one. */
+        public static Tile parse(String key) {
+            if (key == null)
+                return null;
+            final String[] p = key.split("/");
+            if (p.length != 3)
+                return null;
+            try {
+                final int z = Integer.parseInt(p[0]), x = Integer.parseInt(p[1]), y = Integer.parseInt(p[2]);
+                final int n = 1 << Math.max(0, Math.min(20, z));
+                return z < 0 || z > 20 || x < 0 || y < 0 || x >= n || y >= n ? null : new Tile(z, x, y);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+
+        public double west() {
+            return x * 360d / (1 << z) - 180d;
+        }
+
+        public double east() {
+            return (x + 1) * 360d / (1 << z) - 180d;
+        }
+
+        public double north() {
+            return lat(y, z);
+        }
+
+        public double south() {
+            return lat(y + 1, z);
+        }
+
+        // StrictMath, not Math: Math may differ in the last digit between phones, and a
+        // URL that differs in one digit is a different cache entry.
+        private static double lat(int y, int z) {
+            return StrictMath.toDegrees(StrictMath.atan(StrictMath.sinh(StrictMath.PI * (1 - 2d * y / (1 << z)))));
+        }
+    }
+
+    /** The tiles at zoom {@code z} covering a box (south, west, north, east), north to south, west to east. */
+    public static java.util.List<Tile> tilesFor(double[] box, int z) {
+        final int n = 1 << z;
+        final int x0 = tileX(box[1], n), x1 = tileX(box[3], n), y0 = tileY(box[2], n), y1 = tileY(box[0], n);
+        final java.util.List<Tile> out = new java.util.ArrayList<>();
+        for (int y = y0; y <= y1; y++)
+            for (int x = x0; x <= x1; x++)
+                out.add(new Tile(z, x, y));
+        return out;
+    }
+
+    private static int tileX(double lon, int n) {
+        final int x = (int) StrictMath.floor((lon + 180d) / 360d * n);
+        return Math.max(0, Math.min(n - 1, x));
+    }
+
+    private static int tileY(double lat, int n) {
+        final double r = StrictMath.toRadians(Math.max(-85.05112878, Math.min(85.05112878, lat)));
+        final double y = (1 - StrictMath.log(StrictMath.tan(r) + 1 / StrictMath.cos(r)) / StrictMath.PI) / 2 * n;
+        return Math.max(0, Math.min(n - 1, (int) StrictMath.floor(y)));
+    }
+
+    /** A feature of a tile: its fields, its geometry, and its object ID, which is what tiles merge on. */
+    public static final class TileFeature {
+        public final JSONObject props;
+        public final Geometry geometry;
+        public final long oid;
+
+        TileFeature(JSONObject props, Geometry geometry, long oid) {
+            this.props = props;
+            this.geometry = geometry;
+            this.oid = oid;
+        }
+    }
+
+    /** What one tile brought back, and what it cost. */
+    public static final class TileAnswer {
+        public final java.util.List<TileFeature> features = new java.util.ArrayList<>();
+        public int rows, wireBytes, bytes, pages;
+        /** The CDN's word for the answer (TCP_HIT, TCP_MISS...), or "-". */
+        public String cache = "-";
+        public long ms;
+    }
+
+    /**
+     * A service that answered a tile query with an error, or with something that is not
+     * the protobuf asked for: tile queries are not for it, and the caller goes back to
+     * the plain query. A network failure is not this; it is an ordinary exception.
+     */
+    public static final class TileRefused extends Exception {
+        TileRefused(String why) {
+            super(why);
+        }
+    }
+
+    /** The most pages one tile may run to: 40,000 rows at 4,000 a page, far past any land tile. */
+    private static final int TILE_MAX_PAGES = 10;
+
+    /**
+     * The URL of one tile page. Everything in it comes from the arguments, which come from
+     * the tile and the layer's fixed definition, so two phones asking for the same tile of
+     * the same layer send the same characters.
+     */
+    static String tileUrl(String base, int layerId, String where, String outFields, Tile t, double tolerance,
+            int pageSize, int offset) throws Exception {
+        final String env = String.format(Locale.US,
+                "{\"xmin\":%.6f,\"ymin\":%.6f,\"xmax\":%.6f,\"ymax\":%.6f,\"spatialReference\":{\"wkid\":4326}}",
+                t.west(), t.south(), t.east(), t.north());
+        final String quant = String.format(Locale.US,
+                "{\"mode\":\"view\",\"originPosition\":\"upperLeft\",\"tolerance\":%.6f,\"extent\":%s}", tolerance, env);
+        return base + "/" + layerId + "/query?f=pbf&where=" + enc(where) + "&outFields=" + enc(outFields)
+                + "&returnGeometry=true&geometry=" + enc(env) + "&geometryType=esriGeometryEnvelope&inSR=4326"
+                + "&spatialRel=esriSpatialRelIntersects&outSR=4326&resultType=tile&resultOffset=" + offset
+                + "&resultRecordCount=" + pageSize + "&quantizationParameters=" + enc(quant);
+    }
+
+    /**
+     * Every feature of one tile, decoded, with its object ID from {@code oidField}. Throws
+     * {@link TileRefused} when the service will not answer this way, an ordinary exception
+     * when the network or the server failed. Nothing is handed out until the whole tile
+     * is in, so a refusal halfway leaves the caller nothing to undo.
+     */
+    public static TileAnswer tile(String base, int layerId, String where, String outFields, final String oidField,
+            Tile t, double tolerance, int pageSize, String token) throws Exception {
+        final TileAnswer a = new TileAnswer();
+        final long t0 = System.currentTimeMillis();
+        int offset = 0;
+        for (int page = 0; page < TILE_MAX_PAGES; page++) {
+            final Fetched f = getBytes(tileUrl(base, layerId, where, outFields, t, tolerance, pageSize, offset), token);
+            a.wireBytes += f.wireBytes;
+            a.bytes += f.body.length;
+            a.pages++;
+            if (page == 0)
+                a.cache = f.cache;
+            // A service that cannot answer a tile in PBF answers the error in JSON, with 200.
+            if (f.body.length > 0 && f.body[0] == '{') {
+                String why = "not protobuf";
+                try {
+                    final JSONObject err = new JSONObject(new String(f.body, "UTF-8")).optJSONObject("error");
+                    if (err != null)
+                        why = err.optString("message", why);
+                } catch (org.json.JSONException ignored) {
+                }
+                throw new TileRefused(why);
+            }
+            final EsriPbf.Page p;
+            try {
+                p = EsriPbf.read(f.body, new EsriPbf.Sink() {
+                    @Override
+                    public void feature(java.util.Map<String, Object> attrs, int type, java.util.List<double[]> parts)
+                            throws Exception {
+                        final Object id = attrs.get(oidField);
+                        if (!(id instanceof Number))
+                            throw new IllegalStateException("a row with no " + oidField);
+                        final Geometry g = fromParts(type, parts);
+                        if (g == null)
+                            return;
+                        final JSONObject props = new JSONObject();
+                        for (java.util.Map.Entry<String, Object> e : attrs.entrySet()) {
+                            final Object v = e.getValue();
+                            // org.json refuses NaN and infinity; a server's odd number is
+                            // one empty field, never a failed layer.
+                            if (v instanceof Double && (((Double) v).isNaN() || ((Double) v).isInfinite()))
+                                continue;
+                            props.put(e.getKey(), v);
+                        }
+                        a.features.add(new TileFeature(props, g, ((Number) id).longValue()));
+                    }
+                });
+            } catch (IllegalStateException | IndexOutOfBoundsException e) {
+                throw new TileRefused("did not decode: " + e.getMessage());
+            }
+            a.rows += p.count;
+            if (!p.exceededTransferLimit || p.count == 0)
+                break;
+            offset += p.count;
+        }
+        a.ms = System.currentTimeMillis() - t0;
+        return a;
+    }
+
+    /** A GET's body, with what it cost on the wire and what the CDN said about it. */
+    static final class Fetched {
+        byte[] body;
+        int wireBytes;
+        String cache;
+    }
+
+    /** The most a tile may weigh on the wire, and unpacked: a land tile is under 1 MB of either. */
+    private static final int MAX_WIRE_BYTES = 32 << 20, MAX_BODY_BYTES = 64 << 20;
+
+    /**
+     * GET of a binary body, https only, the token (if any) in the Esri authorization
+     * header. It asks for gzip itself, as Android's HttpURLConnection would, so the
+     * cache key is the same and the bytes on the wire can be counted; both the packed
+     * and the unpacked size are capped, so a hostile answer cannot fill the phone.
+     */
+    static Fetched getBytes(String url, String token) throws Exception {
+        if (!url.startsWith("https://"))
+            throw new IllegalStateException("not https: " + hostOf(url));
+        final HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        c.setConnectTimeout(20000);
+        c.setReadTimeout(60000);
+        c.setRequestProperty("User-Agent", "FeatureLayer/0.1 (ATAK plugin)");
+        c.setRequestProperty("Accept-Encoding", "gzip");
+        if (token != null)
+            c.setRequestProperty("X-Esri-Authorization", "Bearer " + token);
+        try {
+            final int code = c.getResponseCode();
+            if (code != 200) {
+                final int q = url.indexOf('?');
+                throw new IllegalStateException("HTTP " + code + " for " + (q > 0 ? url.substring(0, q) : url));
+            }
+            final byte[] wire;
+            try (java.io.InputStream in = c.getInputStream()) {
+                wire = readCapped(in, MAX_WIRE_BYTES);
+            }
+            final Fetched f = new Fetched();
+            f.wireBytes = wire.length;
+            f.cache = c.getHeaderField("x-cache") == null ? "-" : c.getHeaderField("x-cache");
+            if ("gzip".equalsIgnoreCase(c.getContentEncoding())) {
+                try (java.io.InputStream in = new java.util.zip.GZIPInputStream(new java.io.ByteArrayInputStream(wire))) {
+                    f.body = readCapped(in, MAX_BODY_BYTES);
+                }
+            } else {
+                f.body = wire;
+            }
+            return f;
+        } finally {
+            c.disconnect();
+        }
+    }
+
+    private static byte[] readCapped(java.io.InputStream in, int cap) throws Exception {
+        final java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream(65536);
+        final byte[] buf = new byte[16384];
+        int n;
+        while ((n = in.read(buf)) > 0) {
+            if (out.size() + n > cap)
+                throw new IllegalStateException("answer over " + (cap >> 20) + " MB");
+            out.write(buf, 0, n);
+        }
+        return out.toByteArray();
     }
 
     // ---- geometry -----------------------------------------------------------------

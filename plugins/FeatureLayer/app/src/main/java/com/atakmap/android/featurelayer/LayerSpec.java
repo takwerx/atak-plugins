@@ -58,6 +58,11 @@ public class LayerSpec {
     public String scopeKind;            // "me", "box", "shape"; null = no spatial filter
     public double scopeRadiusM = 40000; // "me"
     public double[] scopeBox;           // "box": south, west, north, east
+    /**
+     * A land layer's map tiles held in its store ("8/43/102"), so after a restart it knows
+     * what it already has and fetches only what the view adds.
+     */
+    public String[] tiles;
     public String scopeRings;           // "shape": the Esri JSON rings of a drawn shape
     /** A date field to window on, and how far back: "poly_DateCurrent", 72 h. 0 = everything. */
     public String timeField;
@@ -234,6 +239,8 @@ public class LayerSpec {
         if (scopeBox != null)
             o.put("scopeBox", new JSONArray(
                     java.util.Arrays.asList(scopeBox[0], scopeBox[1], scopeBox[2], scopeBox[3])));
+        if (tiles != null)
+            o.put("tiles", new JSONArray(java.util.Arrays.asList(tiles)));
         o.put("setFill", new JSONObject(setFill));
         o.put("setKind", new JSONObject(setKind));
         o.put("setOn", new JSONObject(setOn));
@@ -319,6 +326,14 @@ public class LayerSpec {
         final JSONArray sbx = o.optJSONArray("scopeBox");
         if (sbx != null && sbx.length() == 4)
             s.scopeBox = new double[] { sbx.getDouble(0), sbx.getDouble(1), sbx.getDouble(2), sbx.getDouble(3) };
+        final JSONArray tl = o.optJSONArray("tiles");
+        if (tl != null) {
+            final java.util.List<String> keys = new java.util.ArrayList<>();
+            for (int i = 0; i < tl.length() && i < 256; i++)
+                if (Esri.Tile.parse(tl.optString(i, null)) != null)
+                    keys.add(tl.optString(i));
+            s.tiles = keys.toArray(new String[0]);
+        }
         final JSONObject sf = o.optJSONObject("setFill");
         if (sf != null) {
             final java.util.Iterator<String> k = sf.keys();
