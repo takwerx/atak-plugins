@@ -16,11 +16,11 @@
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content" />
+        <!-- Settings takes only its own width so the switch can read in full. -->
         <Button
             android:id="@+id/btn_settings"
             style="@style/TakwerxButton"
-            android:layout_width="0dp"
-            android:layout_weight="1"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginLeft="6dp"
             android:text="@string/settings" />

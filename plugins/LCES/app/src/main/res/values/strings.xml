@@ -10,7 +10,7 @@
     <!-- The pane size button names what a tap does, like Atmosphere's. -->
     <string name="wide">Wide</string>
     <string name="half">Half</string>
-    <string name="lessons">Lessons</string>
+    <string name="lessons">Lessons Learned</string>
     <string name="show_settings">Open or close</string>
 
     <string name="tile_orders">10s &amp; 18s</string>
@@ -68,7 +68,7 @@
     <string name="show_section">Show this section</string>
 
     <!-- Search -->
-    <string name="search_hint">Search the IRPG and lessons</string>
+    <string name="search_hint">Search IRPG &amp; Lessons Learned</string>
     <string name="clear">Clear</string>
     <string name="results_some">%1$d pages in the IRPG match “%2$s”.</string>
     <plurals name="matches">
