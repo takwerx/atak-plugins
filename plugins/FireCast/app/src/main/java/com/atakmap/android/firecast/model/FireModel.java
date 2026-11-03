@@ -1147,7 +1147,14 @@ public final class FireModel {
     public void rerun(Run r) {
         if (r == null || running)
             return;
-        place(new GeoPoint(r.lat, r.lon));
+        // That run's own start, not whatever start is held now.
+        if (r.perimeter != null) {
+            usePerimeter(r.perimeterParts != null ? r.perimeterParts : new double[][][] { r.perimeter },
+                    r.perimeterNote, r.perimeterKind, false);
+        } else {
+            clearPerimeter();
+            place(new GeoPoint(r.lat, r.lon));
+        }
         run(r.lat, r.lon);
     }
 
@@ -2314,7 +2321,9 @@ public final class FireModel {
     /** The one judgment on a run's numbers: no spread is a sentence, not a zero. */
     private static void finish(Run r) {
         if (r.result == null)
-            r.problem = "The fire model did not run.";
+            r.problem = Behave.load() ? "The fire model did not run: it refused these inputs."
+                    : "The fire model did not run: its library did not load. This happens after FireCast is "
+                    + "reinstalled while ATAK is open. Close ATAK fully, open it again, then tap Run model.";
         else if (r.result.rosFtPerMin < 0.05)
             r.problem = String.format(Locale.US, "Will not carry fire here as it stands: fuel moisture %.0f%% in %s is past "
                     + "what this fuel burns at. Try Conditions: Dry day to see what a dry day does.", r.m1,
