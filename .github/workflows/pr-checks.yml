@@ -1,0 +1,112 @@
+name: PR checks
+
+# Tier 1 of the test plan (takwerx/ops#238): automatic checks on every pull
+# request, no Claude involved. For each plugin the PR touches: the civ debug
+# build and the plugin's unit tests, on the Studio (scripts/ci-plugin-check.sh).
+#
+# Why the Studio: the ATAK SDK is not ours to publish (CLAUDE.md, HARD RULE 1),
+# so GitHub's runners cannot build these plugins. Why same-repo PRs only: a
+# self-hosted runner executes the PR's code (gradle scripts, tests) on AJ's Mac,
+# so a fork PR never gets near it. Uses `pull_request`, never
+# `pull_request_target`, with a read-only token and no secrets.
+#
+# The build job stays off until repo variable TIER1_PLUGIN_BUILDS is `true`, and
+# it needs a runner labelled self-hosted, macOS, tak-worker registered to this
+# repo. Require "checks-ok" in branch protection, not the individual jobs.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # Which plugins does this PR touch? Free GitHub runner, no SDK needed.
+  detect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      plugins: ${{ steps.pick.outputs.plugins }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: pick
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: echo "plugins=$(bash scripts/ci-changed-plugins.sh "origin/$BASE_REF")" >> "$GITHUB_OUTPUT"
+
+  # HARD RULE 1: the SDK's binaries and signing keys never enter the repo.
+  sdk-guard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          bad="$(git diff --name-only --diff-filter=AMR "origin/$BASE_REF"...HEAD \
+            | grep -E '(^|/)(main\.jar|atak\.apk|atak-javadoc\.jar|atak-gradle-takdev\.jar|android_keystore)$|\.(jks|keystore|p12)$|(^|/)keystore\.properties$' || true)"
+          if [ -n "$bad" ]; then
+            echo "::error::This PR adds SDK artifacts or signing material. The SDK license forbids publishing them (CLAUDE.md, HARD RULE 1):"
+            echo "$bad"
+            exit 1
+          fi
+          echo "No SDK artifacts or signing material in this PR."
+
+  # One build per touched plugin, one at a time, on the Studio.
+  build:
+    needs: detect
+    if: >-
+      needs.detect.outputs.plugins != '[]'
+      && vars.TIER1_PLUGIN_BUILDS == 'true'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, macOS, tak-worker]
+    # `heavy` may hold a build in its queue for up to 45 minutes.
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        plugin: ${{ fromJSON(needs.detect.outputs.plugins) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - env:
+          PLUGIN: ${{ matrix.plugin }}
+        run: bash scripts/ci-plugin-check.sh "$PLUGIN"
+
+  # One stable name to require in branch protection.
+  checks-ok:
+    needs: [detect, sdk-guard, build]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - env:
+          DETECT: ${{ needs.detect.result }}
+          GUARD: ${{ needs.sdk-guard.result }}
+          BUILD: ${{ needs.build.result }}
+          PLUGINS: ${{ needs.detect.outputs.plugins }}
+          ENABLED: ${{ vars.TIER1_PLUGIN_BUILDS }}
+          SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        run: |
+          [ "$DETECT" = success ] || { echo "::error::detect: $DETECT"; exit 1; }
+          [ "$GUARD" = success ]  || { echo "::error::sdk-guard: $GUARD"; exit 1; }
+          if [ "$PLUGINS" != '[]' ] && [ "$ENABLED" = true ]; then
+            if [ "$SAME_REPO" != true ]; then
+              echo "::error::Fork PR: its code is never run on the Studio. A maintainer must push the branch to takwerx/atak-plugins so it gets built."
+              exit 1
+            fi
+            [ "$BUILD" = success ] || { echo "::error::build: $BUILD"; exit 1; }
+          fi
+          # build is skipped when no plugin is touched or TIER1_PLUGIN_BUILDS is off; both pass.
+          echo "ok (plugins: $PLUGINS, builds enabled: ${ENABLED:-false}, build: $BUILD)"
