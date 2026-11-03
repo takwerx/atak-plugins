@@ -74,10 +74,10 @@
             android:layout_width="0dp" android:layout_weight="1"
             android:layout_height="match_parent" android:layout_marginLeft="6dp"
             android:text="@string/tile_lces" />
-        <Button android:id="@+id/tile_briefing" style="@style/TakwerxButton"
+        <Button android:id="@+id/tile_denominators" style="@style/TakwerxTwoLineTile"
             android:layout_width="0dp" android:layout_weight="1"
-            android:layout_height="match_parent" android:layout_marginLeft="6dp"
-            android:text="@string/tile_briefing" />
+            android:layout_height="wrap_content" android:layout_marginLeft="6dp"
+            android:text="@string/tile_denominators" />
     </LinearLayout>
     <LinearLayout
         android:layout_width="match_parent"
@@ -85,9 +85,9 @@
         android:orientation="horizontal"
         android:layout_marginTop="6dp"
         android:baselineAligned="false">
-        <Button android:id="@+id/tile_denominators" style="@style/TakwerxTwoLineTile"
+        <Button android:id="@+id/tile_briefing" style="@style/TakwerxButton"
             android:layout_width="0dp" android:layout_weight="1"
-            android:layout_height="wrap_content" android:text="@string/tile_denominators" />
+            android:layout_height="match_parent" android:text="@string/tile_briefing" />
         <Button android:id="@+id/tile_irpg" style="@style/TakwerxButton"
             android:layout_width="0dp" android:layout_weight="1"
             android:layout_height="match_parent" android:layout_marginLeft="6dp"
