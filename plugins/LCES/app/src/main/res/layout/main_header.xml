@@ -59,6 +59,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/heading_irpg" />
+    <!-- Two rows of three: the pages read every time, and the report a crew
+         needs in a hurry (IWI, in the red of the medical pages). -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -68,14 +70,14 @@
         <Button android:id="@+id/tile_orders" style="@style/TakwerxButton"
             android:layout_width="0dp" android:layout_weight="1"
             android:layout_height="match_parent" android:text="@string/tile_orders" />
-        <Button android:id="@+id/tile_watchouts" style="@style/TakwerxTwoLineTile"
-            android:layout_width="0dp" android:layout_weight="1"
-            android:layout_height="wrap_content" android:layout_marginLeft="6dp"
-            android:text="@string/tile_watchouts" />
         <Button android:id="@+id/tile_lces" style="@style/TakwerxButton"
             android:layout_width="0dp" android:layout_weight="1"
             android:layout_height="match_parent" android:layout_marginLeft="6dp"
             android:text="@string/tile_lces" />
+        <Button android:id="@+id/tile_briefing" style="@style/TakwerxButton"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="match_parent" android:layout_marginLeft="6dp"
+            android:text="@string/tile_briefing" />
     </LinearLayout>
     <LinearLayout
         android:layout_width="match_parent"
@@ -83,16 +85,17 @@
         android:orientation="horizontal"
         android:layout_marginTop="6dp"
         android:baselineAligned="false">
-        <Button android:id="@+id/tile_briefing" style="@style/TakwerxButton"
-            android:layout_width="0dp" android:layout_weight="1"
-            android:layout_height="match_parent" android:text="@string/tile_briefing" />
         <Button android:id="@+id/tile_denominators" style="@style/TakwerxTwoLineTile"
             android:layout_width="0dp" android:layout_weight="1"
-            android:layout_height="wrap_content" android:layout_marginLeft="6dp"
-            android:text="@string/tile_denominators" />
+            android:layout_height="wrap_content" android:text="@string/tile_denominators" />
         <Button android:id="@+id/tile_irpg" style="@style/TakwerxButton"
             android:layout_width="0dp" android:layout_weight="1"
             android:layout_height="match_parent" android:layout_marginLeft="6dp"
             android:text="@string/tile_irpg" />
+        <Button android:id="@+id/tile_iwi" style="@style/TakwerxButton"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="match_parent" android:layout_marginLeft="6dp"
+            android:textColor="@color/tile_iwi"
+            android:text="@string/tile_iwi" />
     </LinearLayout>
 </LinearLayout>

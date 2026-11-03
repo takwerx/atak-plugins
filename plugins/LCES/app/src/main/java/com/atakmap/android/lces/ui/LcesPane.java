@@ -152,11 +152,12 @@ public final class LcesPane implements PageView.Opener {
         });
 
         tile(header, R.id.tile_orders, "orders");
-        tile(header, R.id.tile_watchouts, "watchouts");
         tile(header, R.id.tile_lces, "lces");
         tile(header, R.id.tile_briefing, "briefing");
         tile(header, R.id.tile_denominators, "denominators");
         tile(header, R.id.tile_irpg, IrpgPages.CONTENTS);
+        // Until IWI's own screens move in, the tile opens the book's report page.
+        tile(header, R.id.tile_iwi, "mir");
 
         final View.OnClickListener backToMain = new View.OnClickListener() {
             @Override

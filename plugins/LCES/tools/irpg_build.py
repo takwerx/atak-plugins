@@ -59,17 +59,17 @@ EXTRA = [
 COVERS = [
     (2, "Sizeup Report", "front cover (inside)"),
     (139, "Briefing Checklist", "back cover (inside)"),
-    (140, "10 Standard Firefighting Orders", "back cover (outside)"),
-    (140, "18 Watch Out Situations", "back cover (outside)"),
+    # One page, as the back cover prints them, with both headings kept.
+    (140, "10s & 18s", "back cover (outside)"),
     (3, "About the IRPG", "title page"),        # titled by us: the page has none
     (138, "Publication Notice", "122"),         # titled by us
 ]
-UNTITLED = {"About the IRPG", "Publication Notice"}
+UNTITLED = {"About the IRPG", "Publication Notice",
+            "10s & 18s"}
 
 # Ids the pane's tiles and the plugin's code rely on; everything else is a slug.
 IDS = {
-    "10 Standard Firefighting Orders": "orders",
-    "18 Watch Out Situations": "watchouts",
+    "10s & 18s": "orders",
     "LCES": "lces",
     "Briefing Checklist": "briefing",
     "Common Denominators of Fire Behavior on Tragedy Fires": "denominators",
@@ -884,13 +884,7 @@ def main():
     for n, title, where in COVERS:
         if title in cover_blocks:
             continue
-        blocks = build_topic(pages, {"title": title, "pg": where}, [n], figs, warnings)
-        if n == 140:
-            head, tail = split_at_title(blocks, "18 Watch Out Situations")
-            cover_blocks["10 Standard Firefighting Orders"] = head
-            cover_blocks["18 Watch Out Situations"] = tail or []
-        else:
-            cover_blocks[title] = blocks
+        cover_blocks[title] = build_topic(pages, {"title": title, "pg": where}, [n], figs, warnings)
     for n, title, where in COVERS:
         out.append({"id": slug(title), "title": title, "section": "Covers",
                     "color": "white", "pg": where, "pdf": [n],

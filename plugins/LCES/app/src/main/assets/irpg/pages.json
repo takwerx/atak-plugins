@@ -9773,7 +9773,7 @@
   },
   {
    "id": "orders",
-   "title": "10 Standard Firefighting Orders",
+   "title": "10s & 18s",
    "section": "Covers",
    "color": "white",
    "pg": "back cover (outside)",
@@ -9781,6 +9781,11 @@
     140
    ],
    "blocks": [
+    {
+     "t": "h",
+     "x": "<b>10 STANDARD FIREFIGHTING ORDERS</b>",
+     "lvl": 0
+    },
     {
      "t": "num",
      "x": "Keep informed on fire weather conditions and forecasts.",
@@ -9840,19 +9845,12 @@
      "x": "Fight fire aggressively, having provided for safety first.",
      "lvl": 0,
      "n": "10"
-    }
-   ]
-  },
-  {
-   "id": "watchouts",
-   "title": "18 Watch Out Situations",
-   "section": "Covers",
-   "color": "white",
-   "pg": "back cover (outside)",
-   "pdf": [
-    140
-   ],
-   "blocks": [
+    },
+    {
+     "t": "h",
+     "x": "<b>18 WATCH OUT SITUATIONS</b>",
+     "lvl": 0
+    },
     {
      "t": "num",
      "x": "Fire not scouted and sized up.",
@@ -10733,15 +10731,9 @@
     },
     {
      "t": "toc",
-     "x": "10 Standard Firefighting Orders",
+     "x": "10s & 18s",
      "pg": "back cover (outside)",
      "id": "orders"
-    },
-    {
-     "t": "toc",
-     "x": "18 Watch Out Situations",
-     "pg": "back cover (outside)",
-     "id": "watchouts"
     },
     {
      "t": "toc",

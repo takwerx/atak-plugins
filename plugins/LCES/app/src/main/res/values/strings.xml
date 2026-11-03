@@ -13,12 +13,12 @@
     <string name="lessons">Lessons</string>
     <string name="show_settings">Open or close</string>
 
-    <string name="tile_orders">10 Orders</string>
-    <string name="tile_watchouts">18 Watch Outs</string>
+    <string name="tile_orders">10s &amp; 18s</string>
     <string name="tile_lces">LCES</string>
     <string name="tile_briefing">Briefing</string>
     <string name="tile_denominators">Common Denominators</string>
     <string name="tile_irpg">IRPG</string>
+    <string name="tile_iwi">IWI</string>
 
     <string name="heading_irpg">From the IRPG</string>
     <string name="status_no_layer">The Lessons Learned layer comes in a later build.</string>

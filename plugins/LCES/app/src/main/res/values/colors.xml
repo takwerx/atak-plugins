@@ -9,4 +9,6 @@
     <!-- Where a page comes from, under its title: readable, quieter than the text. -->
     <color name="source_gray">#b0b0b0</color>
 
+    <!-- The IWI tile, in the red of the IRPG's medical pages. -->
+    <color name="tile_iwi">#FF6B6B</color>
 </resources>
