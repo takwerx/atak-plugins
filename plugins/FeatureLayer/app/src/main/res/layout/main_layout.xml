@@ -484,7 +484,7 @@
             android:textSize="12sp"
             android:textColor="#BBBBBB"
             android:paddingTop="6dp"
-            android:text="Census Bureau boundaries, lines within about 50 m. Kept on the phone once fetched. Sources found with the help of Joseph Elfelt, mappingsupport.com." />
+            android:text="Census Bureau, CAL FIRE and USGS boundaries, kept on the device once fetched. Sources found with the help of Joseph Elfelt, mappingsupport.com." />
     </LinearLayout>
   </LinearLayout>
 </LinearLayout>

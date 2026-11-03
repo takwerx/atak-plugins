@@ -51,7 +51,7 @@ public class LoadedLayer {
      * 2010s, 2000s and 1990s in color. 60: every decade in a color of its own.
      * 61: 1979 and earlier grey again. 62: tribal lands gated at 20 mi (Boundaries.TRIBAL_GATE_SINCE).
      */
-    private static final int STYLE_VERSION = 62;
+    private static final int STYLE_VERSION = 63;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
@@ -234,7 +234,11 @@ public class LoadedLayer {
                     final boolean poly = isArea(g);
                     final com.atakmap.android.maps.Shape shape = item instanceof com.atakmap.android.maps.Shape
                             ? (com.atakmap.android.maps.Shape) item : null;
-                    final int color = ChooserGlyphs.visible(shape == null ? 0xFFFFFFFF : shape.getStrokeColor());
+                    // A filled area is known by its fill: the land layers share one grey edge,
+                    // and SRA and FRA both read grey in the chooser (operator, 2026-11-02).
+                    final int fill = shape == null ? 0 : shape.getFillColor();
+                    final int color = ChooserGlyphs.visible(shape == null ? 0xFFFFFFFF
+                            : poly && (fill >>> 24) != 0 ? fill : shape.getStrokeColor());
                     String uri = poly ? polygonGlyph : lineGlyph;
                     int tint = color;
                     String cat = null;

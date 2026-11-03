@@ -981,11 +981,23 @@ public final class Boundaries {
      */
     /**
      * A class drawn in a color of the operator's choosing rather than the publisher's:
-     * SRA red (operator, 2026-10-14: "sra should be red"). 0 keeps the publisher's.
+     * SRA red (operator, 2026-10-14: "sra should be red"). Protection Areas match it:
+     * CAL FIRE red like SRA, BLM yellow, Defense blue (operator, 2026-11-02). 0 keeps
+     * the publisher's.
      */
     static int classHue(String kind, String label) {
-        if (KIND_RESPONSIBILITY.equals(kind) && label != null && label.startsWith("State Responsibility"))
+        if (label == null)
+            return 0;
+        if (KIND_RESPONSIBILITY.equals(kind) && label.startsWith("State Responsibility"))
             return 0xFF1744;
+        if (KIND_DPA.equals(kind)) {
+            if (label.equals("CAL FIRE"))
+                return 0xFF1744;
+            if (label.equals("Bureau of Land Management"))
+                return 0xFFD600;
+            if (label.equals("Department of Defense"))
+                return 0x2962FF;
+        }
         return 0;
     }
 
