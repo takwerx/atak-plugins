@@ -94,12 +94,17 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp" />
                 <TextView
+                    style="@style/TakwerxSectionHeading"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:paddingTop="16dp"
-                    android:textSize="14sp"
-                    android:textColor="@color/white"
-                    android:text="@string/settings_lessons_later" />
+                    android:text="@string/heading_lessons" />
+                <!-- Area, Types and the map key, as drop-down rows built in code. -->
+                <LinearLayout
+                    android:id="@+id/lessons_settings"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
             </LinearLayout>
         </ScrollView>
     </LinearLayout>

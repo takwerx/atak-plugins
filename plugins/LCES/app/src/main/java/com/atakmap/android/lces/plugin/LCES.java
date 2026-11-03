@@ -3,6 +3,8 @@ package com.atakmap.android.lces.plugin;
 import android.content.Context;
 
 import com.atak.plugins.impl.PluginContextProvider;
+import com.atakmap.android.lces.lessons.Incident;
+import com.atakmap.android.lces.lessons.LessonsManager;
 import com.atakmap.android.lces.ui.LcesDropDown;
 import com.atakmap.android.lces.ui.LcesPane;
 import com.atakmap.android.maps.MapView;
@@ -28,6 +30,8 @@ public class LCES implements IPlugin {
     IHostUIService uiService;
     ToolbarItem toolbarItem;
     LcesDropDown dropDown;
+    LcesPane pane;
+    LessonsManager lessons;
     MapView mapView;
 
     public LCES(IServiceController serviceController) {
@@ -63,8 +67,28 @@ public class LCES implements IPlugin {
         if (uiService != null)
             uiService.addToolbarItem(toolbarItem);
         mapView = MapView.getMapView();
-        if (mapView == null)
+        if (mapView == null) {
             Log.w(TAG, "no map view at start");
+            return;
+        }
+        // The Lessons Learned layer lives as long as the plugin, not the pane: it is on
+        // the map and answers taps whether or not the pane has been opened.
+        lessons = new LessonsManager(mapView, pluginContext);
+        lessons.setListener(new LessonsManager.Listener() {
+            @Override
+            public void onLessons(LessonsManager.Result r) {
+                if (pane != null)
+                    pane.onLessons(r);
+            }
+
+            @Override
+            public void onTapped(Incident i) {
+                showPane();
+                if (pane != null)
+                    pane.openIncident(i);
+            }
+        });
+        lessons.start();
     }
 
     @Override
@@ -73,6 +97,11 @@ public class LCES implements IPlugin {
         if (dropDown != null) {
             dropDown.dispose();
             dropDown = null;
+        }
+        pane = null;
+        if (lessons != null) {
+            lessons.stop();
+            lessons = null;
         }
         if (uiService != null)
             uiService.removeToolbarItem(toolbarItem);
@@ -87,8 +116,12 @@ public class LCES implements IPlugin {
             Log.w(TAG, "no map view; the pane has nothing to show");
             return;
         }
-        if (dropDown == null)
-            dropDown = new LcesDropDown(mapView, new LcesPane(mapView, pluginContext));
+        if (dropDown == null) {
+            pane = new LcesPane(mapView, pluginContext, lessons);
+            dropDown = new LcesDropDown(mapView, pane);
+            if (lessons != null && lessons.last() != null)
+                pane.onLessons(lessons.last());
+        }
         dropDown.show();
     }
 }

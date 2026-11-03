@@ -21,8 +21,47 @@
     <string name="tile_iwi">IWI</string>
 
     <string name="heading_irpg">From the IRPG</string>
-    <string name="status_no_layer">The Lessons Learned layer comes in a later build.</string>
-    <string name="settings_lessons_later">The Lessons Learned settings come with the layer.</string>
+    <string name="heading_lessons_near_you">Lessons near you</string>
+    <string name="heading_lessons_near_center">Lessons near the map center</string>
+    <string name="heading_lessons_search">Lessons that match</string>
+    <string name="heading_irpg_search">In the IRPG</string>
+    <string name="details">Details</string>
+
+    <!-- Lessons Learned status line -->
+    <string name="lessons_loading">Loading the lessons learned…</string>
+    <string name="lessons_map_off">Lessons off the map.</string>
+    <string name="lessons_none">No lessons here. Widen the Area or switch on more types in Settings.</string>
+    <string name="lessons_no_fix">No GPS fix, measuring from the map center.</string>
+    <string name="lessons_as_of">List as of %s.</string>
+
+    <!-- Lessons Learned settings -->
+    <string name="heading_lessons">Lessons Learned</string>
+    <string name="area">Area</string>
+    <string name="area_everything">Everything</string>
+    <string name="types">Types</string>
+    <string name="map_key">Map key</string>
+    <string name="measuring_from">Measuring from</string>
+    <string name="my_location">My Location</string>
+    <string name="map_center">Map center</string>
+    <string name="check_for_new">Check for new incidents</string>
+    <string name="checking">Checking…</string>
+
+    <!-- Incident page -->
+    <string name="lesson_go_to">Show on the map</string>
+    <string name="lesson_what_happened">What happened</string>
+    <string name="lesson_from_report">From the report</string>
+    <string name="lesson_details">Details</string>
+    <string name="lesson_fire">Fire</string>
+    <string name="lesson_activity">Activity</string>
+    <string name="lesson_entrapment">Entrapment</string>
+    <string name="lesson_behavior">Fire behavior</string>
+    <string name="lesson_open_report">Open the full report</string>
+    <string name="lesson_report_needs_network">Opens the Lessons Learned Center\'s page in the browser. Needs a network.</string>
+    <string name="lesson_no_browser">No browser on this device to open the report.</string>
+    <string name="lesson_source">From the Wildland Fire Lessons Learned Center\'s incident review database.</string>
+    <string name="lesson_source_dated">From the Wildland Fire Lessons Learned Center\'s incident review database, as of %s.</string>
+    <string name="your_location">your location</string>
+    <string name="the_map_center">the map center</string>
     <string name="show_section">Show this section</string>
 
     <!-- Search -->
