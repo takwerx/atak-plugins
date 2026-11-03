@@ -576,7 +576,10 @@ public final class LcesPane implements PageView.Opener {
         if (row != null) {
             for (int k = tiles.size() % across; k != 0 && k < across; k++) {
                 final View gap = new View(pluginContext);
-                final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, 1, 1f);
+                // MATCH_PARENT, not a fixed height: a 1 px spacer sets the row's
+                // height and squeezes the tile beside it to 1 px.
+                final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
+                        LinearLayout.LayoutParams.MATCH_PARENT, 1f);
                 lp.leftMargin = dp(6);
                 row.addView(gap, lp);
             }
