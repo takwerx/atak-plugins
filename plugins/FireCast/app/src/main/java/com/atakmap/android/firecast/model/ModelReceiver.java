@@ -1468,8 +1468,14 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
     /** The Start and conditions bar: what the next run will use, in one line when shut. */
     private void paintSettings() {
         final TextView note = view.findViewById(R.id.start_note);
-        final String start = model.startNote();
+        String start = model.startNote();
+        // A refused shape stays in orange until a start is placed.
+        final boolean refused = start == null && model.startRefused() != null
+                && model.perimeter() == null && model.startPoint() == null;
+        if (refused)
+            start = model.startRefused();
         note.setText(start == null ? "" : start);
+        note.setTextColor(refused ? 0xFFFF9800 : 0xFFFFFFFF);
         note.setVisibility(start == null || fedsOpen ? View.GONE : View.VISIBLE);
         final String from = ((Button) view.findViewById(R.id.btn_place)).getText().toString()
                 .replace("Start from: ", "");

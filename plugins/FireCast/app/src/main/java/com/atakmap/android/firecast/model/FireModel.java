@@ -428,6 +428,13 @@ public final class FireModel {
         return startNote;
     }
 
+    /** Why the last shape tapped was refused; shown until a start is placed. */
+    private volatile String startRefused;
+
+    public String startRefused() {
+        return startRefused;
+    }
+
     public double[][] perimeter() {
         return perimeter;
     }
@@ -587,8 +594,11 @@ public final class FireModel {
                 }
                 final String said = takeShape((com.atakmap.android.maps.Shape) item);
                 cancelPick();
+                startRefused = said;
                 if (said != null) {
-                    startNote = said;
+                    // Refused: drop the old start too, so Run model cannot quietly run it.
+                    clearPerimeter();
+                    removeMarker();
                     changed();
                 }
                 if (onPlaced != null)
