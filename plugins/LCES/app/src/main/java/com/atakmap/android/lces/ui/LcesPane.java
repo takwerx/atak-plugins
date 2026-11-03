@@ -38,7 +38,9 @@ import com.atakmap.coremap.maps.coords.GeoPoint;
 
 import java.text.NumberFormat;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Set;
 
@@ -83,7 +85,7 @@ public final class LcesPane implements PageView.Opener {
     private final Button settingsWide;
     private final Button readerWide;
     private final RowAdapter rows;
-    private final Fold areaFold, typesFold, keyFold;
+    private final Fold areaFold, typesFold, catsFold, keyFold;
     private IrpgPages pages;
     private LcesDropDown host;
     /** The page being read was opened from the contents; Back returns there. */
@@ -250,6 +252,7 @@ public final class LcesPane implements PageView.Opener {
         final LinearLayout lessonsSettings = root.findViewById(R.id.lessons_settings);
         areaFold = new Fold(lessonsSettings, "area");
         typesFold = new Fold(lessonsSettings, "types");
+        catsFold = new Fold(lessonsSettings, "categories");
         keyFold = new Fold(lessonsSettings, "key");
         refreshSettings();
     }
@@ -411,12 +414,36 @@ public final class LcesPane implements PageView.Opener {
         } else {
             b.append(count(r.kept)).append(r.kept == 1 ? " lesson." : " lessons, nearest first.");
         }
+        if (lessonsManager != null) {
+            final int types = lessonsManager.shownTypes().size();
+            final Set<String> off = lessonsManager.hiddenCategories();
+            int cats = 0;
+            for (String c : r.categoryCounts.keySet())
+                if (!off.contains(c))
+                    cats++;
+            final List<String> hidden = new ArrayList<>();
+            if (types < Incident.Type.values().length)
+                hidden.add(types + " of " + Incident.Type.values().length + " types");
+            if (cats < r.categoryCounts.size())
+                hidden.add(cats == 1 ? "only " + categoryLabel(firstShown(r, off))
+                        : cats + " of " + r.categoryCounts.size() + " categories");
+            if (!hidden.isEmpty())
+                b.append(" Showing ").append(android.text.TextUtils.join(", ", hidden))
+                        .append('.');
+        }
         if (r.noFix)
             b.append(' ').append(pluginContext.getString(R.string.lessons_no_fix));
         if (!r.sourceEdited.isEmpty())
             b.append(' ').append(pluginContext.getString(R.string.lessons_as_of,
                     IncidentPage.longDate(r.sourceEdited)));
         return b.toString();
+    }
+
+    private static String firstShown(LessonsManager.Result r, Set<String> off) {
+        for (String c : r.categoryCounts.keySet())
+            if (!off.contains(c))
+                return c;
+        return "";
     }
 
     private static String count(int n) {
@@ -439,6 +466,7 @@ public final class LcesPane implements PageView.Opener {
             return;
         buildArea();
         buildTypes();
+        buildCategories();
         buildKey();
     }
 
@@ -522,6 +550,88 @@ public final class LcesPane implements PageView.Opener {
             tiles.add(b);
         }
         addTileRows(body, tiles, 2);
+    }
+
+    /**
+     * The LLC's own categories (Aviation, Chainsaw, Medical ...), with All and None
+     * so one category alone is two taps.
+     */
+    private void buildCategories() {
+        final LessonsManager.Result r = lessonsResult;
+        final Map<String, Integer> cats = r == null
+                ? java.util.Collections.<String, Integer>emptyMap() : r.categoryCounts;
+        final Set<String> off = lessonsManager.hiddenCategories();
+        int shown = 0;
+        for (String c : cats.keySet())
+            if (!off.contains(c))
+                shown++;
+        catsFold.label(pluginContext.getString(R.string.categories),
+                cats.isEmpty() ? null : shown + " of " + cats.size());
+        final LinearLayout body = catsFold.body;
+        body.removeAllViews();
+
+        final List<Button> bulk = new ArrayList<>();
+        final Button all = new Button(pluginContext, null, 0, R.style.TakwerxButton);
+        all.setText(R.string.categories_all);
+        all.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                lessonsManager.setHiddenCategories(new HashSet<String>());
+                refreshSettings();
+            }
+        });
+        bulk.add(all);
+        final Button none = new Button(pluginContext, null, 0, R.style.TakwerxButton);
+        none.setText(R.string.categories_none);
+        none.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                lessonsManager.setHiddenCategories(new HashSet<>(cats.keySet()));
+                refreshSettings();
+            }
+        });
+        bulk.add(none);
+        addTileRows(body, bulk, 2);
+
+        final List<Button> tiles = new ArrayList<>();
+        for (final Map.Entry<String, Integer> e : cats.entrySet()) {
+            final boolean isOn = !off.contains(e.getKey());
+            final SpannableStringBuilder sb = new SpannableStringBuilder();
+            sb.append(categoryLabel(e.getKey())).append(" (").append(count(e.getValue()))
+                    .append(")\n");
+            colored(sb, isOn ? "ON" : "OFF", pluginContext.getResources().getColor(
+                    isOn ? R.color.state_on : R.color.state_off));
+            final Button b = new Button(pluginContext, null, 0, R.style.TakwerxTwoLineTile);
+            b.setText(sb);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    lessonsManager.setCategoryShown(e.getKey(),
+                            lessonsManager.hiddenCategories().contains(e.getKey()));
+                    refreshSettings();
+                }
+            });
+            tiles.add(b);
+        }
+        addTileRows(body, tiles, 2);
+    }
+
+    /** The LLC's category, shortened where its own name would not fit on a tile. */
+    static String categoryLabel(String c) {
+        switch (c) {
+            case "":
+                return "Not Given";
+            case "Equipment/Facilities Damage or Malfunction":
+                return "Equipment Damage";
+            case "Prescribed Fire (Rx) Wildfire Declaration":
+                return "Rx Declared Wildfire";
+            case "Tools (hand and power)":
+                return "Hand and Power Tools";
+            case "Motor Vehicle Accident":
+                return "Vehicle Accident";
+            default:
+                return c;
+        }
     }
 
     /** Built from the same colors the map's icons are drawn in, so the two agree. */

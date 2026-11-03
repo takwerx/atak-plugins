@@ -23,6 +23,8 @@ import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -52,6 +54,11 @@ public final class LessonsManager {
     public static final String PREF_ON = "lces.lessonsOn";
     /** Kinds switched off, by {@link Incident.Type#name()}, comma separated. */
     public static final String PREF_HIDDEN = "lces.lessons.hidden";
+    /**
+     * LLC categories switched off, one per line. Off, not on, is stored so a category
+     * a later catalog brings in starts shown.
+     */
+    public static final String PREF_HIDDEN_CATS = "lces.lessons.hiddenCategories";
     /** Area radius in meters; -1 for everything. */
     public static final String PREF_AREA_M = "lces.lessons.areaM";
     /** Measure from the map center instead of My Location. */
@@ -71,6 +78,8 @@ public final class LessonsManager {
         public final int kept;
         /** Every incident in the catalog, per kind: the counts on the Types filter. */
         public final Map<Incident.Type, Integer> counts;
+        /** Every incident in the catalog, per LLC category, largest first. */
+        public final Map<String, Integer> categoryCounts;
         public final boolean fromCenter;
         /** Measuring from the map center because there is no GPS fix. */
         public final boolean noFix;
@@ -80,12 +89,13 @@ public final class LessonsManager {
         public final GeoPoint origin;
 
         Result(List<Near> nearest, int kept, Map<Incident.Type, Integer> counts,
-                boolean fromCenter, boolean noFix, String sourceEdited, boolean ready,
+                Map<String, Integer> categoryCounts, boolean fromCenter, boolean noFix, String sourceEdited, boolean ready,
                 GeoPoint origin) {
             this.origin = origin;
             this.nearest = nearest;
             this.kept = kept;
             this.counts = counts;
+            this.categoryCounts = categoryCounts;
             this.fromCenter = fromCenter;
             this.noFix = noFix;
             this.sourceEdited = sourceEdited;
@@ -286,6 +296,39 @@ public final class LessonsManager {
         rebuild();
     }
 
+    /** The LLC categories switched off. */
+    public Set<String> hiddenCategories() {
+        final Set<String> off = new HashSet<>();
+        for (String s : prefs.getString(PREF_HIDDEN_CATS, "").split("\n")) {
+            if (!s.isEmpty())
+                off.add(s);
+        }
+        return off;
+    }
+
+    public void setCategoryShown(String category, boolean shown) {
+        final Set<String> off = hiddenCategories();
+        if (shown)
+            off.remove(category);
+        else
+            off.add(category);
+        setHiddenCategories(off);
+    }
+
+    /** Replaces the whole set: All passes an empty set, None every category. */
+    public void setHiddenCategories(Set<String> off) {
+        final List<String> sorted = new ArrayList<>(off);
+        Collections.sort(sorted);
+        final StringBuilder b = new StringBuilder();
+        for (String s : sorted) {
+            if (b.length() > 0)
+                b.append('\n');
+            b.append(s);
+        }
+        prefs.edit().putString(PREF_HIDDEN_CATS, b.toString()).apply();
+        rebuild();
+    }
+
     /** Meters, or -1 for everything. */
     public double areaMeters() {
         return prefs.getFloat(PREF_AREA_M, -1f);
@@ -322,11 +365,13 @@ public final class LessonsManager {
     // ---- the rule --------------------------------------------------------------------
 
     /**
-     * What the list and the map both show: a kind that is switched on, inside the Area.
-     * The one place this is decided.
+     * What the list and the map both show: a kind that is switched on, in a category
+     * that is switched on, inside the Area. The one place this is decided.
      */
-    public static boolean kept(Incident i, Set<Incident.Type> types, double areaM, double meters) {
-        return types.contains(i.type) && (areaM <= 0 || meters <= areaM);
+    public static boolean kept(Incident i, Set<Incident.Type> types, Set<String> hiddenCats,
+            double areaM, double meters) {
+        return types.contains(i.type) && !hiddenCats.contains(i.category)
+                && (areaM <= 0 || meters <= areaM);
     }
 
     /** Main thread: read where the list measures from, then do the pass on the worker. */
@@ -338,12 +383,13 @@ public final class LessonsManager {
         final GeoPoint origin = fromCenter ? centerPoint() : self;
         final boolean noFix = self == null && !fromCenterPref();
         final Set<Incident.Type> types = shownTypes();
+        final Set<String> hiddenCats = hiddenCategories();
         final double areaM = areaMeters();
         try {
             worker.execute(new Runnable() {
                 @Override
                 public void run() {
-                    pass(origin, fromCenter, noFix, types, areaM);
+                    pass(origin, fromCenter, noFix, types, hiddenCats, areaM);
                 }
             });
         } catch (java.util.concurrent.RejectedExecutionException stoppedAlready) {
@@ -352,23 +398,27 @@ public final class LessonsManager {
     }
 
     private void pass(GeoPoint origin, boolean fromCenter, boolean noFix,
-            Set<Incident.Type> types, double areaM) {
+            Set<Incident.Type> types, Set<String> hiddenCats, double areaM) {
         final LessonsCatalog.Data d = data;
         final Map<Incident.Type, Integer> counts = new EnumMap<>(Incident.Type.class);
         for (Incident.Type t : Incident.Type.values())
             counts.put(t, 0);
         if (d == null) {
-            publish(new Result(Collections.<Near>emptyList(), 0, counts, fromCenter, noFix,
+            publish(new Result(Collections.<Near>emptyList(), 0, counts,
+                    Collections.<String, Integer>emptyMap(), fromCenter, noFix,
                     "", false, origin));
             return;
         }
         final List<Near> kept = new ArrayList<>();
         final List<Incident> drawn = new ArrayList<>();
+        final Map<String, Integer> cats = new HashMap<>();
         for (Incident i : d.incidents) {
             counts.put(i.type, counts.get(i.type) + 1);
+            final Integer c = cats.get(i.category);
+            cats.put(i.category, c == null ? 1 : c + 1);
             final double m = origin == null ? Double.NaN
                     : origin.distanceTo(new GeoPoint(i.lat, i.lon));
-            if (kept(i, types, origin == null ? -1 : areaM, m)) {
+            if (kept(i, types, hiddenCats, origin == null ? -1 : areaM, m)) {
                 kept.add(new Near(i, m));
                 drawn.add(i);
             }
@@ -382,20 +432,39 @@ public final class LessonsManager {
             }
         });
         // The map gets the same set as the list; rewrite only when that set changed.
-        final String key = setKey(d, types, areaM, kept);
+        final String key = setKey(d, types, hiddenCats, areaM, kept);
         if (!key.equals(drawnKey)) {
             overlay.rewrite(drawn);
             drawnKey = key;
         }
         final List<Near> nearest = new ArrayList<>(kept.subList(0, Math.min(LIST_CAP, kept.size())));
         publish(new Result(Collections.unmodifiableList(nearest), kept.size(), counts,
-                fromCenter, noFix, d.sourceEdited, true, origin));
+                byCount(cats), fromCenter, noFix, d.sourceEdited, true, origin));
     }
 
     /** Equal keys mean equal sets on the map. */
-    private static String setKey(LessonsCatalog.Data d, Set<Incident.Type> types, double areaM,
-            List<Near> kept) {
-        final StringBuilder b = new StringBuilder(d.built).append('|').append(types);
+    /** Largest first, then by name, so the tiles do not move between passes. */
+    private static Map<String, Integer> byCount(final Map<String, Integer> cats) {
+        final List<String> names = new ArrayList<>(cats.keySet());
+        Collections.sort(names, new Comparator<String>() {
+            @Override
+            public int compare(String a, String b) {
+                final int n = cats.get(b) - cats.get(a);
+                return n != 0 ? n : a.compareTo(b);
+            }
+        });
+        final Map<String, Integer> out = new LinkedHashMap<>();
+        for (String s : names)
+            out.put(s, cats.get(s));
+        return Collections.unmodifiableMap(out);
+    }
+
+    private static String setKey(LessonsCatalog.Data d, Set<Incident.Type> types,
+            Set<String> hiddenCats, double areaM, List<Near> kept) {
+        final List<String> off = new ArrayList<>(hiddenCats);
+        Collections.sort(off);
+        final StringBuilder b = new StringBuilder(d.built).append('|').append(types)
+                .append('|').append(off);
         if (areaM <= 0)
             return b.toString();
         // A radius: the set depends on where it is measured from, so name its members.
@@ -546,7 +615,7 @@ public final class LessonsManager {
         }
     }
 
-    /** Incidents whose name, fire or summary hold every word of the search. */
+    /** Incidents whose name, fire, state, category or summary hold every word of the search. */
     public List<Incident> search(String q) {
         final LessonsCatalog.Data d = data;
         final List<Incident> out = new ArrayList<>();
@@ -554,7 +623,8 @@ public final class LessonsManager {
             return out;
         final String[] words = q.toLowerCase(Locale.US).trim().split("\\s+");
         for (Incident i : d.incidents) {
-            final String hay = (i.name + " " + i.fire + " " + i.state + " " + i.summary)
+            final String hay = (i.name + " " + i.fire + " " + i.state + " " + i.category
+                    + " " + i.summary)
                     .toLowerCase(Locale.US);
             boolean all = true;
             for (String w : words) {
