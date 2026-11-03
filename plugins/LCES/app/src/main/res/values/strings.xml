@@ -30,6 +30,7 @@
     <!-- Lessons Learned status line -->
     <string name="lessons_loading">Loading the lessons learned…</string>
     <string name="lessons_map_off">Lessons off the map.</string>
+    <string name="search_map_off">Turn Lessons Learned ON to see them on the map.</string>
     <string name="lessons_none">No lessons here. Widen the Area or switch on more types or categories in Settings.</string>
     <string name="lessons_no_fix">No GPS fix, measuring from the map center.</string>
     <string name="lessons_as_of">List as of %s.</string>

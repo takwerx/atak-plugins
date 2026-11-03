@@ -172,6 +172,10 @@ public final class LcesPane implements PageView.Opener {
             @Override
             public void afterTextChanged(Editable s) {
                 fillList();
+                // The map follows the search once typing pauses, not every letter:
+                // each change rewrites the map's store.
+                search.removeCallbacks(searchToMap);
+                search.postDelayed(searchToMap, 400);
             }
         });
         search.setOnEditorActionListener(new TextView.OnEditorActionListener() {
@@ -255,6 +259,9 @@ public final class LcesPane implements PageView.Opener {
         catsFold = new Fold(lessonsSettings, "categories");
         keyFold = new Fold(lessonsSettings, "key");
         refreshSettings();
+        // A new pane starts with an empty search box, so the map shows the whole rule.
+        if (lessonsManager != null)
+            lessonsManager.setSearch(null);
     }
 
     void setHost(LcesDropDown host) {
@@ -354,6 +361,15 @@ public final class LcesPane implements PageView.Opener {
         fillList();
     }
 
+    /** Hands the search to the map, so the map shows only what the list found. */
+    private final Runnable searchToMap = new Runnable() {
+        @Override
+        public void run() {
+            if (lessonsManager != null)
+                lessonsManager.setSearch(search.getText().toString());
+        }
+    };
+
     /** The list under the tiles: the lessons nearest first, or what a search found. */
     private void fillList() {
         final String q = search.getText().toString().trim();
@@ -373,12 +389,18 @@ public final class LcesPane implements PageView.Opener {
             final StringBuilder s = new StringBuilder(found.isEmpty()
                     ? pluginContext.getString(R.string.results_none, q)
                     : pluginContext.getString(R.string.results_some, found.size(), q));
-            if (!incidents.isEmpty())
+            if (!incidents.isEmpty()) {
                 s.append(' ').append(incidents.size() > SEARCH_CAP
                         ? "The " + SEARCH_CAP + " best of " + count(incidents.size())
                                 + " lessons that match are under them."
                         : count(incidents.size()) + (incidents.size() == 1
                                 ? " lesson matches too." : " lessons match too."));
+                s.append(' ').append(lessonsManager.isOn()
+                        ? (incidents.size() == 1 ? "The map shows only that one."
+                                : "The map shows only those " + count(incidents.size()) + ".")
+                                + " Clear to show the rest."
+                        : pluginContext.getString(R.string.search_map_off));
+            }
             status.setText(s);
         } else {
             final LessonsManager.Result r = lessonsResult;

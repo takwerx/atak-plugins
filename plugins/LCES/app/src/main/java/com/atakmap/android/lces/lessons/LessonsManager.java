@@ -143,6 +143,11 @@ public final class LessonsManager {
     private MapMenuEventListener tapListener;
     /** What the map holds now, so a pass that keeps the same set does not rewrite it. */
     private String drawnKey;
+    /**
+     * While a search is typed in the pane: the ids of the incidents it found, which
+     * are then all the map shows. Null when there is no search.
+     */
+    private volatile Set<String> searchIds;
     private boolean stopped;
 
     private final AtakMapView.OnMapMovedListener moved = new AtakMapView.OnMapMovedListener() {
@@ -365,13 +370,40 @@ public final class LessonsManager {
     // ---- the rule --------------------------------------------------------------------
 
     /**
-     * What the list and the map both show: a kind that is switched on, in a category
+     * What the list and the map both show. During a search, exactly what the search
+     * found, as its list does; otherwise a kind that is switched on, in a category
      * that is switched on, inside the Area. The one place this is decided.
      */
-    public static boolean kept(Incident i, Set<Incident.Type> types, Set<String> hiddenCats,
-            double areaM, double meters) {
+    public static boolean kept(Incident i, Set<String> searchIds, Set<Incident.Type> types,
+            Set<String> hiddenCats, double areaM, double meters) {
+        if (searchIds != null)
+            return searchIds.contains(i.id);
         return types.contains(i.type) && !hiddenCats.contains(i.category)
                 && (areaM <= 0 || meters <= areaM);
+    }
+
+    /**
+     * Main thread. The map shows only what this search found until it is cleared;
+     * null or fewer than two letters ends the search. Returns what it found.
+     */
+    public List<Incident> setSearch(String q) {
+        final String t = q == null ? "" : q.trim();
+        final List<Incident> found = t.length() >= 2 ? search(t) : null;
+        Set<String> ids = null;
+        if (found != null) {
+            ids = new HashSet<>();
+            for (Incident i : found)
+                ids.add(i.id);
+        }
+        final Set<String> was = searchIds;
+        searchIds = ids == null ? null : Collections.unmodifiableSet(ids);
+        if (was == null ? ids != null : !was.equals(ids))
+            rebuild();
+        return found == null ? Collections.<Incident>emptyList() : found;
+    }
+
+    public boolean searching() {
+        return searchIds != null;
     }
 
     /** Main thread: read where the list measures from, then do the pass on the worker. */
@@ -384,12 +416,13 @@ public final class LessonsManager {
         final boolean noFix = self == null && !fromCenterPref();
         final Set<Incident.Type> types = shownTypes();
         final Set<String> hiddenCats = hiddenCategories();
+        final Set<String> ids = searchIds;
         final double areaM = areaMeters();
         try {
             worker.execute(new Runnable() {
                 @Override
                 public void run() {
-                    pass(origin, fromCenter, noFix, types, hiddenCats, areaM);
+                    pass(origin, fromCenter, noFix, ids, types, hiddenCats, areaM);
                 }
             });
         } catch (java.util.concurrent.RejectedExecutionException stoppedAlready) {
@@ -397,7 +430,7 @@ public final class LessonsManager {
         }
     }
 
-    private void pass(GeoPoint origin, boolean fromCenter, boolean noFix,
+    private void pass(GeoPoint origin, boolean fromCenter, boolean noFix, Set<String> ids,
             Set<Incident.Type> types, Set<String> hiddenCats, double areaM) {
         final LessonsCatalog.Data d = data;
         final Map<Incident.Type, Integer> counts = new EnumMap<>(Incident.Type.class);
@@ -418,7 +451,7 @@ public final class LessonsManager {
             cats.put(i.category, c == null ? 1 : c + 1);
             final double m = origin == null ? Double.NaN
                     : origin.distanceTo(new GeoPoint(i.lat, i.lon));
-            if (kept(i, types, hiddenCats, origin == null ? -1 : areaM, m)) {
+            if (kept(i, ids, types, hiddenCats, origin == null ? -1 : areaM, m)) {
                 kept.add(new Near(i, m));
                 drawn.add(i);
             }
@@ -432,7 +465,7 @@ public final class LessonsManager {
             }
         });
         // The map gets the same set as the list; rewrite only when that set changed.
-        final String key = setKey(d, types, hiddenCats, areaM, kept);
+        final String key = setKey(d, ids, types, hiddenCats, areaM, kept);
         if (!key.equals(drawnKey)) {
             overlay.rewrite(drawn);
             drawnKey = key;
@@ -459,23 +492,25 @@ public final class LessonsManager {
         return Collections.unmodifiableMap(out);
     }
 
-    private static String setKey(LessonsCatalog.Data d, Set<Incident.Type> types,
-            Set<String> hiddenCats, double areaM, List<Near> kept) {
+    private static String setKey(LessonsCatalog.Data d, Set<String> ids,
+            Set<Incident.Type> types, Set<String> hiddenCats, double areaM, List<Near> kept) {
         final List<String> off = new ArrayList<>(hiddenCats);
         Collections.sort(off);
         final StringBuilder b = new StringBuilder(d.built).append('|').append(types)
                 .append('|').append(off);
-        if (areaM <= 0)
+        if (ids == null && areaM <= 0)
             return b.toString();
-        // A radius: the set depends on where it is measured from, so name its members.
+        // A search or a radius: name the members, since the set is no longer fixed by
+        // the filters alone.
         long h = 1125899906842597L;
-        final List<String> ids = new ArrayList<>(kept.size());
+        final List<String> members = new ArrayList<>(kept.size());
         for (Near n : kept)
-            ids.add(n.incident.id);
-        Collections.sort(ids);
-        for (String id : ids)
+            members.add(n.incident.id);
+        Collections.sort(members);
+        for (String id : members)
             h = 31 * h + id.hashCode();
-        return b.append('|').append(areaM).append('|').append(ids.size()).append('|').append(h)
+        return b.append('|').append(ids != null).append('|').append(areaM).append('|')
+                .append(members.size()).append('|').append(h)
                 .toString();
     }
 
