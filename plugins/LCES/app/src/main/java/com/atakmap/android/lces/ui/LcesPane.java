@@ -455,9 +455,6 @@ public final class LcesPane implements PageView.Opener {
         }
         if (r.noFix)
             b.append(' ').append(pluginContext.getString(R.string.lessons_no_fix));
-        if (!r.sourceEdited.isEmpty())
-            b.append(' ').append(pluginContext.getString(R.string.lessons_as_of,
-                    IncidentPage.longDate(r.sourceEdited)));
         return b.toString();
     }
 

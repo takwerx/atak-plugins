@@ -33,7 +33,6 @@
     <string name="search_map_off">Turn Lessons Learned ON to see them on the map.</string>
     <string name="lessons_none">No lessons here. Widen the Area or switch on more types or categories in Settings.</string>
     <string name="lessons_no_fix">No GPS fix, measuring from the map center.</string>
-    <string name="lessons_as_of">List as of %s.</string>
 
     <!-- Lessons Learned settings -->
     <string name="heading_lessons">Lessons Learned</string>
