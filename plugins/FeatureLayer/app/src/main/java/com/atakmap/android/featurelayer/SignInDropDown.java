@@ -36,11 +36,49 @@ public class SignInDropDown extends DropDownReceiver implements OnStateListener 
     private String redirectPrefix;
     /** ATAK's window mode before we asked it to resize for the keyboard. */
     private Integer savedSoftInput;
+    /** How far the keyboard reaches over the pane, last we measured; 0 when it is down. */
+    private int keyboardOverlap;
+    /**
+     * ATAK runs full screen, and a full-screen window ignores ADJUST_RESIZE: on a Galaxy
+     * Tab S7+ the keyboard covered the login fields (operator, 2026-11-02). So the pane
+     * measures the keyboard itself, from what is left of the screen, and pads the web view
+     * up out of its way.
+     */
+    private final android.view.ViewTreeObserver.OnGlobalLayoutListener keyboardWatch =
+            new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
+                @Override
+                public void onGlobalLayout() {
+                    final android.graphics.Rect visible = new android.graphics.Rect();
+                    root.getWindowVisibleDisplayFrame(visible);
+                    final int[] at = new int[2];
+                    root.getLocationOnScreen(at);
+                    final int bottom = at[1] + root.getHeight(); // the pane is a fixed size; padding is inside it
+                    // Less than a sixth of the screen is a nav bar or a gesture strip, not a keyboard.
+                    int overlap = Math.max(0, bottom - visible.bottom);
+                    if (overlap < root.getRootView().getHeight() / 6)
+                        overlap = 0;
+                    if (overlap == keyboardOverlap)
+                        return;
+                    keyboardOverlap = overlap;
+                    root.setPadding(0, 0, 0, overlap);
+                    // The field the keyboard came up for is centered again in the smaller view.
+                    if (overlap > 0 && web != null)
+                        web.postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (web != null)
+                                    web.evaluateJavascript("try{var a=document.activeElement;"
+                                            + "if(a&&a!==document.body)a.scrollIntoView({block:'center'});}catch(x){}", null);
+                            }
+                        }, 150);
+                }
+            };
 
     public SignInDropDown(MapView mapView) {
         super(mapView);
         root = new LinearLayout(mapView.getContext());
         root.setOrientation(LinearLayout.VERTICAL);
+        root.getViewTreeObserver().addOnGlobalLayoutListener(keyboardWatch);
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -120,6 +158,8 @@ public class SignInDropDown extends DropDownReceiver implements OnStateListener 
 
     @Override
     public void onDropDownClose() {
+        keyboardOverlap = 0;
+        root.setPadding(0, 0, 0, 0);
         final android.view.Window win = activityWindow();
         if (win != null && savedSoftInput != null) {
             win.setSoftInputMode(savedSoftInput);
@@ -147,6 +187,7 @@ public class SignInDropDown extends DropDownReceiver implements OnStateListener 
 
     @Override
     protected void disposeImpl() {
+        root.getViewTreeObserver().removeOnGlobalLayoutListener(keyboardWatch);
         if (web != null) {
             web.destroy();
             web = null;
