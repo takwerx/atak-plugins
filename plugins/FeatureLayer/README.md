@@ -62,6 +62,14 @@ its attributes, a bloodhound, a range and bearing line, or a marker.
 _________________________________________________________________
 STATUS
 
+0.16, boundaries on every target, and the land layers. Built for ATAK 5.6,
+5.7 and 5.8. California adds CAL FIRE Responsibility Areas, Protection Areas,
+CAL FIRE Units and Land Ownership; every state adds USGS Public Land and Public
+Access. Counties, tribal lands and CAL FIRE Units are named from about the
+125-mile scale. A tap on a boundary opens its details. CA Air Intel has an
+Active only switch, and Find lists only the types switched on. The guide and
+manual show the new layers on the map.
+
 0.15, boundaries. A built-in Boundaries source, public, no sign-in: county,
 city and tribal land boundaries from the Census Bureau, one or more states at
 a time, every boundary in a state or only the ones picked by name. Each area
