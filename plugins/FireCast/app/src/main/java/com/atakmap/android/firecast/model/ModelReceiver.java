@@ -878,6 +878,21 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
 
     /** Main thread. */
     public void render() {
+        // The page is rebuilt whole, so it keeps its own place: on the S22 the Start and
+        // conditions bar slid under the pinned rows after a dialog closed (2026-11-02).
+        // Not seen again on dev 1 (2026-11-04), so the place is put back after the
+        // rebuild has been laid out, whatever moved it.
+        final android.view.ViewParent sp = body.getParent() == null ? null : body.getParent().getParent();
+        if (sp instanceof android.widget.ScrollView) {
+            final android.widget.ScrollView scroll = (android.widget.ScrollView) sp;
+            final int y = scroll.getScrollY();
+            scroll.post(new Runnable() {
+                @Override
+                public void run() {
+                    scroll.scrollTo(0, y);
+                }
+            });
+        }
         body.removeAllViews();
         final java.util.List<FireModel.Run> runs = model.runs();
         if (shown == null || !runs.contains(shown))
