@@ -324,6 +324,32 @@ and the page says why; *Dry day* shows what it would do once it dries.
 ]
 
 #tak-slide[
+= A run from a perimeter you draw
+
+#image("18.jpg", width: 72%)
+
+A drawn outline burns from its whole edge. The slider and the table work the
+same as for a point.
+]
+
+#tak-slide[
+= A run from a shape on the map
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("23.jpg", width: 90%)
+][
+  Any area already on the map can be the start: one you drew earlier, one a
+  contact sent, an imported KML, or a perimeter from another layer. Every piece
+  of it starts burning.
+
+  #v(4pt)
+
+  A line is refused, in orange, and the start is cleared so nothing runs by
+  mistake; the outline has to be an area.
+]
+]
+
+#tak-slide[
 = The slider on a run
 
 #image("15.jpg", width: 72%)

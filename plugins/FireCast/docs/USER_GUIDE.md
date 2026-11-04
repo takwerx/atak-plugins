@@ -181,6 +181,18 @@ A run can be small. A litter fire under trees in a light wind may cover a fracti
 
 ![The slider on a run from a NASA perimeter](screenshots/24_slider_nasa_run.png)
 
+A perimeter you draw burns from its whole edge, the same way:
+
+![A perimeter drawn with ATAK's shape tool](screenshots/39_drawn_perimeter.png)
+
+![The run from the drawn perimeter, slider at 1 h 15 min](screenshots/39b_drawn_perimeter_run.png)
+
+So does a shape already on the map, here a fire perimeter from another layer:
+
+![A shape already on the map as the start](screenshots/40_map_shape_start.png)
+
+![The run from that shape](screenshots/40b_map_shape_run.png)
+
 
 ### Predicted Fire Size
 
