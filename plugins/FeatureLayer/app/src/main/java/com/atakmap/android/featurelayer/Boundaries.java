@@ -160,8 +160,15 @@ public final class Boundaries {
             UNIT_RGB = 0xFF9100;
 
     static final double MILE = 1609.344;
-    /** Counties and tribal lands label from the 20-mile scale, cities and communities from the 5-mile scale. */
     static final double LABEL_GSD_20MI = 20 * MILE / ScaleBar.FALLBACK_BAR_PIXELS;
+    /**
+     * Counties, tribal lands and CAL FIRE Units label from the 125-mile scale (operator,
+     * 2026-11-03: "we need labels coming on sooner, at 125 mile scale"); cities and
+     * communities stay at the 5-mile scale ("city ok where its at"). They were 20 mi.
+     */
+    static final double LABEL_GSD_125MI = 125 * MILE / ScaleBar.FALLBACK_BAR_PIXELS;
+    /** The style version that brought the 125-mile labels; a layer saved before it moves once. */
+    static final int LABEL_125MI_SINCE = 64;
     /**
      * Cities, communities and tribal lands draw from the 20-mile scale in; counties at
      * every zoom. Tribal lands drew at every zoom until 2026-10-13 (operator: "tribes are
@@ -584,7 +591,7 @@ public final class Boundaries {
         s.fillAlpha = 0; // outline only; the fill control adds a tint
         s.labels = true;
         final boolean places = KIND_CITIES.equals(kind) || KIND_COMMUNITIES.equals(kind);
-        s.labelGsd = places ? LayerSpec.DEFAULT_LABEL_GSD_WIDE : LABEL_GSD_20MI;
+        s.labelGsd = places ? LayerSpec.DEFAULT_LABEL_GSD_WIDE : LABEL_GSD_125MI;
         s.gateGsd = places || KIND_TRIBAL.equals(kind) ? GATE_GSD_20MI : Double.MAX_VALUE;
         return s;
     }
@@ -643,6 +650,10 @@ public final class Boundaries {
         // style version moves on after its next fetch, so a gate set later stays.
         if (KIND_TRIBAL.equals(s.kind) && s.styleVersion < TRIBAL_GATE_SINCE && s.gateGsd == Double.MAX_VALUE)
             s.gateGsd = GATE_GSD_20MI;
+        // A named layer saved with the old 20-mile labels takes the 125-mile ones, once.
+        if (!mosaic(s.kind) && !KIND_CITIES.equals(s.kind) && !KIND_COMMUNITIES.equals(s.kind)
+                && s.styleVersion < LABEL_125MI_SINCE && Math.abs(s.labelGsd - LABEL_GSD_20MI) < 1e-9)
+            s.labelGsd = LABEL_GSD_125MI;
     }
 
     /** The where clause: the states by FIPS, or the picked GEOIDs. Tribal lands have no state field; their state is a shape ({@link #passes}). */
