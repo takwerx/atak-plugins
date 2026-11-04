@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Feature Layer",
-   plugin-version: "0.14",
+   plugin-version: "0.16",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -54,6 +54,9 @@ takes any ArcGIS Online organization you sign in to.
   *Fire History* is where fires have burned since 1900, public.
 
   *CA Air Intel* is statewide California fire perimeters, public.
+
+  *Boundaries* is counties, cities, communities, tribal lands, and whose ground
+  it is: CAL FIRE's areas, units and ownership, federal land and public access.
 
   *NIFS Archive (demo)* is last year's Dragon Bravo fire, public, for trying the
   symbology without a login.
@@ -455,7 +458,7 @@ takes any ArcGIS Online organization you sign in to.
   #image("25.jpg", width: 100%)
 
   Active perimeters draw in orange with a dark red edge, named at the center.
-  Inactive ones are not fetched.
+  With *Active only* on, inactive ones are not fetched.
 ]
 ]
 
@@ -467,9 +470,11 @@ takes any ArcGIS Online organization you sign in to.
 ][
   #image("23-2.png", width: 100%)
 ][
-  Its Features list has a row per source with a line saying what it is: CAL
-  FIRE intel flights, FIRIS, USFS, NIFC, WFIGS, EGP and the FIRIS WFIGS combo.
-  Each toggles on its own.
+  *Perimeters: Active only ON*, the default, shows only perimeters CAL FIRE
+  marks active; *OFF* shows inactive ones too, such as last week's FIRIS flight.
+
+  Below, a row per source: CAL FIRE intel flights, FIRIS, USFS, NIFC, WFIGS, EGP
+  and the FIRIS WFIGS combo, each ON/OFF. *Find* lists only the sources on.
 
   Only the latest perimeter per fire per source is drawn, so a fire flown by
   USFS, then CAL FIRE, then FIRIS shows one perimeter per source, not every
@@ -671,6 +676,112 @@ takes any ArcGIS Online organization you sign in to.
   The row reads "My Fires"; *Clear My Fires* asks first:
 
   #image("65.png", width: 100%)
+]
+]
+
+#tak-slide[
+= Boundaries
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("68.png", width: 100%)
+][
+  #image("70.png", width: 100%)
+][
+  Lines that say where you are and whose ground it is. Public, no login.
+
+  *State* picks up to five states, the one under the map first. *Kinds* picks
+  what to draw. *Which* is *All*, or *Pick names...* for particular counties,
+  cities, communities or tribal lands. *Add* puts one row in the list.
+]
+]
+
+#tak-slide[
+= Boundaries: kinds
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("69-1.png", width: 100%)
+][
+  #image("69-2.png", width: 100%)
+][
+  Counties, Cities, Communities and Tribal Lands are Census lines, named at the
+  center.
+
+  California only, from CAL FIRE: *Responsibility Areas* (SRA red, LRA grey, FRA
+  green), *Protection Areas* (CAL FIRE red, BLM yellow, Defense blue), *CAL FIRE
+  Units* ("Sonoma-Lake Napa Unit (LNU)") and *Land Ownership*.
+
+  Every state, from USGS: *Public Land* by agency and *Public Access*.
+]
+]
+
+#tak-slide[
+= Boundaries: the row
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("71.png", width: 100%)
+][
+  #image("72.png", width: 100%)
+][
+  One row for the states, *ON/OFF* for every kind at once; it remembers which
+  were on. The line under it says where the map center is, or where you are
+  with a GPS fix.
+
+  The arrow opens it: each kind is its own row. Named kinds have a *Color*
+  button: counties purple, cities royal blue, communities yellow, tribal lands
+  pink, units orange.
+]
+]
+
+#tak-slide[
+= Boundaries: map key and a tap
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("73.png", width: 100%)
+][
+  #image("74.png", width: 100%)
+][
+  A land layer's arrow opens its map key, the colors of what is in view. Land
+  layers load what is on screen and around it and follow the map by themselves.
+  All of it is kept on the device and comes back after a restart, network or not.
+
+  A tap opens the details straight in the pane, no radial. With several shapes
+  under your finger, Select Item lists them first.
+]
+]
+
+#tak-slide[
+= Boundaries on the map
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("75.jpg", width: 100%)
+
+  Counties purple, cities royal blue, communities yellow.
+][
+  #image("76.jpg", width: 100%)
+
+  CAL FIRE Units in orange, named with their code.
+][
+  #image("77.jpg", width: 100%)
+
+  Responsibility Areas: SRA red, FRA green, LRA grey.
+]
+]
+
+#tak-slide[
+= Land layers on the map
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("78.jpg", width: 100%)
+
+  Protection Areas: CAL FIRE red, Forest Service green, Defense blue.
+][
+  #image("79.jpg", width: 100%)
+
+  Land Ownership: each owner in its own color, private land left clear.
+][
+  #image("80.png", width: 100%)
+
+  Several shapes under a tap: Select Item, each in its own color.
 ]
 ]
 
