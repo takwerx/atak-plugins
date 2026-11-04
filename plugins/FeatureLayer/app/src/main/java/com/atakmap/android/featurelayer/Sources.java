@@ -330,6 +330,12 @@ public final class Sources {
     public static void migrate(LayerSpec s) {
         if (s == null || s.id == null)
             return;
+        // A Boundaries layer is rebuilt from what was picked; its endpoints, layers and
+        // types are the plugin's.
+        if (s.id.startsWith(Boundaries.ID_PREFIX) && s.kind != null && s.states != null) {
+            Boundaries.fixed(s);
+            return;
+        }
         final LayerSpec now = "dart-personnel".equals(s.id) ? dartPersonnel()
                 : "dart-vehicles".equals(s.id) ? dartVehicles()
                 : "nifc-fireguard".equals(s.id) ? fireGuard()
@@ -388,12 +394,15 @@ public final class Sources {
     public static LayerSpec caAirIntel() {
         final LayerSpec s = new LayerSpec();
         s.id = "ca-air-intel";
-        s.title = "CA Air Intel perimeters";
-        s.subtitle = "FIRIS, CAL FIRE, USFS, NIFC, WFIGS";
+        // Just the name on the main page: the sources are its types, listed inside.
+        s.title = "CA Air Intel";
+        s.subtitle = "";
         s.portal = null;
         s.base = CA_AIR_INTEL;
         s.layerIds = new int[] { 0 };
-        s.where = "displayStatus = 'Active'"; // an inactive perimeter is yesterday's news
+        s.where = "1=1";
+        // An inactive perimeter is yesterday's news, but the Active only switch can show it.
+        s.activeWhere = "displayStatus = 'Active'";
         s.labelField = "incident_name";        // the service labels by mission number
         s.geojson = false;
         s.profile = LayerSpec.Profile.GENERIC;

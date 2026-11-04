@@ -438,6 +438,54 @@
             android:layout_height="wrap_content"
             android:text="FireGuard" />
     </LinearLayout>
+    <!-- Boundaries: county, city and tribal land boundaries by state. Each row reads
+         "Name: value" and opens a list; Add makes the layer. Gone for every other source. -->
+    <LinearLayout
+        android:id="@+id/boundaries_panel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="4dp"
+        android:visibility="gone">
+        <Button
+            android:id="@+id/btn_bnd_state"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="left|center_vertical"
+            android:text="State: pick one" />
+        <Button
+            android:id="@+id/btn_bnd_kind"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="left|center_vertical"
+            android:text="Kinds: Counties, Cities, Tribal Lands" />
+        <Button
+            android:id="@+id/btn_bnd_which"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="left|center_vertical"
+            android:text="Which: All" />
+        <Button
+            android:id="@+id/btn_bnd_add"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Add" />
+        <TextView
+            android:id="@+id/bnd_note"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textColor="#BBBBBB"
+            android:paddingTop="6dp"
+            android:text="Census Bureau, CAL FIRE and USGS boundaries, kept on the device once fetched. Sources found with the help of Joseph Elfelt, mappingsupport.com." />
+    </LinearLayout>
   </LinearLayout>
 </LinearLayout>
 </ScrollView>

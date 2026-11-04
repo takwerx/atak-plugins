@@ -32,6 +32,17 @@
             android:contentDescription="Show or hide the controls for this layer"
             android:src="@drawable/ic_expand" />
     </LinearLayout>
+    <!-- A Boundaries layer: which county or city the phone is in, read from the layer
+         itself. Shown while the layer is on, open or closed; gone on every other layer. -->
+    <TextView
+        android:id="@+id/row_where"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="13sp"
+        android:textColor="#FFFFFF"
+        android:paddingTop="4dp"
+        android:paddingLeft="4dp"
+        android:visibility="gone" />
     <!-- Shown with the controls only: a closed row is one line (operator, 2026-10-05:
          "i want it compact, i can see that when i expand it"). -->
     <TextView
@@ -108,6 +119,15 @@
                 android:layout_marginLeft="4dp"
                 android:text="Go to" />
         </LinearLayout>
+        <!-- A Boundaries layer's outline color: "Color: Purple", opening the picker. Gone otherwise. -->
+        <Button
+            android:id="@+id/row_color"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Color: Purple"
+            android:visibility="gone" />
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
