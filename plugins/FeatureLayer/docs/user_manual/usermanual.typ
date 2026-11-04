@@ -753,15 +753,15 @@ takes any ArcGIS Online organization you sign in to.
 = Boundaries on the map
 
 #toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
-  #image("75.png", width: 100%)
+  #image("75.jpg", width: 100%)
 
   Counties purple, cities royal blue, communities yellow.
 ][
-  #image("76.png", width: 100%)
+  #image("76.jpg", width: 100%)
 
   CAL FIRE Units in orange, named with their code.
 ][
-  #image("77.png", width: 100%)
+  #image("77.jpg", width: 100%)
 
   Responsibility Areas: SRA red, FRA green, LRA grey.
 ]
@@ -771,11 +771,11 @@ takes any ArcGIS Online organization you sign in to.
 = Land layers on the map
 
 #toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
-  #image("78.png", width: 100%)
+  #image("78.jpg", width: 100%)
 
   Protection Areas: CAL FIRE red, Forest Service green, Defense blue.
 ][
-  #image("79.png", width: 100%)
+  #image("79.jpg", width: 100%)
 
   Land Ownership: each owner in its own color, private land left clear.
 ][
