@@ -578,6 +578,29 @@ A land layer's arrow opens its map key, the colors of what is in view, then
 screen and around it and follow the map by themselves. Everything is kept on the
 device, so with no network it all comes back after a restart.
 
+### On the map
+
+![Counties, cities and communities](screenshots/75_boundaries_counties_cities.png)
+
+Counties in purple, cities in royal blue, communities in yellow, each named at its
+center.
+
+![CAL FIRE Units](screenshots/76_calfire_units.png)
+
+CAL FIRE Units in orange, named with their code.
+
+![Responsibility Areas](screenshots/77_responsibility_areas.png)
+
+Responsibility Areas: SRA red, FRA green, LRA grey along the valley towns.
+
+![Protection Areas](screenshots/78_protection_areas.png)
+
+Protection Areas: CAL FIRE red, Forest Service green, Defense blue.
+
+![Land Ownership](screenshots/79_land_ownership.png)
+
+Land Ownership: each owner in its own color, private land left clear.
+
 ### A tap
 
 ![The details of a protection area](screenshots/74_land_details.png)
@@ -585,6 +608,8 @@ device, so with no network it all comes back after a restart.
 A tap on a boundary opens its details straight in the pane, no radial: the kind,
 the agency, the level, the unit. With several shapes under your finger, Select
 Item lists them first, each with its own color.
+
+![Select Item over the land layers](screenshots/80_select_item_land.png)
 
 ## Your own organization
 

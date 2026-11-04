@@ -750,6 +750,42 @@ takes any ArcGIS Online organization you sign in to.
 ]
 
 #tak-slide[
+= Boundaries on the map
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("75.png", width: 100%)
+
+  Counties purple, cities royal blue, communities yellow.
+][
+  #image("76.png", width: 100%)
+
+  CAL FIRE Units in orange, named with their code.
+][
+  #image("77.png", width: 100%)
+
+  Responsibility Areas: SRA red, FRA green, LRA grey.
+]
+]
+
+#tak-slide[
+= Land layers on the map
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("78.png", width: 100%)
+
+  Protection Areas: CAL FIRE red, Forest Service green, Defense blue.
+][
+  #image("79.png", width: 100%)
+
+  Land Ownership: each owner in its own color, private land left clear.
+][
+  #image("80.png", width: 100%)
+
+  Several shapes under a tap: Select Item, each in its own color.
+]
+]
+
+#tak-slide[
 = Your own organization
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
