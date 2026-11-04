@@ -1003,11 +1003,14 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
             b.setTextColor(on ? 0xFF4CD964 : 0xFFFF5A5A);
         }
 
-        final StringBuilder on = new StringBuilder();
-        for (DetectionSource s : feed.sources())
+        // A count, not the names: two names already ran off the bar (operator, 2026-11-04).
+        int onCount = 0, all = 0;
+        for (DetectionSource s : feed.sources()) {
+            all++;
             if (feed.filters.isOn(s.id()))
-                on.append(on.length() == 0 ? "" : ", ").append(s.title());
-        feeds.label("Feeds", on.length() == 0 ? "none on" : on.toString());
+                onCount++;
+        }
+        feeds.label("Feeds", onCount == 0 ? "none on" : onCount + " of " + all + " on");
         modelsLabel();
         filters.label("Filters", (feed.filters.areaIsRadius() ? "within " + Units.formatBig(feed.filters.areaM) : "in view")
                 + ", last " + feed.filters.windowLabel()
