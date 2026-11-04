@@ -207,6 +207,8 @@ public final class FireModel {
         public String perimeterKind;
         /** When the fire started, epoch ms, or 0 for unknown; with a perimeter it calibrates the run. */
         public long startedAt;
+        /** When the perimeter was mapped, epoch ms: NASA's scan time; 0 for one drawn or tapped now. */
+        public long perimeterAt;
         /**
          * Where the run's clock starts, epoch ms: the ignition the operator set, for a
          * point start, so the rings are where the fire should be at each time since,
@@ -421,6 +423,10 @@ public final class FireModel {
         return perimeterKind;
     }
 
+    /** When the held perimeter was mapped, epoch ms: NASA's scan time, 0 for a drawn or tapped one (now). */
+    private volatile long perimeterAt;
+    private static final String PREF_PERIMETER_AT = "model.perimeterAt";
+
     /** What the page says about the start: where its perimeter came from, or why there is none. */
     private volatile String startNote;
 
@@ -504,7 +510,7 @@ public final class FireModel {
                             return;
                         }
                         usePerimeter(found.rings != null ? found.rings : new double[][][] { found.ring },
-                                fedsNote(found, fire), "nasa", true);
+                                fedsNote(found, fire), "nasa", found.atMs, true);
                     }
                 });
             }
@@ -516,7 +522,7 @@ public final class FireModel {
      * as the start: every part, the largest the main one, no copy drawn (the outline
      * is already on the map), the marker on it and, when asked, the map fitted to it.
      */
-    private void usePerimeter(double[][][] rings, String note, String kind, boolean fit) {
+    private void usePerimeter(double[][][] rings, String note, String kind, long mappedAt, boolean fit) {
         int main = 0;
         for (int i = 1; i < rings.length; i++)
             if (Spread.ringAcres(rings[i]) > Spread.ringAcres(rings[main]))
@@ -531,6 +537,7 @@ public final class FireModel {
         }
         setPerimeter(pts, note);
         setKind(kind);
+        setPerimeterAt(mappedAt);
         if (rings.length > 1) {
             final double[][][] ordered = rings.clone();
             ordered[main] = rings[0];
@@ -559,6 +566,11 @@ public final class FireModel {
             }
         }
         changed();
+    }
+
+    private void setPerimeterAt(long at) {
+        perimeterAt = at > 0 ? at : 0;
+        prefs.edit().putLong(PREF_PERIMETER_AT, perimeterAt).apply();
     }
 
     private void setKind(String kind) {
@@ -643,7 +655,7 @@ public final class FireModel {
         for (double[][] r : all)
             acres += Spread.ringAcres(r);
         usePerimeter(all, "From " + title.trim() + String.format(Locale.US, ", %s, a shape already on the map%s.",
-                acresText(acres), all.length > 1 ? " in " + all.length + " pieces" : ""), "shape", false);
+                acresText(acres), all.length > 1 ? " in " + all.length + " pieces" : ""), "shape", 0, false);
         return null;
     }
 
@@ -747,6 +759,7 @@ public final class FireModel {
     private void setPerimeter(GeoPoint[] ring, String note) {
         if (note == null)
             setKind(null);
+        setPerimeterAt(0);
         perimeterNote = note;
         perimeterParts = null;
         prefs.edit().remove(PREF_PERIMETER_PARTS).apply();
@@ -771,6 +784,7 @@ public final class FireModel {
     public void clearPerimeter() {
         perimeter = null;
         setKind(null);
+        setPerimeterAt(0);
         perimeterParts = null;
         prefs.edit().remove(PREF_PERIMETER_PARTS).apply();
         perimeterNote = null;
@@ -992,6 +1006,7 @@ public final class FireModel {
                     perimeter = r;
                     perimeterNote = prefs.getString(PREF_PERIMETER_NOTE, null);
                     perimeterKind = prefs.getString(PREF_PERIMETER_KIND, perimeterNote != null ? "nasa" : null);
+                    perimeterAt = prefs.getLong(PREF_PERIMETER_AT, 0L);
                     startNote = perimeterNote;
                     final String parts = prefs.getString(PREF_PERIMETER_PARTS, null);
                     perimeterParts = parts == null ? null : partsFrom(new org.json.JSONArray(parts));
@@ -1153,7 +1168,7 @@ public final class FireModel {
         // That run's own start, not whatever start is held now.
         if (r.perimeter != null) {
             usePerimeter(r.perimeterParts != null ? r.perimeterParts : new double[][][] { r.perimeter },
-                    r.perimeterNote, r.perimeterKind, false);
+                    r.perimeterNote, r.perimeterKind, r.perimeterAt, false);
         } else {
             clearPerimeter();
             place(new GeoPoint(r.lat, r.lon));
@@ -1299,6 +1314,7 @@ public final class FireModel {
                 r.perimeter = perimeter;
                 r.perimeterNote = r.perimeter == null ? null : perimeterNote;
                 r.perimeterKind = r.perimeter == null ? null : perimeterKind;
+                r.perimeterAt = r.perimeter == null ? 0 : Math.min(perimeterAt, r.ranAt);
                 r.perimeterParts = r.perimeter == null ? null : perimeterParts;
                 final long ign = usableIgnition(r.ranAt);
                 // A point start with an ignition runs from the ignition: the rings are
@@ -2260,8 +2276,20 @@ public final class FireModel {
         // that has done ten times the model is a wind the station did not see, and
         // the page says so rather than a number nobody should trust.
         r.rateScale = 1;
+        // The perimeter is the fire at the moment it was mapped (NASA's scan time, or now
+        // for one drawn or tapped here), so the fire's age is ignition to that moment. An
+        // ignition after the mapping belongs to some other start and is not used: a point
+        // run's ignition 62 min ago once made a 2-day-old NASA outline "948 acres in 62 min"
+        // and ran three times too fast (2026-11-02).
+        final long mappedAt = r.perimeterAt > 0 ? r.perimeterAt : r.ranAt;
+        if (r.perimeter != null && r.startedAt > 0 && r.startedAt >= mappedAt) {
+            r.calibrationNote = "Ignition not used: it is after the perimeter was mapped ("
+                    + new java.text.SimpleDateFormat("MMM d HH:mm", Locale.US).format(new java.util.Date(mappedAt))
+                    + "), so it belongs to another start. The run keeps the model's own rates.";
+            r.startedAt = 0;
+        }
         if (r.perimeter != null && r.startedAt > 0) {
-            final double elapsedMin = (r.ranAt - r.startedAt) / 60000d;
+            final double elapsedMin = (mappedAt - r.startedAt) / 60000d;
             double observedAcres = 0;
             for (double[][] part : r.seeds())
                 observedAcres += Spread.ringAcres(part);
@@ -2948,7 +2976,7 @@ public final class FireModel {
                     .put("eyeLevelWind", r.eyeLevelWind).put("obsNote", r.obsNote == null ? "" : r.obsNote);
             o.put("canopyHeightFt", r.canopyHeightFt).put("crownRatio", r.crownRatio).put("conditions", r.conditions)
                     .put("visible", r.visible).put("ground", r.ground != null).put("halfKm", r.halfKm)
-                    .put("startedAt", r.startedAt).put("rateScale", r.rateScale).put("cellM", r.cellM)
+                    .put("startedAt", r.startedAt).put("perimeterAt", r.perimeterAt).put("rateScale", r.rateScale).put("cellM", r.cellM)
                     .put("originAt", r.originAt);
             final org.json.JSONArray stepsA = new org.json.JSONArray();
             for (int m : r.steps)
@@ -3144,6 +3172,8 @@ public final class FireModel {
             final double half = o.optDouble("halfKm", r.cellM >= 30 ? 10 : HALF_KM);
             r.halfKm = half >= HALF_KM && half <= MAX_HALF_KM ? Math.rint(half) : r.cellM >= 30 ? 10 : HALF_KM;
             r.startedAt = o.optLong("startedAt", 0);
+            final long mapped = o.optLong("perimeterAt", 0);
+            r.perimeterAt = mapped > 0 && mapped <= r.ranAt ? mapped : 0;
             final long origin = o.optLong("originAt", 0);
             r.originAt = origin > 0 && origin <= r.ranAt && r.ranAt - origin <= IGNITION_MAX_MS ? origin : 0;
             final org.json.JSONArray stepsA = o.optJSONArray("steps");
