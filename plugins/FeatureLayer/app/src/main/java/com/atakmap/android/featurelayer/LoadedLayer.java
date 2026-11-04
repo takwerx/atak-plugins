@@ -50,9 +50,10 @@ public class LoadedLayer {
      * stored expiry times are written again. 58: CAL FIRE's record on its fires. 59: Fire History's
      * 2010s, 2000s and 1990s in color. 60: every decade in a color of its own.
      * 61: 1979 and earlier grey again. 62: tribal lands gated at 20 mi (Boundaries.TRIBAL_GATE_SINCE).
-     * 64: county, tribal and CAL FIRE Unit names from 125 mi (Boundaries.LABEL_125MI_SINCE).
+     * 64: county, tribal and CAL FIRE Unit names from 125 mi. 65: the same, measured on
+     * ATAK's real bar (Boundaries.LABEL_125MI_SINCE).
      */
-    private static final int STYLE_VERSION = 64;
+    private static final int STYLE_VERSION = 65;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(

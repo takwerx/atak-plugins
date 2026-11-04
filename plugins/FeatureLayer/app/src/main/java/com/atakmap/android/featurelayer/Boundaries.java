@@ -165,10 +165,15 @@ public final class Boundaries {
      * Counties, tribal lands and CAL FIRE Units label from the 125-mile scale (operator,
      * 2026-11-03: "we need labels coming on sooner, at 125 mile scale"); cities and
      * communities stay at the 5-mile scale ("city ok where its at"). They were 20 mi.
+     * The figure is in FALLBACK_BAR_PIXELS units, and ATAK's real bar is 375 to 415 px on
+     * the S22 and the S10s, so 125 here came on near 235 mi on the bar ("a bit too
+     * soon"); 65 here is about 125 to 135 mi as the bar reads it.
      */
-    static final double LABEL_GSD_125MI = 125 * MILE / ScaleBar.FALLBACK_BAR_PIXELS;
+    static final double LABEL_GSD_125MI = 65 * MILE / ScaleBar.FALLBACK_BAR_PIXELS;
+    /** What the 125-mile labels were for one dev build (style 64), moved like the 20-mile ones. */
+    static final double LABEL_GSD_125MI_V64 = 125 * MILE / ScaleBar.FALLBACK_BAR_PIXELS;
     /** The style version that brought the 125-mile labels; a layer saved before it moves once. */
-    static final int LABEL_125MI_SINCE = 64;
+    static final int LABEL_125MI_SINCE = 65;
     /**
      * Cities, communities and tribal lands draw from the 20-mile scale in; counties at
      * every zoom. Tribal lands drew at every zoom until 2026-10-13 (operator: "tribes are
@@ -652,7 +657,8 @@ public final class Boundaries {
             s.gateGsd = GATE_GSD_20MI;
         // A named layer saved with the old 20-mile labels takes the 125-mile ones, once.
         if (!mosaic(s.kind) && !KIND_CITIES.equals(s.kind) && !KIND_COMMUNITIES.equals(s.kind)
-                && s.styleVersion < LABEL_125MI_SINCE && Math.abs(s.labelGsd - LABEL_GSD_20MI) < 1e-9)
+                && s.styleVersion < LABEL_125MI_SINCE
+                && (Math.abs(s.labelGsd - LABEL_GSD_20MI) < 1e-9 || Math.abs(s.labelGsd - LABEL_GSD_125MI_V64) < 1e-9))
             s.labelGsd = LABEL_GSD_125MI;
     }
 
