@@ -643,8 +643,11 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                     @Override
                     public void onClick(android.content.DialogInterface dialog, int which) {
                         final KestrelStations.Station k = all.get(which);
+                        // A station named "Kestrel 5500" is not "Kestrel Kestrel 5500".
+                        final String src = k.name != null && k.name.trim().toLowerCase(java.util.Locale.US).startsWith("kestrel")
+                                ? k.name.trim() : "Kestrel " + k.name;
                         enterObservation(Observation.checked(k.windMph, k.windFromDeg, Double.NaN, k.tempF, k.rh, Double.NaN,
-                                k.at, true, "Kestrel " + k.name), "Kestrel " + k.name);
+                                k.at, true, src), src);
                     }
                 })
                 .setNegativeButton("Cancel", null)
@@ -1003,8 +1006,9 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             endFold();
         }
         if (r == null) {
-            section("Start placed", "Drag the marker or use Fine Adjust on its menu if it needs to be exact, "
-                    + "then tap Run model.");
+            section("Start placed", model.perimeter() != null
+                    ? "Tap Run model. Everything inside the outline starts burning."
+                    : "Drag the marker or use Fine Adjust on its menu if it needs to be exact, then tap Run model.");
             return;
         }
         if (r.problem != null) {

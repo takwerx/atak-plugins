@@ -2661,6 +2661,9 @@ public final class FireModel {
         last = null;
         status = "";
         removeMarker();
+        // The start goes too, perimeter and all: Clear all left a NASA perimeter held, and
+        // Run model ran it again (2026-11-04).
+        clearPerimeter();
         prefs.edit().remove(PREF_LAT).remove(PREF_LON).apply();
         worker.execute(new Runnable() {
             @Override
