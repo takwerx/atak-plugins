@@ -64,11 +64,13 @@ public class FedsSource implements DetectionSource {
     public int count(Esri.Box box, long sinceMillis) throws Exception {
         final JSONArray features = query(box, true);
         final long cut = since(sinceMillis);
+        final List<double[]> seen = new ArrayList<>();
         int n = 0;
         for (int i = 0; features != null && i < features.length() && i < MAX_FEATURES; i++) {
             final JSONObject f = features.optJSONObject(i);
             final JSONObject p = f == null ? null : f.optJSONObject("properties");
-            if (p != null && Sources.parseIso(p.optString("t", "")) >= cut)
+            if (p != null && Sources.parseIso(p.optString("t", "")) >= cut
+                    && newest(f.optJSONObject("geometry"), Sources.parseIso(p.optString("t", "")), seen))
                 n++;
         }
         return n;
@@ -79,13 +81,15 @@ public class FedsSource implements DetectionSource {
         final JSONArray features = query(box, false);
         final List<HeatDetection> out = new ArrayList<>();
         final long cut = since(sinceMillis);
+        final List<double[]> seen = new ArrayList<>();
         int vertices = 0;
         for (int i = 0; features != null && i < features.length() && i < MAX_FEATURES; i++) {
             if (max > 0 && out.size() >= max)
                 break;
             final JSONObject f = features.optJSONObject(i);
             final JSONObject p = f == null ? null : f.optJSONObject("properties");
-            if (p == null || Sources.parseIso(p.optString("t", "")) < cut)
+            if (p == null || Sources.parseIso(p.optString("t", "")) < cut
+                    || !newest(f.optJSONObject("geometry"), Sources.parseIso(p.optString("t", "")), seen))
                 continue;
             final JSONArray rings = esriRings(f.optJSONObject("geometry"));
             if (rings == null)
@@ -108,6 +112,62 @@ public class FedsSource implements DetectionSource {
                 out.add(d);
         }
         return out;
+    }
+
+    /**
+     * False for an outline mostly covered (half its box or more) by a newer one already
+     * met: the same fire, which FEDS sometimes carries as two fire records, so one fire
+     * drew two outlines (995 ac at 18 h, 948 ac at 30 h) and the newer had to be picked
+     * by reading ages (operator, 2026-11-02). Outlines from the same pass are all kept.
+     * The answer is newest first, so the newer is always met first; {@code seen} collects
+     * the kept boxes as {west, south, east, north, time}. About 25 of 1,000 dropped over
+     * the lower 48 on 2026-11-04.
+     */
+    public static boolean newest(JSONObject geometry, long at, List<double[]> seen) {
+        final double[] b = boxOf(geometry);
+        if (b == null)
+            return true;
+        final double area = (b[2] - b[0]) * (b[3] - b[1]);
+        for (double[] k : seen) {
+            if (k[4] <= at)
+                continue;
+            final double ix = Math.max(0, Math.min(b[2], k[2]) - Math.max(b[0], k[0]));
+            final double iy = Math.max(0, Math.min(b[3], k[3]) - Math.max(b[1], k[1]));
+            if (area > 0 && ix * iy >= 0.5d * area)
+                return false;
+        }
+        if (seen.size() < 2 * MAX_FEATURES)
+            seen.add(new double[] { b[0], b[1], b[2], b[3], at });
+        return true;
+    }
+
+    /** {west, south, east, north} of a GeoJSON Polygon or MultiPolygon, or null. */
+    private static double[] boxOf(JSONObject g) {
+        final JSONArray c = g == null ? null : g.optJSONArray("coordinates");
+        if (c == null)
+            return null;
+        final String type = g.optString("type", "");
+        final List<JSONArray> rings = new ArrayList<>();
+        if ("Polygon".equals(type))
+            rings.add(c.optJSONArray(0));
+        else if ("MultiPolygon".equals(type))
+            for (int i = 0; i < c.length() && i < MAX_FEATURES; i++) {
+                final JSONArray poly = c.optJSONArray(i);
+                rings.add(poly == null ? null : poly.optJSONArray(0));
+            }
+        double w = 180, s = 90, e = -180, n = -90;
+        for (JSONArray r : rings)
+            for (int i = 0; r != null && i < r.length() && i < MAX_VERTICES; i++) {
+                final JSONArray p = r.optJSONArray(i);
+                final double lon = p == null ? Double.NaN : p.optDouble(0, Double.NaN), lat = p == null ? Double.NaN : p.optDouble(1, Double.NaN);
+                if (!(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180))
+                    continue;
+                w = Math.min(w, lon);
+                e = Math.max(e, lon);
+                s = Math.min(s, lat);
+                n = Math.max(n, lat);
+            }
+        return w <= e && s <= n ? new double[] { w, s, e, n } : null;
     }
 
     /** The service's features in the box, newest first; geometry left out for a count. */

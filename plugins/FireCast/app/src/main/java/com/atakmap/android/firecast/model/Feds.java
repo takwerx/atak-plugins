@@ -108,6 +108,7 @@ public final class Feds {
         if (features == null)
             return out;
         final long cutoff = System.currentTimeMillis() - RECENT_MS;
+        final List<double[]> seen = new ArrayList<>();
         for (int f = 0; f < features.length() && f < MAX_FEATURES; f++) {
             final JSONObject feature = features.optJSONObject(f);
             if (feature == null)
@@ -117,7 +118,7 @@ public final class Feds {
             if (props == null || !ID.matcher(id).matches())
                 continue;
             final long at = parseTime(props.optString("t", ""));
-            if (at < cutoff)
+            if (at < cutoff || !com.atakmap.android.firecast.FedsSource.newest(feature.optJSONObject("geometry"), at, seen))
                 continue;
             final List<double[][]> rings = outerRings(feature.optJSONObject("geometry"));
             if (rings.isEmpty())
