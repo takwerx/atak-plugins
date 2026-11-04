@@ -691,6 +691,7 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
             if (p != null)
                 sb.append("\nNASA perimeter: ").append(acres(p)).append(", outline ").append(age(p.atMs)).append(" old");
             ((TextView) v.findViewById(R.id.fire_detail)).setText(sb.toString());
+            runButton(v, p);
             ((TextView) v.findViewById(R.id.fire_power)).setText(f.powerText());
             return v;
         }
@@ -709,7 +710,27 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
             sb.append(" · ").append(Units.rangeBearing(from, p.lat(), p.lon())).append(noFix ? " of map center" : " of you");
         ((TextView) v.findViewById(R.id.fire_detail)).setText(sb.toString());
         ((TextView) v.findViewById(R.id.fire_power)).setText(acres(p));
+        runButton(v, p);
         return v;
+    }
+
+    /** Shows the row's Run a Model button when it has a NASA perimeter, and hides it when not. */
+    private void runButton(View v, final com.atakmap.android.firecast.model.Feds.Fire p) {
+        final View b = v.findViewById(R.id.run_model);
+        b.setVisibility(p == null ? View.GONE : View.VISIBLE);
+        b.setOnClickListener(p == null ? null : new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // The same way in as the perimeter's own detail panel: the model page opens
+                // with this outline as the start.
+                final android.content.Intent i = new android.content.Intent(com.atakmap.android.firecast.model.ModelReceiver.ACTION)
+                        .putExtra("fedsId", p.id).putExtra("fedsAt", p.atMs)
+                        .putExtra("fedsBox", new double[] { p.south, p.west, p.north, p.east })
+                        .putExtra("fedsDays", p.burningDays);
+                closeDropDown();
+                com.atakmap.android.ipc.AtakBroadcast.getInstance().sendBroadcast(i);
+            }
+        });
     }
 
     private static String acres(com.atakmap.android.firecast.model.Feds.Fire p) {

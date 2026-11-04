@@ -144,7 +144,8 @@ perimeter* starts a run from that outline.
   #v(4pt)
 
   Pick the order and how far back above the list. Tap one and the map goes
-  there; the list stays open.
+  there; the list stays open. *Run a Model from this perimeter* on a row with
+  a NASA perimeter starts a run from it.
 ]
 ]
 

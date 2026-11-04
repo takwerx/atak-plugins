@@ -75,7 +75,7 @@ A NASA perimeter's panel gives its acres, when NASA drew it, and what it is not.
 - NASA perimeters with no GOES fire in them, each with its county and state, acres, how long it has burned and how old the outline is.
 - GOES fires seen in only one scan, last; those are often burn piles.
 
-Above the list, the order (**Strongest**, **Newest**, **Nearest** or **Biggest first**) and how far back (**Last 3 hours** to **3 days**, the same setting as **Filters**). **Area** and **Where** narrow it. Tap a fire and the map goes there and draws it; a magenta mark shows the spot at once while its detections load. The list stays open for the next one.
+Above the list, the order (**Strongest**, **Newest**, **Nearest** or **Biggest first**) and how far back (**Last 3 hours** to **3 days**, the same setting as **Filters**). **Area** and **Where** narrow it. Tap a fire and the map goes there and draws it; a magenta mark shows the spot at once while its detections load. The list stays open for the next one. A row with a NASA perimeter has **Run a Model from this perimeter**, which opens the model page started from that outline, with no need to switch the NASA feed on first.
 
 ## 3. Run a Model
 

@@ -27,6 +27,18 @@
             android:textColor="#BBBBBB"
             android:singleLine="true"
             android:ellipsize="end" />
+        <!-- On a row with a NASA perimeter: a run from it without the feed on (operator,
+             2026-11-02). Not focusable, or the row itself stops taking taps. -->
+        <Button
+            android:id="@+id/run_model"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:focusable="false"
+            android:focusableInTouchMode="false"
+            android:text="Run a Model from this perimeter"
+            android:visibility="gone" />
     </LinearLayout>
     <TextView
         android:id="@+id/fire_power"
