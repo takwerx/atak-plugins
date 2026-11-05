@@ -1,10 +1,10 @@
 # Feature Layer — User Guide
 
-**Download Feature Layer 0.14** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Feature Layer 0.16** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.14/ATAK-Plugin-FeatureLayer-0.14--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.14/ATAK-Plugin-FeatureLayer-0.14--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.14/ATAK-Plugin-FeatureLayer-0.14--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.16/ATAK-Plugin-FeatureLayer-0.16--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.16/ATAK-Plugin-FeatureLayer-0.16--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.16/ATAK-Plugin-FeatureLayer-0.16--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/feature-layer/releases
 
@@ -45,6 +45,10 @@ once, whatever source it came from.
   found, public.
 - **Fire History** is where fires have burned since 1900, public.
 - **CA Air Intel** is statewide California fire perimeters, public.
+- **Boundaries** is counties, cities, communities and tribal lands, and the lines
+  that say whose ground it is: CAL FIRE's responsibility areas, protection areas,
+  units and land ownership in California, federal public land and public access in
+  every state. Public.
 - **NIFS Archive (demo)** is last year's Dragon Bravo fire, public, for trying the
   symbology without a login.
 - **Add your own org…** takes any ArcGIS Online organization or ArcGIS Enterprise
@@ -354,11 +358,16 @@ then goes away until the layer is removed.
 It refreshes every minute, so a perimeter posted by an aircraft is on the map
 within a minute or two of reaching ArcGIS.
 
-![The CA Air Intel Features list](screenshots/23_ca_air_intel_features.png)
+![The CA Air Intel Features page](screenshots/23_ca_air_intel_features.png)
 
-Its Features list has a row per source with a line saying what it is: CAL FIRE
-intel flights, FIRIS, USFS, NIFC, WFIGS, EGP and the FIRIS WFIGS combo. Each
-toggles on its own. Only the latest perimeter per fire per source is drawn, so a
+**Perimeters: Active only ON**, the default, shows only the perimeters CAL FIRE
+marks active. Switch it **OFF** to see inactive ones too: a FIRIS flight from last
+week, say, to run a model from once the fire has gone quiet.
+
+Below it, a row per source with a line saying what it is: CAL FIRE intel flights,
+FIRIS, USFS, NIFC, WFIGS, EGP and the FIRIS WFIGS combo. Each toggles on its own,
+and **Find** lists only the sources that are on, so with only FIRIS on it finds
+only FIRIS flights. Only the latest perimeter per fire per source is drawn, so a
 fire flown by USFS, then CAL FIRE, then FIRIS shows one perimeter per source, not
 every pass.
 
@@ -370,7 +379,7 @@ all time. Widening the window adds fires, not copies.
 ![Perimeters named at the center](screenshots/25_perimeter_labels.png)
 
 Active perimeters draw in orange with a dark red edge, named at the center.
-Inactive ones are not fetched.
+With **Active only** on, inactive ones are not fetched.
 
 ## New Fire Starts
 
@@ -510,6 +519,97 @@ is over. The map key ends with a **My Fires** line for the white edge. The list 
 kept when ATAK restarts.
 
 ![Clear My Fires asks first](screenshots/65_clear_my_fires.png)
+
+## Boundaries
+
+![Add Boundaries](screenshots/68_boundaries_add.png)
+
+Lines that say where you are and whose ground it is. Public, no login. Pick
+**Boundaries** as the source, then:
+
+- **State** picks up to five states, the one under the map first.
+- **Kinds** picks what to draw.
+- **Which** is **All**, or **Pick names…** for particular counties, cities,
+  communities or tribal lands, nearest the map first.
+
+**Add** puts one row in the list for those states.
+
+![Kinds, the Census lines](screenshots/69_boundaries_kinds.png)
+
+![Kinds, the land layers](screenshots/69b_land_kinds.png)
+
+- **Counties**, **Cities**, **Communities** and **Tribal Lands** are the Census
+  Bureau's lines, named at the center.
+- **Responsibility Areas**: who has fire protection responsibility. SRA red, LRA
+  grey, FRA green, from CAL FIRE.
+- **Protection Areas**: which agency answers a wildland fire. CAL FIRE red, BLM
+  yellow, Defense blue, the others in CAL FIRE's own colors.
+- **CAL FIRE Units**: the 27 administrative units, named with their code,
+  "Sonoma-Lake Napa Unit (LNU)".
+- **Land Ownership**: public land by owner, from CAL FIRE. Private land is what
+  stays uncolored.
+- **Public Land**: federal land by managing agency, from the USGS Protected Areas
+  Database, every state.
+- **Public Access**: where the public may enter, open, restricted or closed, same
+  source.
+
+The four CAL FIRE kinds are offered only when California is picked.
+
+![Which](screenshots/70_boundaries_which.png)
+
+### The row
+
+![The Boundaries row](screenshots/71_boundaries_row.png)
+
+One row for the states, **ON/OFF** for every kind at once; it remembers which were
+on. The line under it says where the map center is, or where you are once the
+device has a GPS fix.
+
+![The row opened](screenshots/72_boundaries_open.png)
+
+The arrow opens it: each kind is its own **ON/OFF** row with its own line. The
+named kinds have a **Color** button: counties start purple, cities royal blue,
+communities yellow, tribal lands pink, CAL FIRE units orange.
+
+![A land layer's map key](screenshots/73_land_map_key.png)
+
+A land layer's arrow opens its map key, the colors of what is in view, then
+**Features**, **Auto**, **Refresh** and **Remove**. The land layers load what is on
+screen and around it and follow the map by themselves. Everything is kept on the
+device, so with no network it all comes back after a restart.
+
+### On the map
+
+![Counties, cities and communities](screenshots/75_boundaries_counties_cities.png)
+
+Counties in purple, cities in royal blue, communities in yellow, each named at its
+center.
+
+![CAL FIRE Units](screenshots/76_calfire_units.png)
+
+CAL FIRE Units in orange, named with their code.
+
+![Responsibility Areas](screenshots/77_responsibility_areas.png)
+
+Responsibility Areas: SRA red, FRA green, LRA grey along the valley towns.
+
+![Protection Areas](screenshots/78_protection_areas.png)
+
+Protection Areas: CAL FIRE red, Forest Service green, Defense blue.
+
+![Land Ownership](screenshots/79_land_ownership.png)
+
+Land Ownership: each owner in its own color, private land left clear.
+
+### A tap
+
+![The details of a protection area](screenshots/74_land_details.png)
+
+A tap on a boundary opens its details straight in the pane, no radial: the kind,
+the agency, the level, the unit. With several shapes under your finger, Select
+Item lists them first, each with its own color.
+
+![Select Item over the land layers](screenshots/80_select_item_land.png)
 
 ## Your own organization
 
