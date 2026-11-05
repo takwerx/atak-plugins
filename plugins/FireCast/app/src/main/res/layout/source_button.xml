@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One feed's on/off button. Inflated rather than built in code so the TakwerxButton
+     style is resolved by the inflater that already knows the plugin's resources. -->
+<Button xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/source_button"
+    style="@style/TakwerxButton"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="6dp"
+    android:gravity="center_vertical|left"
+    android:text="Feed" />
