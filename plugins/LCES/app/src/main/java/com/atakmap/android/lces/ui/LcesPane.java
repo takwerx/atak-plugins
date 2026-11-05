@@ -188,6 +188,22 @@ public final class LcesPane implements PageView.Opener {
                 search.postDelayed(searchToMap, 400);
             }
         });
+        // While the keyboard is up, the pane above it is a strip a few rows tall. The
+        // status line grows from one line to three when a search starts, which pushed
+        // the box out of that strip; the list then detached its header and the box lost
+        // focus after the second letter. Hold the status at its height while typing.
+        search.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View v, boolean hasFocus) {
+                if (hasFocus) {
+                    status.setMaxLines(Math.max(1, status.getLineCount()));
+                    status.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                } else {
+                    status.setEllipsize(null);
+                    status.setMaxLines(Integer.MAX_VALUE);
+                }
+            }
+        });
         search.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override
             public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
