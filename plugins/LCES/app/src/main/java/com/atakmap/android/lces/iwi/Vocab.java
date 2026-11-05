@@ -167,7 +167,7 @@ public final class Vocab {
     public static final Choices TREATMENT = new Choices(
             new String[] {"pressure", "tourniquet", "splint", "spine", "shock", "epi", "burns",
                     "cooling", "cpr", "aed", "oxygen", "eyes", "none_yet"},
-            new String[] {"Direct Pressure", "Tourniquet", "Splinted", "Head/Neck Stabilized",
+            new String[] {"Direct Pressure", "Tourniquet", "Splinted", "Head/Neck",
                     "Shock Care", "Epi Assisted", "Burns Cooled", "Cooling", "CPR", "AED",
                     "Oxygen", "Eyes Washed", "None Yet"},
             new String[] {"direct pressure", "tourniquet", "splinted",

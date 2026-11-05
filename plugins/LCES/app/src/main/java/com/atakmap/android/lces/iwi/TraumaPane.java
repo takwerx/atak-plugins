@@ -60,6 +60,8 @@ public final class TraumaPane implements TraumaManager.Listener {
     private final Button speedButton;
     private final TextView dataDetail;
     private final Button downloadButton;
+    /** The download's progress and result, under the button that started it. */
+    private final TextView dataResult;
     private final TextView detailsTitle;
     private final TextView detailsSubtitle;
     private final TextView detailsBody;
@@ -86,6 +88,7 @@ public final class TraumaPane implements TraumaManager.Listener {
         speedButton = settingsRoot.findViewById(R.id.iwi_btn_cruise_speed);
         dataDetail = settingsRoot.findViewById(R.id.iwi_data_detail);
         downloadButton = settingsRoot.findViewById(R.id.iwi_btn_download);
+        dataResult = settingsRoot.findViewById(R.id.iwi_data_result);
         detailsTitle = root.findViewById(R.id.iwi_details_title);
         detailsSubtitle = root.findViewById(R.id.iwi_details_subtitle);
         detailsBody = root.findViewById(R.id.iwi_details_body);
@@ -130,6 +133,7 @@ public final class TraumaPane implements TraumaManager.Listener {
             @Override
             public void onClick(View v) {
                 downloadButton.setEnabled(false);
+                showResult("Downloading trauma center data...");
                 TraumaPane.this.pages.status("Downloading trauma center data...");
                 TraumaPane.this.manager.download();
             }
@@ -309,6 +313,12 @@ public final class TraumaPane implements TraumaManager.Listener {
         downloadButton.setText(have ? "Check for an Update" : "Download Now");
     }
 
+    private void showResult(String message) {
+        final boolean has = message != null && !message.isEmpty();
+        dataResult.setText(has ? message : "");
+        dataResult.setVisibility(has ? View.VISIBLE : View.GONE);
+    }
+
     private void pickSpeed() {
         final int[] presets = TraumaManager.CRUISE_PRESETS_KT;
         final String[] labels = new String[presets.length];
@@ -343,6 +353,7 @@ public final class TraumaPane implements TraumaManager.Listener {
 
     @Override
     public void onStatus(String message) {
+        showResult(message);
         pages.status(message);
         downloadButton.setEnabled(true);
     }

@@ -109,5 +109,14 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/iwi_download_now" />
+
+        <TextView
+            android:id="@+id/iwi_data_result"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="13sp"
+            android:textColor="#FFEB3B"
+            android:paddingTop="6dp"
+            android:visibility="gone" />
     </LinearLayout>
 </LinearLayout>

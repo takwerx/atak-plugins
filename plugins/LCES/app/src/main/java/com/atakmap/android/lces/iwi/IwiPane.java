@@ -458,7 +458,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         final GeoPoint p = state.point();
         liveWhere.setText(Coords.ddm(p.getLatitude(), p.getLongitude()) + "\n"
                 + (IwiState.SOURCE_MAP.equals(state.source())
-                        ? "Set on the map" : "My Location when declared"));
+                        ? "Set on the map" : "My Location at the time"));
         final String who = RadioScript.summary(state);
         livePatients.setText(who.isEmpty() ? "No patients counted yet" : who);
     }
