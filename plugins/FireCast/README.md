@@ -64,17 +64,72 @@ in the pane with a list behind a long press and a time slider on the run you pic
 
 The fire model runs on the device. Start from a point, a perimeter you draw, any
 shape already on the map (a FIRIS perimeter in Feature Layer, a shape a contact
-sent), or any NASA perimeter, every piece of it, set when it ignited, use your
-own weather observation or a Kestrel Wx station's, and the
-plugin spreads a fire over the real fuel, slope and canopy (LANDFIRE) with the
-wind from the nearest weather station, how dry the fuels are, and embers,
-counting the buildings and people reached from FEMA's building inventory (people
-as FEMA's upper estimate). Each
-run is repeated 30 times with the inputs nudged the way a forecast misses, and
-the operator picks a Predicted Fire Size, Smallest to Largest, that the rings, the
-slider, the acres and the buildings all follow. Runs stay on the device and come
-back after a restart with no signal. The spread engine is the Forest Service's
-public domain `behave` library, run through the NDK.
+sent), or any NASA perimeter, every piece of it. Set when it ignited if you know,
+and use your own weather observation or a Kestrel Wx station's if you have one.
+Runs stay on the device and come back after a restart with no signal. Nothing
+about a run is sent anywhere unless the operator sends it.
+
+What goes into the model, all fetched for the run from public sources:
+
+  - Ground: LANDFIRE (USGS and the Forest Service) in 30 m cells, for a square
+    4 km each way around the start (10 km for a three-hour run, up to 20 km
+    each way for a large perimeter): the fuel model (one of the 40 Scott and Burgan
+    models), slope and aspect, the tree canopy (cover, height, base height, bulk
+    density), and the vegetation type, which tells houses, roads and parks apart
+    inside LANDFIRE's single urban class. The fire moves in 15 m steps (30 m for
+    three hours, 60 m for the largest squares).
+  - Wind: the nearest weather station that reported in the last three hours,
+    picked by distance and height (RAWS, National Weather Service, and in
+    California the SCE, SDG&E, PG&E and HPWREN utility stations); the National
+    Weather Service hourly forecast for the hours ahead; and, where available,
+    NOAA's HRRR 3 km wind forecast, which varies across the ground and hour by
+    hour. Or the operator's own observation or a Kestrel station.
+  - Fuel moisture: dead fuel (1 h, 10 h, 100 h) from the Forest Service's fire
+    danger figures for the nearest station, else the WFAS national grid; live
+    fuel from the nearest National Fuel Moisture Database sample of the last 45
+    days, else the seasonal figure.
+  - Behavior: the Forest Service Fire Lab's public domain Behave library (the
+    engine in BehavePlus), compiled into the plugin through the NDK: Rothermel
+    surface spread, Scott and Reinhardt crown fire, Albini ember distances.
+  - Spread: cell by cell over the real ground, each cell at its own fuel, slope,
+    canopy and wind. Embers carry it across a road or block narrower than they
+    fly; roads slow it; commercial blocks, water, bare and farmed ground stop it.
+    Houses burn house to house at the rate measured in nine North American
+    conflagrations (Moran, Seielstad and Pietruszka, 2025).
+  - From a perimeter with a known ignition time, the model first replays the
+    fire from ignition to when the perimeter was mapped, compares that with the
+    area it really covered, and scales its rates to match, at most three times
+    faster or slower. The page says when it did, and when it did not.
+  - Predicted Fire Size: each run is repeated 30 times with the wind speed, wind
+    direction and fuel moisture nudged the way forecasts miss, ranked by area
+    burned. The operator picks Smallest to Largest; the rings, slider, acres,
+    buildings and people all follow that pick.
+  - Not in it: firefighting, wind the fire makes itself, wind bent by terrain
+    finer than the forecast grid, fuel breaks narrower than 15 m, and fuel that
+    has changed since LANDFIRE mapped it.
+
+Buildings and people reached, from FEMA's national building inventory (USA
+Structures, built by Oak Ridge National Laboratory for FEMA), which lists every
+structure with its location, occupancy class and a population estimate:
+
+  - Buildings: every structure in the inventory whose location the fire reaches
+    by that time. A building's own cell does not burn, so a building counts when
+    the fire reaches any model cell touching it.
+  - Homes: the buildings among them whose FEMA occupancy class is Residential.
+  - People, shown as "up to": the sum of FEMA's upper estimate (the top of its
+    95% range) for each building reached, its median where there is no upper.
+    The upper figure is used because the median is zero for most second homes
+    and cabins, which read as nobody there beside a count of homes. It is how
+    many people could be inside, not a count of who is home at that hour.
+  - Named, not just counted: schools, hospitals, nursing and care homes, fire
+    and police stations, hotels, churches, community centers and utility sites
+    the fire reaches, with the time it reaches each.
+  - If the inventory cannot be reached, the page says the buildings were not
+    counted; it never shows zero for a count it does not have. Past 8,000
+    buildings the page says the count is a floor.
+  - FIRIS model runs are counted against the same inventory and in the same
+    words; there a building counts when it is inside that hour's FIRIS
+    perimeter.
 
 The detail panel is the point of the plugin. It says how big the footprint is and
 how that was arrived at, when the satellite saw it and how long it has been
