@@ -166,6 +166,7 @@ public final class LcesPane implements PageView.Opener {
             @Override
             public void onClick(View v) {
                 settingsFromIwi = false;
+                showSettingsFor(false);
                 refreshSettings();
                 show(settingsPage);
             }
@@ -325,6 +326,7 @@ public final class LcesPane implements PageView.Opener {
                     @Override
                     public void openSettings() {
                         settingsFromIwi = true;
+                        showSettingsFor(true);
                         refreshSettings();
                         show(settingsPage);
                     }
@@ -583,6 +585,22 @@ public final class LcesPane implements PageView.Opener {
     }
 
     // ---- Settings ---------------------------------------------------------------------
+
+    /**
+     * Settings opened from IWI shows IWI's rows only, under "IWI Settings"; from the
+     * main screen, everything but them (operator, 2026-11-06: "a separate IWI
+     * settings menu").
+     */
+    private void showSettingsFor(boolean fromIwi) {
+        final LinearLayout c = root.findViewById(R.id.settings_container);
+        final View iwiHost = root.findViewById(R.id.iwi_settings_host);
+        for (int i = 0; i < c.getChildCount(); i++) {
+            final View child = c.getChildAt(i);
+            child.setVisibility((child == iwiHost) == fromIwi ? View.VISIBLE : View.GONE);
+        }
+        ((TextView) root.findViewById(R.id.settings_title)).setText(fromIwi
+                ? "IWI Settings" : pluginContext.getString(R.string.settings));
+    }
 
     private void refreshSettings() {
         final boolean large = prefs.getBoolean(PREF_TEXT_LARGE, false);
