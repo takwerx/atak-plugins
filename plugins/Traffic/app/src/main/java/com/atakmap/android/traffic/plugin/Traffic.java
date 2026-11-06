@@ -3,12 +3,9 @@ package com.atakmap.android.traffic.plugin;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.graphics.Typeface;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.style.ForegroundColorSpan;
-import android.text.style.RelativeSizeSpan;
-import android.text.style.StyleSpan;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -65,6 +62,8 @@ public class Traffic implements IPlugin, LiveOverlay.Listener, IncidentFeed.List
      */
     private IncidentFeed incidents;
     private IncidentDetails incidentDetails;
+    /** Answers ATAK before it opens a radial on a 511 icon; see {@link #registerTap}. */
+    private com.atakmap.android.menu.MapMenuEventListener menuListener;
 
     /** What the source button offers. Order is the order they are shown. */
     private final List<LiveOverlay.Source> sources = new ArrayList<>();
@@ -443,6 +442,7 @@ public class Traffic implements IPlugin, LiveOverlay.Listener, IncidentFeed.List
                 new AtakBroadcast.DocumentedIntentFilter();
         filter.addAction(IncidentDetails.ACTION);
         AtakBroadcast.getInstance().registerReceiver(incidentDetails, filter);
+        registerTap(mapView);
 
         // 511 comes back the way it was left, across ATAK restarts and plugin updates,
         // with no separate opt-in (operator, 2026-09-26: "should stay on persistent
@@ -455,7 +455,62 @@ public class Traffic implements IPlugin, LiveOverlay.Listener, IncidentFeed.List
         }
     }
 
+    /**
+     * A tap on a 511 icon opens its details in the pane, no radial (operator,
+     * 2026-11-05). The radial's only reading button was Details, so it was a step in
+     * the way; Bloodhound and range and bearing are still on ATAK's own tools.
+     *
+     * <p>ATAK asks this listener before it opens a radial; answering true stops the
+     * radial and tells ATAK the tap was handled, so no callout is left pinned to the
+     * map after Back (AirAware, 2026-10-09). Only our own items are claimed. The page
+     * opens a quarter second later because a pick from ATAK's Select Item list posts
+     * its own show-details, which would close a page opened inline. It goes through
+     * the same broadcast the radial's Details sent, so a tap, the radial (the
+     * fallback when there is no menu receiver) and the list reach one page.
+     */
+    private void registerTap(final MapView mapView) {
+        menuListener = new com.atakmap.android.menu.MapMenuEventListener() {
+            @Override
+            public boolean onShowMenu(final com.atakmap.android.maps.MapItem item) {
+                if (item == null || incidentDetails == null
+                        || item.getMetaString("traffic_incident", null) == null)
+                    return false;
+                final String uid = item.getUID();
+                mapView.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        final AtakBroadcast b = AtakBroadcast.getInstance();
+                        b.sendBroadcast(new android.content.Intent(
+                                "com.atakmap.android.maps.UNFOCUS"));
+                        b.sendBroadcast(new android.content.Intent(
+                                "com.atakmap.android.maps.HIDE_DETAILS"));
+                        b.sendBroadcast(new android.content.Intent(IncidentDetails.ACTION)
+                                .putExtra("targetUID", uid));
+                    }
+                }, 250);
+                return true;
+            }
+
+            @Override
+            public void onHideMenu(com.atakmap.android.maps.MapItem item) {
+            }
+        };
+        final com.atakmap.android.menu.MapMenuReceiver menus =
+                com.atakmap.android.menu.MapMenuReceiver.getInstance();
+        if (menus != null)
+            menus.addEventListener(menuListener);
+        else
+            Log.w(TAG, "no radial menu receiver; 511 taps keep the radial");
+    }
+
     private void stopIncidents() {
+        if (menuListener != null) {
+            final com.atakmap.android.menu.MapMenuReceiver menus =
+                    com.atakmap.android.menu.MapMenuReceiver.getInstance();
+            if (menus != null)
+                menus.removeEventListener(menuListener);
+            menuListener = null;
+        }
         if (incidentDetails != null) {
             incidentDetails.closeIfOpen();
             if (incidents != null)
@@ -711,15 +766,17 @@ public class Traffic implements IPlugin, LiveOverlay.Listener, IncidentFeed.List
         refreshButton.setEnabled(on || incidentsOn);
         intervalButton.setEnabled(on);
 
+        // The Traffic Overlay button already says ON or OFF; a second big state word
+        // under it said the same thing again (operator, 2026-11-05). Off, the line is
+        // gone; on, it carries only the refresh detail.
         if (!on) {
-            status.setText(state(R.string.state_off, R.color.state_off));
+            status.setVisibility(View.GONE);
             return;
         }
+        status.setVisibility(View.VISIBLE);
 
         final long every = overlay.getIntervalMs() / 1000L;
-        final SpannableStringBuilder sb =
-                new SpannableStringBuilder(state(R.string.state_on, R.color.state_on));
-        sb.append("\n");
+        final SpannableStringBuilder sb = new SpannableStringBuilder();
         if (overlay.isHoldingForScreen())
             sb.append("Holding while the screen is off; refreshes on wake.\n");
         else
@@ -747,24 +804,6 @@ public class Traffic implements IPlugin, LiveOverlay.Listener, IncidentFeed.List
             sb.append("Waiting for the first tiles…");
         }
         status.setText(sb);
-    }
-
-    /**
-     * The state word, in its colour and larger than the detail beneath it.
-     *
-     * ON and OFF are what the operator reads first and often the only thing they read, so
-     * the word carries the answer by itself rather than needing the sentence after it.
-     */
-    private CharSequence state(int wordRes, int colorRes) {
-        final SpannableStringBuilder s =
-                new SpannableStringBuilder(pluginContext.getString(wordRes));
-        final int end = s.length();
-        s.setSpan(new ForegroundColorSpan(
-                        pluginContext.getResources().getColor(colorRes)),
-                0, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        s.setSpan(new StyleSpan(Typeface.BOLD), 0, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        s.setSpan(new RelativeSizeSpan(1.4f), 0, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        return s;
     }
 
     private void say(String message) {
