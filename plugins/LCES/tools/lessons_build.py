@@ -63,6 +63,7 @@ import datetime
 import gzip
 import hashlib
 import json
+import math
 import os
 import re
 import subprocess
@@ -289,6 +290,56 @@ def publish(out_dir, prefix):
     print("live at https://mapdepot.takwerx.org/%s/lessons.json" % prefix)
 
 
+def _slug(url):
+    return url.rstrip("/").rsplit("/", 1)[-1] if url else ""
+
+
+def _km(a, b):
+    dy = (a["lat"] - b["lat"]) * 111.0
+    dx = (a["lon"] - b["lon"]) * 111.0 * math.cos(math.radians(a["lat"]))
+    return math.hypot(dx, dy)
+
+
+def same_incident(a, b):
+    """The source carries some incidents twice: the same name and report, at the
+    same spot or on the same day with the year mistyped (Buck Incident Fatality,
+    2012 and "2022"). Separate incidents that share one report (three pile burn
+    injuries a state apart) are not this, so a different place AND a different
+    day keeps both."""
+    if a["name"].strip().lower() != b["name"].strip().lower():
+        return False
+    close = _km(a, b) <= 5.0
+    if a["date"] == b["date"] and close:
+        return True
+    sa = _slug(a["report"])
+    year_typo = a["date"][5:] == b["date"][5:] and a["date"][:4] != b["date"][:4]
+    return bool(sa) and sa == _slug(b["report"]) and (close or year_typo)
+
+
+def _keep_score(r):
+    """Which copy of a duplicate stays: the one whose link is the LLC's current
+    site and names this incident in this year."""
+    slug = _slug(r["report"])
+    name = re.sub(r"[^a-z0-9]+", "-", r["name"].lower()).strip("-")
+    return (r["report"].startswith("https://lessons.wildfire.gov/"),
+            bool(name) and slug.startswith(name[:20]),
+            slug.endswith(r["date"][:4]),
+            len(r.get("summary") or ""))
+
+
+def drop_duplicates(rows):
+    kept, gone = [], 0
+    for r in rows:
+        twin = next((k for k in kept if same_incident(k, r)), None)
+        if twin is None:
+            kept.append(r)
+            continue
+        gone += 1
+        if _keep_score(r) > _keep_score(twin):
+            kept[kept.index(twin)] = r
+    return kept, gone
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -318,6 +369,10 @@ def main():
             unlinked += 1
         rows.append(r)
     rows.sort(key=lambda r: (r["date"], r["id"]))
+    rows, twins = drop_duplicates(rows)
+    rows.sort(key=lambda r: (r["date"], r["id"]))
+    if twins:
+        dropped["same incident twice"] = twins
     body, head = catalog_bytes(rows, edited)
 
     by_type = {t: 0 for t in TYPES}
