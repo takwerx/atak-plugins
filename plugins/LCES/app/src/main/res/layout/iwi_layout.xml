@@ -263,13 +263,6 @@
                     android:text="@string/iwi_cancel" />
             </LinearLayout>
 
-            <!-- Steps: what the initial call needs, filled in before Declare
-                 (operator, 2026-11-06). Built in code. -->
-            <LinearLayout
-                android:id="@+id/iwi_steps_block"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -357,6 +350,14 @@
                         android:text="@string/iwi_change_location" />
                 </LinearLayout>
             </LinearLayout>
+
+            <!-- Steps: what the initial call needs, filled in before Declare
+                 (operator, 2026-11-06). Built in code. -->
+            <LinearLayout
+                android:id="@+id/iwi_steps_block"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
 
             <TextView
                 style="@style/TakwerxSectionHeading"
