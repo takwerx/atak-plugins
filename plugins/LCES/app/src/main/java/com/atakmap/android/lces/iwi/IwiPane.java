@@ -715,7 +715,15 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         } else {
             final String next = first > 0 ? first + ". " + STEP_NAMES[first - 1]
                     : !state.isLive() ? "Declare IWI" : "Radio Script";
-            stepsBar.setText((STEPS - left) + " of " + STEPS + "   Next: " + next);
+            // The count done in green, the way the boxes beside it are (operator,
+            // 2026-11-06).
+            final SpannableStringBuilder t = new SpannableStringBuilder(
+                    Integer.toString(STEPS - left));
+            if (STEPS - left > 0)
+                t.setSpan(new ForegroundColorSpan(color(R.color.state_on)), 0, t.length(),
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            t.append(" of " + STEPS + "   Next: " + next);
+            stepsBar.setText(t);
         }
         stepsBar.setTextColor(left == 0 ? color(R.color.state_on) : Color.WHITE);
         for (int i = 0; i < STEPS; i++) {
