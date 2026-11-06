@@ -87,7 +87,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private final Button moveButton;
     private final LinearLayout scriptContainer;
     /** Steps: what the initial call needs, one row each, red until filled in. */
-    private Fold stepsFold;
+    private Button stepsBar;
     private final Button[] stepRows = new Button[STEPS];
     private final Button scriptButton;
     /** Red, Yellow, Green, Black: the count boxes pinned over every page. */
@@ -148,6 +148,13 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         moveButton = root.findViewById(R.id.iwi_btn_move);
         scriptContainer = root.findViewById(R.id.iwi_script_container);
         scriptButton = root.findViewById(R.id.iwi_btn_script);
+        stepsBar = root.findViewById(R.id.iwi_steps_bar);
+        stepsBar.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                nextStep();
+            }
+        });
         tally[0] = root.findViewById(R.id.iwi_tally_red);
         tally[1] = root.findViewById(R.id.iwi_tally_yellow);
         tally[2] = root.findViewById(R.id.iwi_tally_green);
@@ -453,6 +460,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     @Override
     public void countsChanged() {
         refreshTally();
+        refreshSteps();
     }
 
     private void refreshTally() {
@@ -632,36 +640,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
 
     // ---- steps: the information first, then Declare, then the call ----
 
-    private void buildSteps(LinearLayout into, TraumaManager manager) {
-        final android.content.SharedPreferences prefs = manager.prefs();
-        final String pref = "iwi.fold.steps";
-        // Open the first time: it is what to do first.
-        if (!prefs.contains(pref))
-            prefs.edit().putBoolean(pref, true).apply();
-        final LinearLayout headRow = new LinearLayout(ctx);
-        headRow.setOrientation(LinearLayout.HORIZONTAL);
-        headRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        final Button head = new Button(ctx, null, 0, R.style.TakwerxButton);
-        head.setGravity(android.view.Gravity.START | android.view.Gravity.CENTER_VERTICAL);
-        headRow.addView(head, new LinearLayout.LayoutParams(0,
-                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        final android.widget.ImageButton chev = new android.widget.ImageButton(ctx, null, 0,
-                R.style.TakwerxIconButton);
-        chev.setImageResource(R.drawable.ic_expand);
-        chev.setContentDescription(ctx.getString(R.string.show_settings));
-        final LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(dp(44), dp(44));
-        clp.leftMargin = dp(2);
-        headRow.addView(chev, clp);
-        final LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        hlp.topMargin = dp(6);
-        into.addView(headRow, hlp);
-
-        final LinearLayout body = new LinearLayout(ctx);
-        body.setOrientation(LinearLayout.VERTICAL);
-        body.setPadding(dp(8), 0, 0, dp(4));
-        into.addView(body, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+    private void buildSteps(LinearLayout body, TraumaManager manager) {
         for (int i = 0; i < STEPS; i++) {
             final int step = i + 1;
             final Button row = new Button(ctx, null, 0, R.style.TakwerxButton);
@@ -681,17 +660,19 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             body.addView(row, rlp);
             stepRows[i] = row;
         }
-        stepsFold = new Fold(head, chev, body, prefs, pref);
     }
 
     /** Each row: its number and name, then what it says, or what is missing. */
     private void refreshSteps() {
-        if (stepsFold == null)
+        if (stepRows[0] == null)
             return;
         final int left = stepsLeft();
-        stepsFold.label("Steps", left == 0 ? "all " + STEPS + " filled in"
-                : (STEPS - left) + " of " + STEPS + " filled in");
-        stepsFold.head.setTextColor(left == 0 ? color(R.color.state_on)
+        final int first = firstMissing();
+        final String next = first > 0 ? first + ". " + STEP_NAMES[first - 1]
+                : !state.isLive() ? "Declare IWI" : "Radio Script";
+        stepsBar.setText((left == 0 ? "Steps: all " + STEPS
+                : "Steps: " + (STEPS - left) + " of " + STEPS) + "   Next: " + next);
+        stepsBar.setTextColor(left == 0 ? color(R.color.state_on)
                 : color(R.color.state_off));
         for (int i = 0; i < STEPS; i++) {
             final int step = i + 1;
@@ -762,6 +743,23 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             if (!stepDone(step))
                 n++;
         return n;
+    }
+
+    /** The pinned bar: the first missing step, else Declare, else the call. */
+    private void nextStep() {
+        final int first = firstMissing();
+        if (first > 0) {
+            goToStep(first, false);
+        } else if (!state.isLive()) {
+            showMain();
+            mainScroll.scrollTo(0, 0);
+            if (!picking && pendingPoint == null)
+                askWhere(false);
+        } else {
+            buildScript();
+            scriptReturn = mainPage;
+            show(scriptPage);
+        }
     }
 
     /** The report, opened at that step's spot. */

@@ -424,6 +424,8 @@ final class ReportForm {
     private void picked() {
         refreshChoices();
         refreshHeads();
+        // The pinned Steps bar follows every pick.
+        host.countsChanged();
     }
 
     // ---- tiles ----

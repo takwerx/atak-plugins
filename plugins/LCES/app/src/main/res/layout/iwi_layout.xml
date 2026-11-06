@@ -94,6 +94,17 @@
             android:src="@drawable/ic_wide" />
     </LinearLayout>
 
+    <!-- Steps, pinned under the counts on every page (operator, 2026-11-06: "it
+         needs to stay at the top"): how many of the six are in and what is next.
+         A tap goes there. -->
+    <Button
+        android:id="@+id/iwi_steps_bar"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="start|center_vertical" />
+
     <!-- The IWI page: Back to the LCES main screen pinned above its scroller. -->
     <LinearLayout
         android:id="@+id/iwi_main_page"
