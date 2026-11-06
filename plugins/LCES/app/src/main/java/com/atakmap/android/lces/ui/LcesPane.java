@@ -65,6 +65,8 @@ public final class LcesPane implements PageView.Opener {
     private static final int SEARCH_CAP = 50;
     /** Area presets, in the operator's large unit. */
     private static final int[] AREA_PRESETS = {10, 25, 50, 100};
+    /** Zoom gate presets, scale bar readings in the operator's large unit (IPAWS's). */
+    private static final double[] GATE_PRESETS = {0.25, 1, 5, 15, 50};
 
     private final MapView mapView;
     private final Context pluginContext;
@@ -87,7 +89,7 @@ public final class LcesPane implements PageView.Opener {
     private final View settingsWide;
     private final View readerWide;
     private final RowAdapter rows;
-    private final Fold areaFold, typesFold, catsFold, keyFold;
+    private final Fold gateFold, areaFold, typesFold, catsFold, keyFold;
     private IrpgPages pages;
     private LcesDropDown host;
     /** The page being read was opened from the contents; Back returns there. */
@@ -288,6 +290,7 @@ public final class LcesPane implements PageView.Opener {
         iwi = traumaManager == null ? null : buildIwi(traumaManager);
 
         final LinearLayout lessonsSettings = root.findViewById(R.id.lessons_settings);
+        gateFold = new Fold(lessonsSettings, "gate");
         areaFold = new Fold(lessonsSettings, "area");
         typesFold = new Fold(lessonsSettings, "types");
         catsFold = new Fold(lessonsSettings, "categories");
@@ -493,7 +496,10 @@ public final class LcesPane implements PageView.Opener {
                                 + " lessons that match are under them."
                         : count(incidents.size()) + (incidents.size() == 1
                                 ? " lesson matches too." : " lessons match too."));
-                s.append(' ').append(lessonsManager.isOn()
+                s.append(' ').append(lessonsManager.zoomedOutPastGate()
+                        ? "Zoom in to " + gateLabel(lessonsManager.gateMeters())
+                                + " to see them on the map."
+                        : lessonsManager.isOn()
                         ? (incidents.size() == 1 ? "The map shows only that one."
                                 : "The map shows only those " + count(incidents.size()) + ".")
                                 + " Clear to show the rest."
@@ -520,6 +526,9 @@ public final class LcesPane implements PageView.Opener {
         final StringBuilder b = new StringBuilder();
         if (lessonsManager != null && !lessonsManager.isOn())
             b.append(pluginContext.getString(R.string.lessons_map_off)).append(' ');
+        else if (lessonsManager != null && lessonsManager.zoomedOutPastGate())
+            b.append("Zoom in to ").append(gateLabel(lessonsManager.gateMeters()))
+                    .append(" to see lessons on the map. ");
         final double area = lessonsManager == null ? -1 : lessonsManager.areaMeters();
         if (r.kept == 0) {
             b.append(pluginContext.getString(R.string.lessons_none));
@@ -583,10 +592,76 @@ public final class LcesPane implements PageView.Opener {
             iwi.refreshSettings();
         if (lessonsManager == null)
             return;
+        buildGate();
         buildArea();
         buildTypes();
         buildCategories();
         buildKey();
+    }
+
+    /** "5 mi or closer", or Always: what the scale bar has to read for the map to draw. */
+    private static String gateLabel(double barMeters) {
+        return barMeters <= 0 ? "Always"
+                : gateName(barMeters / Units.bigToMeters(1)) + " or closer";
+    }
+
+    /** "5 mi", "0.25 mi", "0.37 mi": the large unit, never more than two decimals. */
+    private static String gateName(double big) {
+        String n = String.format(Locale.US, "%.2f", big);
+        n = n.replaceAll("0+$", "").replaceAll("\\.$", "");
+        return n + " " + Units.bigLabel();
+    }
+
+    private void buildGate() {
+        final double gate = lessonsManager.gateMeters();
+        gateFold.label("Zoom gate", gateLabel(gate));
+        final LinearLayout body = gateFold.body;
+        body.removeAllViews();
+        final List<Button> tiles = new ArrayList<>();
+        final Button always = tile("Always", gate <= 0);
+        always.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                lessonsManager.setGate(-1);
+                refreshSettings();
+            }
+        });
+        tiles.add(always);
+        for (final double n : GATE_PRESETS) {
+            final double m = Units.bigToMeters(n);
+            final Button b = tile(gateName(n), gate > 0 && Math.abs(gate - m) < 1);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    lessonsManager.setGate(m);
+                    refreshSettings();
+                }
+            });
+            tiles.add(b);
+        }
+        addTileRows(body, tiles, 3);
+        final Button here = tile("Use this zoom", false);
+        here.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // What the scale bar reads right now becomes the gate.
+                lessonsManager.setGate(ScaleBar.meters(mapView));
+                refreshSettings();
+            }
+        });
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(6);
+        body.addView(here, lp);
+        final TextView now = new TextView(pluginContext);
+        now.setTextColor(0xFFFFFFFF);
+        now.setTextSize(13);
+        now.setPadding(0, dp(6), 0, 0);
+        now.setText("Scale bar now " + ScaleBar.text(mapView) + (gate <= 0 ? ""
+                : !lessonsManager.isOn() ? " - Lessons Learned is OFF"
+                : lessonsManager.zoomedOutPastGate() ? " - lessons hidden on the map"
+                : " - lessons drawn"));
+        body.addView(now);
     }
 
     private void buildArea() {

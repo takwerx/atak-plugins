@@ -65,6 +65,11 @@ public final class LessonsManager {
     public static final String PREF_AREA_M = "lces.lessons.areaM";
     /** Measure from the map center instead of My Location. */
     public static final String PREF_FROM_CENTER = "lces.lessons.fromCenter";
+    /**
+     * Zoom gate: the map draws lessons only while ATAK's scale bar reads this many
+     * meters or less (plugin-ui section 3). Missing or -1 is Always.
+     */
+    public static final String PREF_GATE_M = "lces.lessons.gateBarM";
 
     /** The list shows this many, nearest first, and says so when there are more. */
     public static final int LIST_CAP = 100;
@@ -151,6 +156,8 @@ public final class LessonsManager {
      */
     private volatile Set<String> searchIds;
     private boolean stopped;
+    /** Zoomed out past the zoom gate at the last settled move. Main thread. */
+    private boolean gatedOut;
 
     private final AtakMapView.OnMapMovedListener moved = new AtakMapView.OnMapMovedListener() {
         @Override
@@ -164,6 +171,7 @@ public final class LessonsManager {
     private final Runnable settled = new Runnable() {
         @Override
         public void run() {
+            checkGate(false);
             // Only a list measured from the map center follows the map.
             if (measuringFromCenter())
                 rebuild();
@@ -206,6 +214,7 @@ public final class LessonsManager {
                 main.post(new Runnable() {
                     @Override
                     public void run() {
+                        checkGate(true);
                         rebuild();
                     }
                 });
@@ -262,17 +271,63 @@ public final class LessonsManager {
 
     public void setOn(final boolean on) {
         prefs.edit().putBoolean(PREF_ON, on).apply();
+        if (!applyVisible())
+            return;
+        rebuild();
+    }
+
+    // ---- the zoom gate --------------------------------------------------------------
+
+    /** The gate as the scale bar distance in meters, or -1 for Always. */
+    public double gateMeters() {
+        return prefs.getFloat(PREF_GATE_M, -1f);
+    }
+
+    public void setGate(double barMeters) {
+        prefs.edit().putFloat(PREF_GATE_M, (float) (barMeters > 0 ? barMeters : -1)).apply();
+        checkGate(true);
+    }
+
+    /** True when the switch is on and the map is zoomed out past the gate. Main thread. */
+    public boolean zoomedOutPastGate() {
+        return isOn() && gatedOut;
+    }
+
+    private boolean pastGate() {
+        final double g = gateMeters();
+        // Two percent of slack, so a gate taken with "Use this zoom" holds at that zoom.
+        return g > 0 && com.atakmap.android.lces.ui.ScaleBar.meters(mapView) > g * 1.02;
+    }
+
+    /** Main thread. Shows or hides the layer when the gate's answer changed, or always. */
+    private void checkGate(boolean force) {
+        if (stopped)
+            return;
+        final boolean past = pastGate();
+        if (!force && past == gatedOut)
+            return;
+        gatedOut = past;
+        applyVisible();
+        final Listener l = listener;
+        final Result r = last;
+        if (l != null && r != null)
+            l.onLessons(r);
+    }
+
+    /** The one place the layer is shown or hidden: the switch and the gate together. */
+    private boolean applyVisible() {
+        final boolean visible = isOn() && !gatedOut;
         try {
             worker.execute(new Runnable() {
                 @Override
                 public void run() {
-                    overlay.setVisible(isOn());
+                    overlay.setVisible(visible);
                 }
             });
+            return true;
         } catch (java.util.concurrent.RejectedExecutionException stoppedAlready) {
-            return;
+            return false;
         }
-        rebuild();
     }
 
     public Set<Incident.Type> shownTypes() {
