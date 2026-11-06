@@ -62,6 +62,8 @@ public final class IwiState implements RadioScript.Source {
     public static final String RESOURCES = "resources";
     public static final String CONTINGENCY = "contingency";
     public static final String ADDITIONAL = "additional_info";
+    /** When the reporter slid "Comms acknowledged" on the initial call; gone on Clear. */
+    public static final String REPORTED = "initial_reported_ms";
 
     /** The three rows of item 6, and the five columns of each. */
     public static final String[] COMMS_ROWS = {"cmd", "ag", "tac"};

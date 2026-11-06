@@ -522,8 +522,9 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             }
         }
         refreshSteps();
-        // Declared with every step filled in: the call is next.
-        scriptButton.setTextColor(live && left == 0 ? color(R.color.state_on) : Color.WHITE);
+        // Declared with every step filled in: the call is next, until it is made.
+        scriptButton.setTextColor(live && left == 0 && reportedMs() == 0
+                ? color(R.color.state_on) : Color.WHITE);
         if (!picking || !pickMoves) {
             moveButton.setText("Change Location");
             moveButton.setTextColor(Color.WHITE);
@@ -692,9 +693,15 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             return;
         final int left = stepsLeft();
         final int first = firstMissing();
-        final String next = first > 0 ? first + ". " + STEP_NAMES[first - 1]
-                : !state.isLive() ? "Declare IWI" : "Radio Script";
-        stepsBar.setText((STEPS - left) + " of " + STEPS + "   Next: " + next);
+        final long reported = state.isLive() ? reportedMs() : 0L;
+        if (reported > 0) {
+            // The call is made: nothing left to nag about.
+            stepsBar.setText("Initial report made " + Clock.hhmm(reported));
+        } else {
+            final String next = first > 0 ? first + ". " + STEP_NAMES[first - 1]
+                    : !state.isLive() ? "Declare IWI" : "Radio Script";
+            stepsBar.setText((STEPS - left) + " of " + STEPS + "   Next: " + next);
+        }
         stepsBar.setTextColor(left == 0 ? color(R.color.state_on) : Color.WHITE);
         for (int i = 0; i < STEPS; i++) {
             final boolean done = stepDone(i + 1);
@@ -766,6 +773,15 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         }
     }
 
+    /** When the initial call was acknowledged, or 0 when it has not been made. */
+    private long reportedMs() {
+        try {
+            return Long.parseLong(state.text(IwiState.REPORTED));
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
+    }
+
     /** 0 when every step is filled in. */
     private int firstMissing() {
         for (int step = 1; step <= STEPS; step++)
@@ -792,6 +808,10 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             mainScroll.scrollTo(0, 0);
             if (!picking && pendingPoint == null)
                 askWhere(false);
+        } else if (reportedMs() > 0) {
+            // Made: what comes next is the follow-ups, in the report.
+            form.refresh();
+            show(reportPage);
         } else {
             buildScript();
             scriptReturn = mainPage;
@@ -936,6 +956,42 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             anyMissing |= render(more);
         }
         finishScript(anyMissing);
+        addReportedSlider();
+    }
+
+    /**
+     * The end of the script: "I made the call" (operator, 2026-11-06). Slid once the
+     * initial report is acknowledged; the time is kept and the Steps bar stops pointing
+     * at the Radio Script.
+     */
+    private void addReportedSlider() {
+        if (!state.isLive())
+            return;
+        final long reported = reportedMs();
+        if (reported > 0) {
+            final TextView done = line("Initial report made " + Clock.hhmm(reported) + ".",
+                    16, color(R.color.state_on));
+            done.setTypeface(Typeface.DEFAULT_BOLD);
+            scriptContainer.addView(done);
+            return;
+        }
+        scriptContainer.addView(heading("When the call is acknowledged"));
+        final SlideConfirm slider = new SlideConfirm(ctx);
+        slider.setColor(color(R.color.state_on));
+        slider.setLabel("Slide: Initial Report Made");
+        slider.setOnConfirmed(new SlideConfirm.OnConfirmed() {
+            @Override
+            public void onConfirmed() {
+                state.set(IwiState.REPORTED, Long.toString(System.currentTimeMillis()));
+                showMain();
+                status("Initial report made " + Clock.hhmm(reportedMs()) + ".");
+            }
+        });
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(8);
+        lp.bottomMargin = dp(8);
+        scriptContainer.addView(slider, lp);
     }
 
     /** One patient's follow-up, from its card's Radio update. */
