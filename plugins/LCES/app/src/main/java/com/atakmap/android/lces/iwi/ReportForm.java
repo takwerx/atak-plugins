@@ -179,6 +179,29 @@ final class ReportForm {
         scrollToTop(target);
     }
 
+    /**
+     * A count box at the top was tapped: item 3 open with that color's cards open and
+     * the rest closed, the first of them at the top (operator, 2026-11-06). Total
+     * ({@code color} null) closes every card, so the whole list reads one line each.
+     * A color with no patients goes to item 2's counters to add one.
+     */
+    void openPatients(String color) {
+        if (color != null && state.count(color) == 0) {
+            openStep(2);
+            return;
+        }
+        patients.setOpen(true);
+        View first = null;
+        for (Card c : cards.values()) {
+            final Patient p = state.patient(c.n);
+            final boolean mine = color != null && p != null && color.equals(p.color);
+            c.fold.setOpen(mine);
+            if (mine && first == null)
+                first = c.headRow;
+        }
+        scrollToTop(first != null ? first : (View) patients.head.getParent());
+    }
+
     /** Where item 2's row starts on the page, to scroll it to the top. */
     int initialTop() {
         final View row = (View) status.head.getParent();

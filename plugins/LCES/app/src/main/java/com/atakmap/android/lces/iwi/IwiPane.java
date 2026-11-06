@@ -191,6 +191,21 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             }
         });
         styleTally();
+        for (int i = 0; i < tally.length; i++) {
+            final String c = Patient.COLORS[i];
+            tally[i].setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    openPatients(c);
+                }
+            });
+        }
+        tallyTotal.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openPatients(null);
+            }
+        });
         confirmBlock = root.findViewById(R.id.iwi_confirm_block);
         confirmTitle = root.findViewById(R.id.iwi_confirm_title);
         confirmWhere = root.findViewById(R.id.iwi_confirm_where);
@@ -817,6 +832,15 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             scriptReturn = mainPage;
             show(scriptPage);
         }
+    }
+
+    /** A count box: the report at that color's patients, or all of them for Total. */
+    private void openPatients(String color) {
+        if (pendingPoint != null || picking)
+            return;
+        form.refresh();
+        show(reportPage);
+        form.openPatients(color);
     }
 
     /** The report, opened at that step's spot. */
