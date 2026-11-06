@@ -88,6 +88,13 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private final LinearLayout scriptContainer;
     /** Steps: what the initial call needs, one row each, red until filled in. */
     private Button stepsBar;
+    /** After the call: Patients, Evac Plan, Comms, Contingency. */
+    private final Button[] followUps = new Button[4];
+    private static final String[] FOLLOW_UP_NAMES = {
+            "Patients", "Evac Plan", "Comms", "Contingency"
+    };
+    private View stepBoxesRow;
+    private View followUpBar;
     /** 1 to 6 in the pinned bar: green filled in, red edge while missing. */
     private final TextView[] stepBoxes = new TextView[STEPS];
     private final Button[] stepRows = new Button[STEPS];
@@ -152,6 +159,27 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         scriptButton = root.findViewById(R.id.iwi_btn_script);
         stepsBar = root.findViewById(R.id.iwi_steps_bar);
         final LinearLayout boxes = root.findViewById(R.id.iwi_steps_boxes);
+        stepBoxesRow = boxes;
+        final LinearLayout fu = root.findViewById(R.id.iwi_followup_bar);
+        followUpBar = fu;
+        for (int i = 0; i < followUps.length; i++) {
+            final int which = i;
+            final Button b = new Button(pluginContext, null, 0, R.style.TakwerxButton);
+            b.setText(FOLLOW_UP_NAMES[i]);
+            b.setTextSize(14);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    openFollowUp(which);
+                }
+            });
+            final LinearLayout.LayoutParams flp = new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, i == 3 ? 1.3f : 1f);
+            if (i > 0)
+                flp.leftMargin = dp(4);
+            fu.addView(b, flp);
+            followUps[i] = b;
+        }
         for (int i = 0; i < STEPS; i++) {
             final int step = i + 1;
             final TextView box = new TextView(pluginContext);
@@ -561,7 +589,9 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             return;
         final long at = state.declaredMs();
         final String clock = Clock.hhmm(at);
-        liveTime.setText("Declared " + clock + ", " + ago(System.currentTimeMillis() - at));
+        final long made = reportedMs();
+        liveTime.setText("Declared " + clock + ", " + ago(System.currentTimeMillis() - at)
+                + (made > 0 ? "\nInitial report made " + Clock.hhmm(made) : ""));
         final GeoPoint p = state.point();
         liveWhere.setText(Coords.ddm(p.getLatitude(), p.getLongitude()) + "\n"
                 + (IwiState.SOURCE_MAP.equals(state.source())
@@ -709,9 +739,21 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         final int left = stepsLeft();
         final int first = firstMissing();
         final long reported = state.isLive() ? reportedMs() : 0L;
+        // The call is made: the six steps are done with; the follow-ups take their place.
+        stepBoxesRow.setVisibility(reported > 0 ? View.GONE : View.VISIBLE);
+        stepsBar.setVisibility(reported > 0 ? View.GONE : View.VISIBLE);
+        followUpBar.setVisibility(reported > 0 ? View.VISIBLE : View.GONE);
+        ((View) stepRows[0].getParent()).setVisibility(reported > 0 ? View.GONE : View.VISIBLE);
         if (reported > 0) {
-            // The call is made: nothing left to nag about.
-            stepsBar.setText("Initial report made " + Clock.hhmm(reported));
+            final boolean[] done = {
+                    patientsDone(),
+                    RadioScript.evacPlan(state).complete(),
+                    RadioScript.comms(state).complete(),
+                    RadioScript.contingency(state).complete()
+            };
+            for (int i = 0; i < followUps.length; i++)
+                followUps[i].setTextColor(done[i] ? color(R.color.state_on)
+                        : color(R.color.state_off));
         } else {
             final String next = first > 0 ? first + ". " + STEP_NAMES[first - 1]
                     : !state.isLive() ? "Declare IWI" : "Radio Script";
@@ -794,6 +836,28 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             case 5: return "None, EMT or Paramedic";
             default: return "What you need, or None needed";
         }
+    }
+
+    /** Every patient's card filled in, and at least one patient. */
+    private boolean patientsDone() {
+        final List<Patient> list = state.patients();
+        if (list.isEmpty())
+            return false;
+        for (Patient p : list)
+            if (!RadioScript.patient(state, p).complete())
+                return false;
+        return true;
+    }
+
+    private void openFollowUp(int which) {
+        if (pendingPoint != null || picking)
+            return;
+        form.refresh();
+        show(reportPage);
+        if (which == 0)
+            form.openPatients(null);
+        else
+            form.openItem(which == 1 ? 4 : which == 2 ? 6 : 7);
     }
 
     /** When the initial call was acknowledged, or 0 when it has not been made. */

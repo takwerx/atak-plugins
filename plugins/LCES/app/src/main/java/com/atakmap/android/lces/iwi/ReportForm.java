@@ -202,6 +202,13 @@ final class ReportForm {
         scrollToTop(first != null ? first : (View) patients.head.getParent());
     }
 
+    /** A follow-up button after the call: item 4, 6 or 7 open at the top. */
+    void openItem(int item) {
+        final Fold f = item == 4 ? evacPlan : item == 6 ? comms : contingency;
+        f.setOpen(true);
+        scrollToTop((View) f.head.getParent());
+    }
+
     /** Where item 2's row starts on the page, to scroll it to the top. */
     int initialTop() {
         final View row = (View) status.head.getParent();
