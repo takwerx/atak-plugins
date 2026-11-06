@@ -88,6 +88,8 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private final LinearLayout scriptContainer;
     /** Steps: what the initial call needs, one row each, red until filled in. */
     private Button stepsBar;
+    /** 1 to 6 in the pinned bar: green filled in, red edge while missing. */
+    private final TextView[] stepBoxes = new TextView[STEPS];
     private final Button[] stepRows = new Button[STEPS];
     private final Button scriptButton;
     /** Red, Yellow, Green, Black: the count boxes pinned over every page. */
@@ -149,6 +151,28 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         scriptContainer = root.findViewById(R.id.iwi_script_container);
         scriptButton = root.findViewById(R.id.iwi_btn_script);
         stepsBar = root.findViewById(R.id.iwi_steps_bar);
+        final LinearLayout boxes = root.findViewById(R.id.iwi_steps_boxes);
+        for (int i = 0; i < STEPS; i++) {
+            final int step = i + 1;
+            final TextView box = new TextView(pluginContext);
+            box.setText(Integer.toString(step));
+            box.setTextSize(18);
+            box.setTypeface(Typeface.DEFAULT_BOLD);
+            box.setGravity(android.view.Gravity.CENTER);
+            box.setContentDescription("Step " + step + ": " + STEP_NAMES[i]);
+            box.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    goToStep(step, false);
+                }
+            });
+            final LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(dp(38),
+                    LinearLayout.LayoutParams.MATCH_PARENT);
+            if (i > 0)
+                blp.leftMargin = dp(4);
+            boxes.addView(box, blp);
+            stepBoxes[i] = box;
+        }
         stepsBar.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -670,10 +694,23 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         final int first = firstMissing();
         final String next = first > 0 ? first + ". " + STEP_NAMES[first - 1]
                 : !state.isLive() ? "Declare IWI" : "Radio Script";
-        stepsBar.setText((left == 0 ? "Steps: all " + STEPS
-                : "Steps: " + (STEPS - left) + " of " + STEPS) + "   Next: " + next);
-        stepsBar.setTextColor(left == 0 ? color(R.color.state_on)
-                : color(R.color.state_off));
+        stepsBar.setText((STEPS - left) + " of " + STEPS + "   Next: " + next);
+        stepsBar.setTextColor(left == 0 ? color(R.color.state_on) : Color.WHITE);
+        for (int i = 0; i < STEPS; i++) {
+            final boolean done = stepDone(i + 1);
+            final android.graphics.drawable.GradientDrawable box =
+                    new android.graphics.drawable.GradientDrawable();
+            box.setCornerRadius(dp(4));
+            if (done) {
+                box.setColor(color(R.color.state_on));
+                stepBoxes[i].setTextColor(Color.BLACK);
+            } else {
+                box.setColor(0xFF1E1E1E);
+                box.setStroke(dp(2), color(R.color.state_off));
+                stepBoxes[i].setTextColor(color(R.color.state_off));
+            }
+            stepBoxes[i].setBackground(box);
+        }
         for (int i = 0; i < STEPS; i++) {
             final int step = i + 1;
             final boolean done = stepDone(step);
