@@ -1,6 +1,7 @@
 package com.atakmap.android.lces.iwi;
 
 import com.atakmap.android.lces.plugin.R;
+import com.atakmap.android.lces.ui.SlideConfirm;
 
 import android.app.AlertDialog;
 import android.content.Context;
@@ -102,7 +103,10 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private final View confirmBlock;
     private final TextView confirmTitle;
     private final TextView confirmWhere;
-    private final Button confirmButton;
+    private final SlideConfirm confirmSlider;
+    /** Clear IWI, asked in place: what goes, a slider, Cancel. */
+    private final View clearBlock;
+    private final SlideConfirm clearSlider;
     /** The big draggable marker shown while a location waits. */
     private final PreviewMarker preview;
     /** The report page's scroller, so the next step opens at the top. */
@@ -148,7 +152,16 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         confirmBlock = root.findViewById(R.id.iwi_confirm_block);
         confirmTitle = root.findViewById(R.id.iwi_confirm_title);
         confirmWhere = root.findViewById(R.id.iwi_confirm_where);
-        confirmButton = root.findViewById(R.id.iwi_btn_confirm);
+        confirmSlider = new SlideConfirm(pluginContext);
+        confirmSlider.setColor(color(R.color.triage_red));
+        ((android.view.ViewGroup) root.findViewById(R.id.iwi_confirm_slider))
+                .addView(confirmSlider);
+        clearBlock = root.findViewById(R.id.iwi_clear_block);
+        clearSlider = new SlideConfirm(pluginContext);
+        clearSlider.setColor(color(R.color.state_off));
+        clearSlider.setLabel("Slide to Clear IWI");
+        ((android.view.ViewGroup) root.findViewById(R.id.iwi_clear_slider))
+                .addView(clearSlider);
         reportScroll = (View) root.findViewById(R.id.iwi_report_container).getParent();
         preview = new PreviewMarker(mapView, new PreviewMarker.OnMoved() {
             @Override
@@ -165,12 +178,26 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                 });
             }
         });
-        confirmButton.setOnClickListener(new View.OnClickListener() {
+        confirmSlider.setOnConfirmed(new SlideConfirm.OnConfirmed() {
             @Override
-            public void onClick(View v) {
+            public void onConfirmed() {
                 confirmPending();
             }
         });
+        clearSlider.setOnConfirmed(new SlideConfirm.OnConfirmed() {
+            @Override
+            public void onConfirmed() {
+                clearNow();
+            }
+        });
+        root.findViewById(R.id.iwi_btn_clear_cancel).setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        hideClear();
+                        updateMain();
+                    }
+                });
         root.findViewById(R.id.iwi_btn_confirm_cancel).setOnClickListener(
                 new View.OnClickListener() {
                     @Override
@@ -187,7 +214,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                 if (picking)
                     cancelPick();
                 else if (state.isLive())
-                    confirmClear();
+                    askClear();
                 else
                     askWhere(false);
             }
@@ -326,6 +353,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     public void onClosed() {
         cancelPick();
         cancelPending();
+        hideClear();
     }
 
     public void dispose() {
@@ -442,7 +470,10 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         }
         // While a location waits, the confirm above is the only Declare on the page.
         final boolean waiting = pendingPoint != null;
-        declareButton.setVisibility(waiting ? View.GONE : View.VISIBLE);
+        if (!live)
+            hideClear();
+        final boolean clearing = clearBlock.getVisibility() == View.VISIBLE;
+        declareButton.setVisibility(waiting || clearing ? View.GONE : View.VISIBLE);
         moveButton.setEnabled(!waiting);
         liveBlock.setVisibility(live ? View.VISIBLE : View.GONE);
         updateLive();
@@ -507,9 +538,11 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         // A map tap is already in view; My Location may not be.
         if (IwiState.SOURCE_SELF.equals(source))
             mapView.getMapController().panTo(p, true);
-        confirmTitle.setText(move ? "Move the IWI here?" : "Declare the IWI here?");
+        confirmTitle.setText(move ? "Move the IWI here?" : "Confirm the IWI location");
         showWhere();
-        confirmButton.setText(move ? "Move IWI" : "Declare IWI");
+        confirmSlider.setLabel(move ? "Slide to Move IWI" : "Slide to Confirm IWI");
+        confirmSlider.reset();
+        hideClear();
         confirmBlock.setVisibility(View.VISIBLE);
         status(null);
         show(mainPage);
@@ -569,28 +602,27 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         confirmBlock.setVisibility(View.GONE);
     }
 
-    // ---- clear: two selections ----
+    // ---- clear: Clear IWI, then a slide ----
 
-    private void confirmClear() {
-        new AlertDialog.Builder(mapView.getContext())
-                .setTitle("Clear this IWI?")
-                .setMessage("This removes the IWI marker from your map and erases the "
-                        + "patient details in the report on this device.\n\n"
-                        + "Who you call and the frequencies (items 1 and 6) are kept for "
-                        + "the next one.\n\n"
-                        + "It does not remove the marker from anyone you sent it to.")
-                .setPositiveButton("Clear IWI", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        IwiMarker.remove(mapView, state.uid());
-                        state.clear();
-                        form.refresh();
-                        status("IWI cleared.");
-                        updateMain();
-                    }
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+    private void askClear() {
+        clearSlider.reset();
+        clearBlock.setVisibility(View.VISIBLE);
+        status(null);
+        updateMain();
+        mainScroll.scrollTo(0, 0);
+    }
+
+    private void hideClear() {
+        clearBlock.setVisibility(View.GONE);
+    }
+
+    private void clearNow() {
+        hideClear();
+        IwiMarker.remove(mapView, state.uid());
+        state.clear();
+        form.refresh();
+        status("IWI cleared.");
+        updateMain();
     }
 
     // ---- a tap on the map ----

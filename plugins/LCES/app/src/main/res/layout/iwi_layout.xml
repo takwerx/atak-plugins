@@ -178,29 +178,62 @@
                     android:textColor="@color/guide_grey"
                     android:text="@string/iwi_confirm_note" />
 
-                <LinearLayout
+                <!-- Slide to confirm, added from code (operator, 2026-11-06: a tap
+                     could declare by accident). -->
+                <FrameLayout
+                    android:id="@+id/iwi_confirm_slider"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginTop="6dp">
+                    android:layout_marginTop="8dp" />
 
-                    <Button
-                        android:id="@+id/iwi_btn_confirm"
-                        style="@style/TakwerxButton"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:textColor="@color/state_on" />
+                <Button
+                    android:id="@+id/iwi_btn_confirm_cancel"
+                    style="@style/TakwerxButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/iwi_cancel" />
+            </LinearLayout>
 
-                    <Button
-                        android:id="@+id/iwi_btn_confirm_cancel"
-                        style="@style/TakwerxButton"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:layout_marginLeft="6dp"
-                        android:text="@string/iwi_cancel" />
-                </LinearLayout>
+            <!-- Clear IWI, asked in place with a slider rather than a dialog. -->
+            <LinearLayout
+                android:id="@+id/iwi_clear_block"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="17sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/white"
+                    android:text="@string/iwi_clear_title" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="2dp"
+                    android:textSize="14sp"
+                    android:textColor="@color/guide_grey"
+                    android:text="@string/iwi_clear_note" />
+
+                <FrameLayout
+                    android:id="@+id/iwi_clear_slider"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp" />
+
+                <Button
+                    android:id="@+id/iwi_btn_clear_cancel"
+                    style="@style/TakwerxButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/iwi_cancel" />
             </LinearLayout>
 
             <LinearLayout
