@@ -264,7 +264,7 @@ final class ReportForm {
 
         evacLabel = label("Evacuation request");
         body.addView(evacLabel);
-        tiles(body, Vocab.EVAC, 2, false, textBinding(IwiState.EVAC_REQUEST), groups);
+        tiles(body, Vocab.EVAC, 2, true, textBinding(IwiState.EVAC_REQUEST), groups);
 
         body.addView(label("Patient location"));
         latLong = new TextView(ctx);
@@ -341,7 +341,7 @@ final class ReportForm {
 
         head(contact, "1. Contact", RadioScript.contact(state), RadioScript.calling(state));
         final int n = state.patientCount();
-        final String evac = state.text(IwiState.EVAC_REQUEST);
+        final String evac = Vocab.labels(state.text(IwiState.EVAC_REQUEST), Vocab.EVAC);
         head(status, "2. Incident Status", RadioScript.status(state, coords),
                 (n == 1 ? "1 patient" : n + " patients") + (evac.isEmpty() ? "" : ", " + evac));
         head(resources, "5. Resources", RadioScript.resources(state),

@@ -91,7 +91,7 @@ public final class IwiMarker {
             med.setAttribute("medline_remarks", remarks);
         if (!s.text(IwiState.HELISPOT).isEmpty())
             med.setAttribute("hlz_remarks", s.text(IwiState.HELISPOT));
-        final String evac = s.text(IwiState.EVAC_REQUEST);
+        final String evac = Vocab.labels(s.text(IwiState.EVAC_REQUEST), Vocab.EVAC);
         if (!evac.isEmpty()) {
             med.setAttribute("equipment_other", "true");
             med.setAttribute("equipment_detail", evac);

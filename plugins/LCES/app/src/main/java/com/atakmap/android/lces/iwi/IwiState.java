@@ -85,6 +85,12 @@ public final class IwiState implements RadioScript.Source {
 
     public IwiState(SharedPreferences prefs) {
         this.prefs = prefs;
+        // Evacuation was one label before 2026-11-06 ("Air Ambulance"); now codes.
+        final String evac = text(EVAC_REQUEST);
+        if (!evac.isEmpty() && Vocab.parse(evac, Vocab.EVAC).isEmpty()) {
+            final int i = java.util.Arrays.asList(Vocab.EVAC.labels).indexOf(evac);
+            set(EVAC_REQUEST, i < 0 ? "" : Vocab.EVAC.codes[i]);
+        }
     }
 
     public static String commsKey(String row, String col) {

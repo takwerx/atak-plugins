@@ -88,9 +88,12 @@ public final class Vocab {
                     "struck by a rolling rock", "cut by a chainsaw or tool", "burns",
                     "electrical contact", "other injury"}, null);
 
-    /** Stored as the label, which is what earlier builds stored. */
+    /**
+     * Pick-many since 2026-11-06 (operator: short-haul to a helispot, then an air
+     * ambulance). Builds before stored one label; {@link IwiState} converts it.
+     */
     public static final Choices EVAC = new Choices(
-            new String[] {"Air Ambulance", "Short-Haul", "Hoist", "Ground Ambulance", "Other"},
+            new String[] {"air", "shorthaul", "hoist", "ground", "other"},
             new String[] {"Air Ambulance", "Short-Haul", "Hoist", "Ground Ambulance", "Other"},
             new String[] {"air ambulance", "short-haul", "hoist", "ground ambulance",
                     "other transport"}, null);

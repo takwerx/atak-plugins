@@ -502,12 +502,12 @@ public final class RadioScript {
     }
 
     private static String evac(Source s) {
-        return Vocab.EVAC.spoken(s.text(IwiState.EVAC_REQUEST));
+        return Vocab.saidAnd(s.text(IwiState.EVAC_REQUEST), Vocab.EVAC);
     }
 
     static boolean needsWeight(Source s) {
-        final String v = s.text(IwiState.EVAC_REQUEST);
-        return "Short-Haul".equals(v) || "Hoist".equals(v);
+        final java.util.Set<String> v = Vocab.parse(s.text(IwiState.EVAC_REQUEST), Vocab.EVAC);
+        return v.contains("shorthaul") || v.contains("hoist");
     }
 
     private static String care(Source s) {
