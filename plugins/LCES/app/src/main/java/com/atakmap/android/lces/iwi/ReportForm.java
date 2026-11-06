@@ -117,6 +117,11 @@ final class ReportForm {
     private View radioContactBlock;
     private TextView latLong;
     private TextView callsignLine;
+    /** Where steps 2 to 5 of the IWI page's Steps start, inside item 2. */
+    private View patientsLabel;
+    private View natureLabel;
+    private View evacLabel;
+    private View careLabel;
     /** True while boxes are being filled from the state, so no watcher writes back. */
     private boolean binding;
 
@@ -135,6 +140,43 @@ final class ReportForm {
     /** Declared: the next step is the initial report, item 2 open. */
     void openInitial() {
         status.setOpen(true);
+    }
+
+    /**
+     * A red step on the IWI page was tapped: open the row it lives in and bring that
+     * spot to the top of the report. Steps are numbered as on the IWI page:
+     * 1 who you call, 2 patients, 3 what happened, 4 evacuation, 5 medical on scene,
+     * 6 resources.
+     */
+    void openStep(int step) {
+        final View target;
+        switch (step) {
+            case 1:
+                contact.setOpen(true);
+                target = (View) contact.head.getParent();
+                break;
+            case 2:
+                status.setOpen(true);
+                target = patientsLabel;
+                break;
+            case 3:
+                status.setOpen(true);
+                target = natureLabel;
+                break;
+            case 4:
+                status.setOpen(true);
+                target = evacLabel;
+                break;
+            case 5:
+                status.setOpen(true);
+                target = careLabel;
+                break;
+            default:
+                resources.setOpen(true);
+                target = (View) resources.head.getParent();
+                break;
+        }
+        scrollToTop(target);
     }
 
     /** Where item 2's row starts on the page, to scroll it to the top. */
@@ -201,7 +243,8 @@ final class ReportForm {
 
         status = section(root, "iwi.fold.r2");
         body = body(status);
-        body.addView(label("Patients"));
+        patientsLabel = label("Patients");
+        body.addView(patientsLabel);
         stepper(body, IwiState.RED, R.color.triage_red);
         stepper(body, IwiState.YELLOW, R.color.triage_yellow);
         stepper(body, IwiState.GREEN, R.color.triage_green);
@@ -214,11 +257,13 @@ final class ReportForm {
         mb.addView(guide(s(R.string.mir_green)));
         mb.addView(guide(s(R.string.mir_black)));
 
-        body.addView(label("What happened"));
+        natureLabel = label("What happened");
+        body.addView(natureLabel);
         natureGroup(body, "Medical", Vocab.MEDICAL, "iwi.fold.medical");
         natureGroup(body, "Trauma", Vocab.TRAUMA, "iwi.fold.trauma_list");
 
-        body.addView(label("Evacuation request"));
+        evacLabel = label("Evacuation request");
+        body.addView(evacLabel);
         tiles(body, Vocab.EVAC, 2, false, textBinding(IwiState.EVAC_REQUEST), groups);
 
         body.addView(label("Patient location"));
@@ -228,7 +273,8 @@ final class ReportForm {
         body.addView(latLong);
         body.addView(guide("Where the IWI marker is. Change Location on the IWI page moves it."));
 
-        body.addView(label("Medical on scene"));
+        careLabel = label("Medical on scene");
+        body.addView(careLabel);
         body.addView(guide("The highest level of medical training on scene."));
         tiles(body, Vocab.CARE, 3, false, textBinding(IwiState.CARE_ROLE), groups);
 

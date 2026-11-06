@@ -60,6 +60,12 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
 
     private static final String TAG = "LCES-IWI-Pane";
     private static final long TICK_MS = 30_000L;
+    /** Steps 1 to 6: what the initial call needs before the IWI is declared. */
+    private static final int STEPS = 6;
+    private static final String[] STEP_NAMES = {
+            "Who You Call", "Patients", "What Happened", "Evacuation Request",
+            "Medical on Scene", "Resources"
+    };
 
     private final Context ctx;
     private final MapView mapView;
@@ -80,6 +86,10 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private final TextView livePatients;
     private final Button moveButton;
     private final LinearLayout scriptContainer;
+    /** Steps: what the initial call needs, one row each, red until filled in. */
+    private Fold stepsFold;
+    private final Button[] stepRows = new Button[STEPS];
+    private final Button scriptButton;
     /** Red, Yellow, Green, Black: the count boxes pinned over every page. */
     private final TextView[] tally = new TextView[4];
     private final TextView tallyTotal;
@@ -137,6 +147,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         livePatients = root.findViewById(R.id.iwi_live_patients);
         moveButton = root.findViewById(R.id.iwi_btn_move);
         scriptContainer = root.findViewById(R.id.iwi_script_container);
+        scriptButton = root.findViewById(R.id.iwi_btn_script);
         tally[0] = root.findViewById(R.id.iwi_tally_red);
         tally[1] = root.findViewById(R.id.iwi_tally_yellow);
         tally[2] = root.findViewById(R.id.iwi_tally_green);
@@ -215,6 +226,9 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                     cancelPick();
                 else if (state.isLive())
                     askClear();
+                else if (firstMissing() > 0)
+                    // The information first: an IWI declared without it is no use.
+                    goToStep(firstMissing(), true);
                 else
                     askWhere(false);
             }
@@ -298,6 +312,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         form = new ReportForm(pluginContext, mapView, state, manager.prefs(),
                 (LinearLayout) root.findViewById(R.id.iwi_report_container), this);
         trauma = new TraumaPane(mapView, root, settingsRoot, manager, this, this);
+        buildSteps((LinearLayout) root.findViewById(R.id.iwi_steps_block), manager);
         updateMain();
         handler.postDelayed(tick, TICK_MS);
     }
@@ -460,10 +475,23 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             (pickMoves ? moveButton : declareButton).setText("Cancel");
             (pickMoves ? moveButton : declareButton).setTextColor(color(R.color.amber));
         }
+        final int left = stepsLeft();
         if (!picking || pickMoves) {
-            declareButton.setText(live ? "Clear IWI" : "Declare IWI");
-            declareButton.setTextColor(live ? color(R.color.state_off) : Color.WHITE);
+            if (live) {
+                declareButton.setText("Clear IWI");
+                declareButton.setTextColor(color(R.color.state_off));
+            } else if (left > 0) {
+                declareButton.setText("Declare IWI: " + left
+                        + (left == 1 ? " step left" : " steps left"));
+                declareButton.setTextColor(color(R.color.guide_grey));
+            } else {
+                declareButton.setText("Declare IWI");
+                declareButton.setTextColor(Color.WHITE);
+            }
         }
+        refreshSteps();
+        // Declared with every step filled in: the call is next.
+        scriptButton.setTextColor(live && left == 0 ? color(R.color.state_on) : Color.WHITE);
         if (!picking || !pickMoves) {
             moveButton.setText("Change Location");
             moveButton.setTextColor(Color.WHITE);
@@ -600,6 +628,152 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
 
     private void hideConfirm() {
         confirmBlock.setVisibility(View.GONE);
+    }
+
+    // ---- steps: the information first, then Declare, then the call ----
+
+    private void buildSteps(LinearLayout into, TraumaManager manager) {
+        final android.content.SharedPreferences prefs = manager.prefs();
+        final String pref = "iwi.fold.steps";
+        // Open the first time: it is what to do first.
+        if (!prefs.contains(pref))
+            prefs.edit().putBoolean(pref, true).apply();
+        final LinearLayout headRow = new LinearLayout(ctx);
+        headRow.setOrientation(LinearLayout.HORIZONTAL);
+        headRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        final Button head = new Button(ctx, null, 0, R.style.TakwerxButton);
+        head.setGravity(android.view.Gravity.START | android.view.Gravity.CENTER_VERTICAL);
+        headRow.addView(head, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        final android.widget.ImageButton chev = new android.widget.ImageButton(ctx, null, 0,
+                R.style.TakwerxIconButton);
+        chev.setImageResource(R.drawable.ic_expand);
+        chev.setContentDescription(ctx.getString(R.string.show_settings));
+        final LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(dp(44), dp(44));
+        clp.leftMargin = dp(2);
+        headRow.addView(chev, clp);
+        final LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        hlp.topMargin = dp(6);
+        into.addView(headRow, hlp);
+
+        final LinearLayout body = new LinearLayout(ctx);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(8), 0, 0, dp(4));
+        into.addView(body, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        for (int i = 0; i < STEPS; i++) {
+            final int step = i + 1;
+            final Button row = new Button(ctx, null, 0, R.style.TakwerxButton);
+            row.setGravity(android.view.Gravity.START | android.view.Gravity.CENTER_VERTICAL);
+            row.setSingleLine(false);
+            row.setMaxLines(2);
+            row.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    goToStep(step, false);
+                }
+            });
+            final LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            rlp.topMargin = dp(4);
+            body.addView(row, rlp);
+            stepRows[i] = row;
+        }
+        stepsFold = new Fold(head, chev, body, prefs, pref);
+    }
+
+    /** Each row: its number and name, then what it says, or what is missing. */
+    private void refreshSteps() {
+        if (stepsFold == null)
+            return;
+        final int left = stepsLeft();
+        stepsFold.label("Steps", left == 0 ? "all " + STEPS + " filled in"
+                : (STEPS - left) + " of " + STEPS + " filled in");
+        stepsFold.head.setTextColor(left == 0 ? color(R.color.state_on)
+                : color(R.color.state_off));
+        for (int i = 0; i < STEPS; i++) {
+            final int step = i + 1;
+            final boolean done = stepDone(step);
+            final SpannableStringBuilder b = new SpannableStringBuilder(
+                    step + ". " + STEP_NAMES[i]);
+            b.setSpan(new StyleSpan(Typeface.BOLD), 0, b.length(),
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            final String value = done ? stepValue(step) : stepMissing(step);
+            if (!value.isEmpty()) {
+                b.append('\n');
+                final int at = b.length();
+                b.append(value);
+                b.setSpan(new android.text.style.RelativeSizeSpan(0.85f), at, b.length(),
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+            stepRows[i].setText(b);
+            stepRows[i].setTextColor(done ? color(R.color.state_on)
+                    : color(R.color.state_off));
+        }
+    }
+
+    private boolean stepDone(int step) {
+        switch (step) {
+            case 1: return RadioScript.contact(state).complete();
+            case 2: return state.patientCount() > 0;
+            case 3: return !state.text(IwiState.NATURE).isEmpty();
+            case 4: return !state.text(IwiState.EVAC_REQUEST).isEmpty();
+            case 5: return !state.text(IwiState.CARE_ROLE).isEmpty();
+            default: return RadioScript.resources(state).complete();
+        }
+    }
+
+    private String stepValue(int step) {
+        switch (step) {
+            case 1: return RadioScript.calling(state);
+            case 2: return RadioScript.summary(state);
+            case 3: return Vocab.labels(state.text(IwiState.NATURE), Vocab.MEDICAL,
+                    Vocab.TRAUMA);
+            case 4: return Vocab.labels(state.text(IwiState.EVAC_REQUEST), Vocab.EVAC);
+            case 5: return Vocab.labels(state.text(IwiState.CARE_ROLE), Vocab.CARE);
+            default: return Vocab.labels(state.text(IwiState.RESOURCES), Vocab.RESOURCES);
+        }
+    }
+
+    private String stepMissing(int step) {
+        switch (step) {
+            case 1: return "Set your callsign in ATAK";
+            case 2: return "Count them by triage color";
+            case 3: return "Medical or trauma: pick from the list";
+            case 4: return "Air ambulance, short-haul, ground...";
+            case 5: return "None, EMT or Paramedic";
+            default: return "What you need, or None needed";
+        }
+    }
+
+    /** 0 when every step is filled in. */
+    private int firstMissing() {
+        for (int step = 1; step <= STEPS; step++)
+            if (!stepDone(step))
+                return step;
+        return 0;
+    }
+
+    private int stepsLeft() {
+        int n = 0;
+        for (int step = 1; step <= STEPS; step++)
+            if (!stepDone(step))
+                n++;
+        return n;
+    }
+
+    /** The report, opened at that step's spot. */
+    private void goToStep(int step, boolean fromDeclare) {
+        form.refresh();
+        show(reportPage);
+        form.openStep(step);
+        if (fromDeclare) {
+            final int left = stepsLeft();
+            status("Fill in the steps first: " + left + (left == 1 ? " left." : " left.")
+                    + " Then Declare.");
+        }
     }
 
     // ---- clear: Clear IWI, then a slide ----
