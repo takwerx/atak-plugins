@@ -7,6 +7,29 @@
     android:layout_height="wrap_content"
     android:orientation="vertical">
 
+    <!-- Where the IWI is shared: one Data Sync feed, or this device only. -->
+    <TextView
+        style="@style/TakwerxSectionHeading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="16dp"
+        android:text="@string/iwi_heading_sharing" />
+
+    <Button
+        android:id="@+id/iwi_btn_feed"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="13sp"
+        android:textColor="@color/white"
+        android:paddingTop="4dp"
+        android:text="@string/iwi_feed_explain" />
+
     <TextView
         style="@style/TakwerxSectionHeading"
         android:layout_width="match_parent"

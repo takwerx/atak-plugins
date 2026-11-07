@@ -110,6 +110,9 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private final TextView[] tally = new TextView[4];
     private final TextView tallyTotal;
     private final Exits exits;
+    /** The Data Sync feed the IWI's markers go to, if one is chosen. */
+    private final IwiFeed feed;
+    private final Button feedButton;
     /** Where the script page's Back goes: the main page or the report. */
     private View scriptReturn;
 
@@ -118,6 +121,8 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         @Override
         public void run() {
             updateLive();
+            // Anything that waited for the server goes out once it is back.
+            feed.flush();
             handler.postDelayed(this, TICK_MS);
         }
     };
@@ -151,6 +156,20 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         this.mapView = mapView;
         this.state = new IwiState(manager.prefs());
         this.exits = exits;
+        this.feed = new IwiFeed(mapView, manager.prefs());
+        feedButton = settingsRoot.findViewById(R.id.iwi_btn_feed);
+        feedButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                feed.choose(new IwiFeed.Then() {
+                    @Override
+                    public void done() {
+                        feedChanged();
+                    }
+                });
+            }
+        });
+        showFeed();
 
         mainPage = root.findViewById(R.id.iwi_main_page);
         mainScroll = root.findViewById(R.id.iwi_main_scroll);
@@ -454,6 +473,33 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         cancelPick();
         cancelPending();
         handler.removeCallbacks(tick);
+        feed.dispose();
+    }
+
+    private void showFeed() {
+        feedButton.setText("Data Sync Feed: " + feed.describe());
+    }
+
+    /** A feed picked or dropped: the markers go to it now, not at the next change. */
+    private void feedChanged() {
+        showFeed();
+        if (state.isLive())
+            IwiMarker.write(state);
+        final String evacUid = state.text(IwiState.EVAC_UID);
+        final GeoPoint ep = evacPoint();
+        if (!evacUid.isEmpty() && ep != null)
+            EvacMarker.write(evacUid, ep);
+        if (feed.isSet())
+            status("Sharing in " + feed.name() + ".");
+    }
+
+    /** Where the evac marker is, read off the map. */
+    private GeoPoint evacPoint() {
+        final String uid = state.text(IwiState.EVAC_UID);
+        if (uid.isEmpty())
+            return null;
+        final com.atakmap.android.maps.MapItem it = mapView.getRootGroup().deepFindUID(uid);
+        return it instanceof PointMapItem ? ((PointMapItem) it).getPoint() : null;
     }
 
     // ---- pages ----
@@ -688,6 +734,13 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         form.refresh();
         updateMain();
         if (!move) {
+            // No feed yet and a server is there: ask once whether to share it.
+            feed.askAtDeclare(new IwiFeed.Then() {
+                @Override
+                public void done() {
+                    feedChanged();
+                }
+            });
             // Declared: straight on to the initial report.
             form.openInitial();
             show(reportPage);
@@ -948,6 +1001,9 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         hideClear();
         IwiMarker.remove(mapView, state.uid());
         IwiMarker.remove(mapView, state.text(IwiState.EVAC_UID));
+        // Out of the feed too: Clear is the reporter's own act.
+        IwiFeed.withdraw(state.uid());
+        IwiFeed.withdraw(state.text(IwiState.EVAC_UID));
         state.clear();
         // Back to how a first IWI looks: every drop-down closed (operator, 2026-11-06).
         form.closeAll();

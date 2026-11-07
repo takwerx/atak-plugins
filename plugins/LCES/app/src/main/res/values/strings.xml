@@ -98,6 +98,8 @@
     <string name="iwi_heading_report">Report</string>
     <string name="iwi_heading_reference">Reference</string>
     <string name="iwi_heading_trauma_settings">IWI: Nearest Trauma Center</string>
+    <string name="iwi_heading_sharing">IWI: Sharing</string>
+    <string name="iwi_feed_explain">The IWI marker and the evac marker go to this Data Sync feed, with every update. Devices off the network get them when they are back; if this device is off, the update waits and goes out when the server is connected.</string>
     <string name="iwi_cruise_explain">The flight time on the line is straight-line distance at this speed. One number, used for every estimate.</string>
     <string name="iwi_confirm_note">Press and drag the marker to put it exactly where the patient is.</string>
     <string name="iwi_clear_title">Clear this IWI?</string>

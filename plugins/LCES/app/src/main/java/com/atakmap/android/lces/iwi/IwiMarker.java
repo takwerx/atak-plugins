@@ -116,6 +116,7 @@ public final class IwiMarker {
             return false;
         }
         CotMapComponent.getInternalDispatcher().dispatch(e);
+        IwiFeed.offer(e);
         return true;
     }
 

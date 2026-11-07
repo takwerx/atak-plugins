@@ -51,6 +51,7 @@ public final class EvacMarker {
             return false;
         }
         CotMapComponent.getInternalDispatcher().dispatch(e);
+        IwiFeed.offer(e);
         return true;
     }
 }
