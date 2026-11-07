@@ -733,6 +733,12 @@ final class ReportForm {
                     host.patientScript(n);
                 }
             }), weighted(0));
+            actions.addView(button("Transported", new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    confirmTransported(n);
+                }
+            }), weighted(dp(6)));
             actions.addView(button("Remove Patient", new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -869,13 +875,62 @@ final class ReportForm {
         cards.clear();
         // Most severe first, Reds on top, so a new Red never lands under the Greens.
         final List<Patient> list = state.patientsBySeverity();
-        if (list.isEmpty()) {
-            patientsBox.addView(guide("No patients yet. Count them in 2. Incident Status; "
-                    + "each one gets a card here for its follow-ups."));
-            return;
-        }
+        final List<Patient> gone = state.transported();
+        if (list.isEmpty())
+            patientsBox.addView(guide(gone.isEmpty()
+                    ? "No patients yet. Count them in 2. Incident Status; "
+                            + "each one gets a card here for its follow-ups."
+                    : "No patients left on scene."));
         for (Patient p : list)
             cards.put(p.n, new Card(p));
+        if (gone.isEmpty())
+            return;
+        // Off the list, not forgotten: who left and when. A tap puts one back.
+        patientsBox.addView(label("Transported"));
+        for (final Patient p : gone) {
+            final Button b = button(p.label() + " " + Patient.name(p.color) + ", "
+                    + Clock.hhmm(p.transportedMs), new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            confirmBackOnScene(p.n);
+                        }
+                    });
+            b.setTextColor(color(R.color.guide_grey));
+            final LinearLayout.LayoutParams lp = full();
+            lp.topMargin = dp(4);
+            patientsBox.addView(b, lp);
+        }
+    }
+
+    private void confirmTransported(final int n) {
+        new AlertDialog.Builder(mapView.getContext())
+                .setTitle(label(n) + " transported?")
+                .setMessage("The patient leaves the list and the counts. They are listed "
+                        + "under Transported, where a tap puts them back.")
+                .setPositiveButton("Transported", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        state.setTransported(n, System.currentTimeMillis());
+                        patientsChanged();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void confirmBackOnScene(final int n) {
+        new AlertDialog.Builder(mapView.getContext())
+                .setTitle("Put " + label(n) + " back on the list?")
+                .setMessage("For a patient marked transported by mistake.")
+                .setPositiveButton("Back on the List", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        state.setTransported(n, 0L);
+                        patientsChanged();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     /** A re-triage moves the card to its new place in the order. */

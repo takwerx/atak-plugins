@@ -217,9 +217,42 @@ public final class IwiState implements RadioScript.Source {
 
     // ---- patients ----
 
-    /** Every card, in the order they were added. */
+    /** The patients still on scene, in the order they were added. */
     @Override
     public List<Patient> patients() {
+        final List<Patient> out = new ArrayList<>();
+        for (Patient p : all())
+            if (p.transportedMs == 0)
+                out.add(p);
+        return out;
+    }
+
+    /** The patients transported off the scene, in the order they left. */
+    public List<Patient> transported() {
+        final List<Patient> out = new ArrayList<>();
+        for (Patient p : all())
+            if (p.transportedMs > 0)
+                out.add(p);
+        Collections.sort(out, new Comparator<Patient>() {
+            @Override
+            public int compare(Patient a, Patient b) {
+                return Long.compare(a.transportedMs, b.transportedMs);
+            }
+        });
+        return out;
+    }
+
+    /** Off the scene now, or back on it with 0. */
+    public void setTransported(int n, long ms) {
+        final List<Patient> list = all();
+        for (Patient p : list)
+            if (p.n == n)
+                p.transportedMs = ms;
+        save(list);
+    }
+
+    /** Every card, transported or not, in the order they were added. */
+    private List<Patient> all() {
         final List<Patient> out = new ArrayList<>();
         final String json = prefs.getString(K_PATIENTS, "");
         if (json == null || json.isEmpty())
@@ -244,6 +277,7 @@ public final class IwiState implements RadioScript.Source {
                     }
                 }
                 p.updatedMs = o.optLong("updated", 0L);
+                p.transportedMs = o.optLong("transported", 0L);
                 out.add(p);
             }
         } catch (JSONException e) {
@@ -278,6 +312,8 @@ public final class IwiState implements RadioScript.Source {
                     picks.put(e.getKey(), e.getValue());
                 o.put("v", picks);
                 o.put("updated", p.updatedMs);
+                if (p.transportedMs > 0)
+                    o.put("transported", p.transportedMs);
                 a.put(o);
             }
         } catch (JSONException e) {
@@ -289,7 +325,7 @@ public final class IwiState implements RadioScript.Source {
 
     /** A new card of this color, numbered after the highest so far. */
     public Patient addPatient(String color) {
-        final List<Patient> list = patients();
+        final List<Patient> list = all();
         int max = 0;
         for (Patient p : list)
             max = Math.max(max, p.n);
@@ -307,10 +343,10 @@ public final class IwiState implements RadioScript.Source {
      * @return the number taken away, or -1 when every card of that color has notes
      */
     public int removeNewestBlank(String color) {
-        final List<Patient> list = patients();
+        final List<Patient> list = all();
         for (int i = list.size() - 1; i >= 0; i--) {
             final Patient p = list.get(i);
-            if (p.color.equals(color) && !p.hasNotes()) {
+            if (p.transportedMs == 0 && p.color.equals(color) && !p.hasNotes()) {
                 list.remove(i);
                 save(list);
                 return p.n;
@@ -320,7 +356,7 @@ public final class IwiState implements RadioScript.Source {
     }
 
     public void removePatient(int n) {
-        final List<Patient> list = patients();
+        final List<Patient> list = all();
         for (int i = 0; i < list.size(); i++)
             if (list.get(i).n == n) {
                 list.remove(i);
@@ -330,7 +366,7 @@ public final class IwiState implements RadioScript.Source {
     }
 
     public Patient patient(int n) {
-        for (Patient p : patients())
+        for (Patient p : all())
             if (p.n == n)
                 return p;
         return null;
@@ -338,7 +374,7 @@ public final class IwiState implements RadioScript.Source {
 
     /** One field of one card: color, assessment, treatment or weight. */
     public void updatePatient(int n, String field, String value) {
-        final List<Patient> list = patients();
+        final List<Patient> list = all();
         for (Patient p : list) {
             if (p.n != n)
                 continue;
