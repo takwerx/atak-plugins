@@ -46,6 +46,9 @@ public final class IwiFeed {
     private static final String TAG = "LCES-IWI-Feed";
     private static final String K_NAME = "iwi.feed.name";
     private static final String K_SERVER = "iwi.feed.server";
+    /** The last feed picked, offered by name at the next Declare. */
+    private static final String K_LAST_NAME = "iwi.feed.lastName";
+    private static final String K_LAST_SERVER = "iwi.feed.lastServer";
     /** A UID already in the feed's contents. */
     private static final String K_PUB = "iwi.feed.pub.";
     /** The newest event for a UID that could not go out yet. */
@@ -157,22 +160,62 @@ public final class IwiFeed {
                 });
     }
 
-    /** At Declare, when no feed is set and a server is connected: one question. */
+    /**
+     * At Declare, every time a server is connected: where this IWI goes, asked right
+     * there, the FOBS way (operator, 2026-11-06). The last feed is one tap; nothing has
+     * to be set up beforehand.
+     */
     void askAtDeclare(final Then then) {
-        if (isSet() || connected().length == 0)
+        final TAKServer[] list = connected();
+        if (list.length == 0)
             return;
-        new AlertDialog.Builder(host)
-                .setTitle("Share this IWI in a Data Sync feed?")
+        final String lastName = prefs.getString(K_LAST_NAME, "");
+        final String lastServer = prefs.getString(K_LAST_SERVER, "");
+        final boolean offerLast = !lastName.isEmpty() && isConnected(lastServer);
+        final AlertDialog.Builder b = new AlertDialog.Builder(host)
+                .setTitle("Send this IWI to a Data Sync feed?")
                 .setMessage("Everyone subscribed to the feed gets the IWI and every "
                         + "update, including devices that are off the network now.")
-                .setPositiveButton("Choose Feed", new DialogInterface.OnClickListener() {
+                .setNegativeButton("This Device Only", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
-                        choose(then);
+                        setFeed("", "");
+                        then.done();
                     }
-                })
-                .setNegativeButton("This Device Only", null)
-                .show();
+                });
+        if (offerLast) {
+            b.setPositiveButton("Send to " + lastName, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface d, int w) {
+                    setFeed(lastName, lastServer);
+                    then.done();
+                }
+            });
+            b.setNeutralButton("Choose Feed", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface d, int w) {
+                    choose(then);
+                }
+            });
+        } else {
+            b.setPositiveButton("Choose Feed", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface d, int w) {
+                    choose(then);
+                }
+            });
+        }
+        b.setCancelable(false).show();
+    }
+
+    /**
+     * Before a new IWI's first marker: with a server there, the question at Declare
+     * decides, so an old choice sends nothing meanwhile. With no server, the choice in
+     * Settings stands and the marker waits for it.
+     */
+    void holdForDeclare() {
+        if (connected().length > 0)
+            prefs.edit().putString(K_NAME, "").putString(K_SERVER, "").apply();
     }
 
     private void listFeeds(final TAKServer server, final Then then) {
@@ -257,6 +300,8 @@ public final class IwiFeed {
     private void setFeed(String name, String server) {
         final SharedPreferences.Editor e = prefs.edit()
                 .putString(K_NAME, name).putString(K_SERVER, server);
+        if (!name.isEmpty())
+            e.putString(K_LAST_NAME, name).putString(K_LAST_SERVER, server);
         for (String k : prefs.getAll().keySet())
             if (k.startsWith(K_PUB) || k.startsWith(K_WAIT))
                 e.remove(k);

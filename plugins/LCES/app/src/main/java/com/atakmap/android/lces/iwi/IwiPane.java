@@ -807,6 +807,9 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         cancelPending();
         if (p == null)
             return;
+        // A new IWI goes nowhere until the question at Declare is answered.
+        if (!move)
+            feed.holdForDeclare();
         if (move)
             state.move(p, source);
         else
@@ -818,7 +821,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         form.refresh();
         updateMain();
         if (!move) {
-            // No feed yet and a server is there: ask once whether to share it.
+            // Where it goes, asked right here (FOBS way); nothing set up beforehand.
             feed.askAtDeclare(new IwiFeed.Then() {
                 @Override
                 public void done() {
