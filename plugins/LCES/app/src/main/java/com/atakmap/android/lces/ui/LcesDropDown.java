@@ -65,6 +65,12 @@ public class LcesDropDown extends DropDownReceiver implements OnStateListener {
             goWide();
     }
 
+    /** Half width, if wide: a tap on the map is next, and the map has to show. */
+    void narrow() {
+        if (isWide())
+            goNarrow();
+    }
+
     private void goWide() {
         if (!isPortrait())
             resize(FULL_WIDTH - HANDLE_THICKNESS_LANDSCAPE, FULL_HEIGHT);

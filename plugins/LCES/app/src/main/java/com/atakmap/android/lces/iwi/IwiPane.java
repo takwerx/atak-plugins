@@ -56,6 +56,9 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
 
         /** Wide or narrow. */
         void toggleWide();
+
+        /** Half width, so the map shows for a tap on it (operator, 2026-11-06). */
+        void narrow();
     }
 
     private static final String TAG = "LCES-IWI-Pane";
@@ -1003,6 +1006,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             return;
         picking = true;
         pickMoves = move;
+        exits.narrow();
         status((noFix ? "No position for My Location yet. " : "")
                 + "Tap the patient's location on the map.");
         updateMain();
@@ -1017,6 +1021,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             return;
         picking = true;
         pickEvac = true;
+        exits.narrow();
         pickMoves = false;
         form.evacPicking(true);
     }

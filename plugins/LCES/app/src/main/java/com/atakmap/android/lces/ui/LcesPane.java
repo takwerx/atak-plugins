@@ -336,6 +336,12 @@ public final class LcesPane implements PageView.Opener {
                         if (host != null)
                             host.toggleWide();
                     }
+
+                    @Override
+                    public void narrow() {
+                        if (host != null)
+                            host.narrow();
+                    }
                 });
     }
 
