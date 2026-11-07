@@ -88,10 +88,14 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private final LinearLayout scriptContainer;
     /** Steps: what the initial call needs, one row each, red until filled in. */
     private Button stepsBar;
-    /** After the call: Patients, Evac Plan, Comms, Contingency. */
-    private final Button[] followUps = new Button[4];
+    /**
+     * After the call: Patient Update, Evac Plan, Contingency. No Comms: the crew is
+     * already on the incident's channels, so it was clutter (operator, 2026-11-06); item 6
+     * is still in the report.
+     */
+    private final Button[] followUps = new Button[3];
     private static final String[] FOLLOW_UP_NAMES = {
-            "Patient Update", "Evac Plan", "Comms", "Contingency"
+            "Patient Update", "Evac Plan", "Contingency"
     };
     private View stepBoxesRow;
     private View followUpBar;
@@ -174,7 +178,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                 }
             });
             final LinearLayout.LayoutParams flp = new LinearLayout.LayoutParams(0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT, i == 3 ? 1.3f : 1f);
+                    LinearLayout.LayoutParams.WRAP_CONTENT, i == 0 ? 1.3f : 1f);
             if (i > 0)
                 flp.leftMargin = dp(4);
             fu.addView(b, flp);
@@ -744,7 +748,6 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             final boolean[] done = {
                     patientsDone(),
                     RadioScript.evacPlan(state).complete(),
-                    RadioScript.comms(state).complete(),
                     RadioScript.contingency(state).complete()
             };
             for (int i = 0; i < followUps.length; i++)
@@ -853,7 +856,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         if (which == 0)
             form.openPatients(null);
         else
-            form.openItem(which == 1 ? 4 : which == 2 ? 6 : 7);
+            form.openItem(which == 1 ? 4 : 7);
     }
 
     /** When the initial call was acknowledged, or 0 when it has not been made. */
