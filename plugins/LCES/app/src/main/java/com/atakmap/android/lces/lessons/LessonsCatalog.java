@@ -130,7 +130,7 @@ public final class LessonsCatalog {
                     : m.optJSONObject("files").optJSONObject(FILE);
             final String sha = entry == null ? "" : entry.optString("sha256", "");
             final String built = m.optString("built", "");
-            if (sha.length() != 64) {
+            if (!sha.matches("[0-9a-fA-F]{64}")) {
                 Log.w(TAG, "the depot manifest names no catalog");
                 return null;
             }
@@ -139,7 +139,10 @@ public final class LessonsCatalog {
                         + held.origin + " " + held.built);
                 return null;
             }
-            final byte[] gz = Http.get(BASE + FILE, MAX_GZ);
+            // The digest in the address: the CDN keeps a file for hours, and without
+            // it a new manifest would arrive with yesterday's catalog behind it.
+            final byte[] gz = Http.get(BASE + FILE + "?sha256=" + sha.toLowerCase(java.util.Locale.ROOT),
+                    MAX_GZ);
             if (!sha.equalsIgnoreCase(sha256(gz))) {
                 Log.w(TAG, "the depot's catalog does not match its manifest; keeping "
                         + held.origin);

@@ -281,6 +281,59 @@ def write_atomic(path, body):
     os.replace(tmp, path)
 
 
+LIVE = "https://mapdepot.takwerx.org/%s/lessons.json.gz"
+# A nightly build with far fewer incidents than the live one is a broken source,
+# not news. The plugin refuses under half; the publisher stops well before that.
+MIN_SHARE_OF_LIVE = 0.9
+
+
+def live_catalog(prefix):
+    """The published catalog, or None when there is none yet. Asked for by the
+    digest its manifest names, as the plugin does: the CDN keeps the bare file
+    for hours after an upload."""
+    import urllib.error
+    import urllib.request
+    head = {"User-Agent": "lces-lessons-build"}
+    try:
+        with urllib.request.urlopen(urllib.request.Request(
+                (LIVE % prefix)[:-3], headers=head), timeout=60) as resp:
+            sha = json.loads(resp.read())["files"]["lessons.json.gz"]["sha256"]
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        raise
+    req = urllib.request.Request("%s?sha256=%s" % (LIVE % prefix, sha), headers=head)
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return json.loads(gzip.decompress(resp.read()))
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        raise
+
+
+def worth_publishing(body, prefix):
+    """False when the live copy holds the same incidents, or when this build has
+    shrunk past MIN_SHARE_OF_LIVE. A device downloads whatever is newer, so an
+    unchanged list published every night costs every device 600 KB a day."""
+    live = live_catalog(prefix)
+    if live is None:
+        return True
+    new = json.loads(body)
+    a, b = dict(new), dict(live)
+    a.pop("built", None)
+    b.pop("built", None)
+    if a == b:
+        print("unchanged from the live copy (built %s); not published" % live.get("built"))
+        return False
+    n_new, n_live = len(new.get("incidents", [])), len(live.get("incidents", []))
+    if n_live and n_new < MIN_SHARE_OF_LIVE * n_live:
+        raise SystemExit("REFUSED: %d incidents against %d live; the source looks broken"
+                         % (n_new, n_live))
+    print("changed: %d incidents, live has %d" % (n_new, n_live))
+    return True
+
+
 def publish(out_dir, prefix):
     """Upload to R2. The catalog lands before the manifest that names its hash."""
     remote = "r2:mapdepot/%s" % prefix
@@ -400,7 +453,7 @@ def main():
         write_atomic(os.path.join(out, "lessons.json"),
                      (json.dumps(manifest, separators=(",", ":")) + "\n").encode())
         print("wrote %s (%.0f KB gzipped) and its manifest" % (out, len(gz) / 1024))
-        if args.publish:
+        if args.publish and worth_publishing(body, args.prefix):
             publish(out, args.prefix)
 
 

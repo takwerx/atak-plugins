@@ -34,7 +34,7 @@ The IRPG:
 Lessons Learned:
 
   - Burnovers, entrapments, fatalities, near misses and injuries from the
-    Wildland Fire Lessons Learned Center's incident database, about 2,270 of
+    Wildland Fire Lessons Learned Center's incident database, more than 2,300 of
     them, as a layer on the ATAK map. Tap one for what happened, a quote from
     the report, the fire behavior, and a link to the full report.
   - A list under the tiles of the incidents nearest you, nearest first.
@@ -68,7 +68,9 @@ PORTS REQUIRED
 
   Once a day, when the device has a network, the plugin reads a small JSON
   manifest from mapdepot.takwerx.org and, only if it lists a newer lessons
-  catalog, downloads it (about 600 KB). The download is checked against the
+  catalog, downloads it (about 640 KB). The server's copy is rebuilt from the
+  Lessons Learned Center's public service nightly and replaced only when the
+  incidents changed. The download is checked against the
   SHA-256 digest in the manifest and against the catalog it replaces before it
   is used.
 
@@ -114,7 +116,7 @@ DEVELOPER NOTES
   typed in by hand, so a new edition is a rerun of irpg_build.py and a read of
   the diff. NWCG publications are public domain.
 
-  The lessons layer is an ATAK feature layer, not markers: about 2,270 points
+  The lessons layer is an ATAK feature layer, not markers: over 2,300 points
   draw without slowing the map, and a filter hides sets in the feature store
   rather than deleting them, so the layer comes back after a restart with no
   network.

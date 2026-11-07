@@ -23,7 +23,7 @@ lessons other crews learned the hard way on the map, where they happened.
 
 - *The IRPG:* every page of the NWCG Incident Response Pocket Guide (PMS 461,
   January 2025), with its tables and diagrams, in the book's own section colors.
-- *Lessons Learned:* about 2,270 burnovers, entrapments, fatalities, near
+- *Lessons Learned:* more than 2,300 burnovers, entrapments, fatalities, near
   misses and injuries from the Wildland Fire Lessons Learned Center, on the map
   and in a list nearest first.
 - *One search box* for both.
@@ -227,9 +227,9 @@ ATAK's *Settings*, then *Tool Preferences*, *Specific Tool Preferences*,
 - *Lessons Learned:* the Wildland Fire Lessons Learned Center's incident
   database. *Open the full report* on an incident opens the Center's own
   report in your browser and needs a network.
-- *The list on the server* is rebuilt every night from the Center's
-  database. Your device picks up the new copy within a day when it has a
-  network, and keeps the copy it has when it does not.
+- *The list on the server* is checked against the Center's database every
+  night and updated when it changes. Your device picks up a new copy within a
+  day when it has a network, and keeps the copy it has when it does not.
 
 #v(6pt)
 
