@@ -1,5 +1,6 @@
 package com.atakmap.android.iwi.plugin;
 
+
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;

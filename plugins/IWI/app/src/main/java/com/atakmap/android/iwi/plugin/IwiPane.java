@@ -1,5 +1,6 @@
 package com.atakmap.android.iwi.plugin;
 
+
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -31,8 +32,10 @@ import java.util.Date;
 import java.util.List;
 
 /**
- * IWI's one pane: the main page, Settings, the trauma center details, the Medical
- * Incident Report and the Radio Script, by visibility swap (PLAN-IWI, "The pane").
+ * The IWI page, the trauma center details, the Medical Incident Report and the Radio
+ * Script, by visibility swap (PLAN-IWI, "The pane"). Built inside LCES 2026-11-03 to
+ * 2026-11-07 and moved back out when IWI became its own plugin again; the trauma center
+ * rows live on IWI's Settings page ({@link IwiDropDown}).
  *
  * <p>Declare walks through where the patient is (My Location, or a tap on the map),
  * confirms it, and puts one CASEVAC marker on this map. Clear is two selections, the
@@ -41,8 +44,29 @@ import java.util.List;
 public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         ReportForm.Host {
 
+    /** What IWI asks of the drop-down around it. */
+    public interface Exits {
+        /** Back from the IWI page: the pane closes. */
+        void leaveIwi();
+
+        /** The IWI page's Settings: the Settings page, whose Back comes here. */
+        void openSettings();
+
+        /** Wide or narrow. */
+        void toggleWide();
+
+        /** Half width, so the map shows for a tap on it (operator, 2026-11-06). */
+        void narrow();
+    }
+
     private static final String TAG = "IWI-Pane";
     private static final long TICK_MS = 30_000L;
+    /** Steps 1 to 6: what the initial call needs before the IWI is declared. */
+    private static final int STEPS = 6;
+    private static final String[] STEP_NAMES = {
+            "Who You Call", "Patients", "What Happened", "Evacuation Request",
+            "Medical on Scene", "Resources"
+    };
 
     private final Context ctx;
     private final MapView mapView;
@@ -51,7 +75,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private final ReportForm form;
 
     private final View mainPage;
-    private final View settingsPage;
+    private final View mainScroll;
     private final View detailsPage;
     private final View reportPage;
     private final View scriptPage;
@@ -63,11 +87,33 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private final TextView livePatients;
     private final Button moveButton;
     private final LinearLayout scriptContainer;
+    /** Steps: what the initial call needs, one row each, red until filled in. */
+    private Button stepsBar;
+    /**
+     * After the call: Patient Update, Evac Plan, Contingency. No Comms: the crew is
+     * already on the incident's channels, so it was clutter (operator, 2026-11-06); item 6
+     * is still in the report.
+     */
+    private final Button[] followUps = new Button[3];
+    private static final String[] FOLLOW_UP_NAMES = {
+            "Patient Update", "Evac Plan", "Contingency"
+    };
+    private View stepBoxesRow;
+    private View followUpBar;
+    /** 1 to 6 in the pinned bar: green filled in, red edge while missing. */
+    private final TextView[] stepBoxes = new TextView[STEPS];
+    private final Button[] stepRows = new Button[STEPS];
+    private final Button scriptButton;
     /** Red, Yellow, Green, Black: the count boxes pinned over every page. */
     private final TextView[] tally = new TextView[4];
     private final TextView tallyTotal;
-    /** Set by the plugin once the drop-down exists: opens the pane wide or narrow. */
-    private Runnable wideToggle;
+    private final Exits exits;
+    private TextView scriptTitle;
+    /** Another device's IWI being read on the script page, or null. */
+    private String viewUid;
+    /** The Data Sync feed the IWI's markers go to, if one is chosen. */
+    private final IwiFeed feed;
+    private final Button feedButton;
     /** Where the script page's Back goes: the main page or the report. */
     private View scriptReturn;
 
@@ -76,6 +122,11 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         @Override
         public void run() {
             updateLive();
+            // Someone else's IWI on screen: the newest version the marker carries.
+            if (viewUid != null && scriptPage.getVisibility() == View.VISIBLE)
+                renderView(viewUid);
+            // Anything that waited for the server goes out once it is back.
+            feed.flush();
             handler.postDelayed(this, TICK_MS);
         }
     };
@@ -87,7 +138,10 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private final View confirmBlock;
     private final TextView confirmTitle;
     private final TextView confirmWhere;
-    private final Button confirmButton;
+    private final SlideConfirm confirmSlider;
+    /** Clear IWI, asked in place: what goes, a slider, Cancel. */
+    private final View clearBlock;
+    private final SlideConfirm clearSlider;
     /** The big draggable marker shown while a location waits. */
     private final PreviewMarker preview;
     /** The report page's scroller, so the next step opens at the top. */
@@ -95,45 +149,138 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
 
     /** True while the next tap on the map is the patient's location. */
     private boolean picking;
+    /** The tap being waited for is item 4's evacuation location, not the IWI. */
+    private boolean pickEvac;
     /** Whether that pick moves a declared IWI rather than declaring one. */
     private boolean pickMoves;
 
-    public IwiPane(Context pluginContext, MapView mapView, View root, TraumaManager manager) {
+    public IwiPane(Context pluginContext, MapView mapView, View root, View settingsRoot,
+            TraumaManager manager, Exits exits) {
         this.ctx = pluginContext;
         this.mapView = mapView;
         this.state = new IwiState(manager.prefs());
-
-        mainPage = root.findViewById(R.id.main_page);
-        settingsPage = root.findViewById(R.id.settings_page);
-        detailsPage = root.findViewById(R.id.details_page);
-        reportPage = root.findViewById(R.id.report_page);
-        scriptPage = root.findViewById(R.id.script_page);
-        status = root.findViewById(R.id.status);
-        declareButton = root.findViewById(R.id.btn_declare);
-        liveBlock = root.findViewById(R.id.live_block);
-        liveTime = root.findViewById(R.id.live_time);
-        liveWhere = root.findViewById(R.id.live_where);
-        livePatients = root.findViewById(R.id.live_patients);
-        moveButton = root.findViewById(R.id.btn_move);
-        scriptContainer = root.findViewById(R.id.script_container);
-        tally[0] = root.findViewById(R.id.tally_red);
-        tally[1] = root.findViewById(R.id.tally_yellow);
-        tally[2] = root.findViewById(R.id.tally_green);
-        tally[3] = root.findViewById(R.id.tally_black);
-        tallyTotal = root.findViewById(R.id.tally_total);
-        root.findViewById(R.id.btn_wide).setOnClickListener(new View.OnClickListener() {
+        this.exits = exits;
+        this.feed = new IwiFeed(mapView, manager.prefs());
+        feedButton = settingsRoot.findViewById(R.id.iwi_btn_feed);
+        feedButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (wideToggle != null)
-                    wideToggle.run();
+                feed.choose(new IwiFeed.Then() {
+                    @Override
+                    public void done() {
+                        feedChanged();
+                    }
+                });
+            }
+        });
+        showFeed();
+
+        mainPage = root.findViewById(R.id.iwi_main_page);
+        mainScroll = root.findViewById(R.id.iwi_main_scroll);
+        detailsPage = root.findViewById(R.id.iwi_details_page);
+        reportPage = root.findViewById(R.id.iwi_report_page);
+        scriptPage = root.findViewById(R.id.iwi_script_page);
+        status = root.findViewById(R.id.iwi_status);
+        declareButton = root.findViewById(R.id.iwi_btn_declare);
+        liveBlock = root.findViewById(R.id.iwi_live_block);
+        liveTime = root.findViewById(R.id.iwi_live_time);
+        liveWhere = root.findViewById(R.id.iwi_live_where);
+        livePatients = root.findViewById(R.id.iwi_live_patients);
+        moveButton = root.findViewById(R.id.iwi_btn_move);
+        scriptContainer = root.findViewById(R.id.iwi_script_container);
+        scriptTitle = root.findViewById(R.id.iwi_script_title);
+        scriptButton = root.findViewById(R.id.iwi_btn_script);
+        stepsBar = root.findViewById(R.id.iwi_steps_bar);
+        final LinearLayout boxes = root.findViewById(R.id.iwi_steps_boxes);
+        stepBoxesRow = boxes;
+        final LinearLayout fu = root.findViewById(R.id.iwi_followup_bar);
+        followUpBar = fu;
+        for (int i = 0; i < followUps.length; i++) {
+            final int which = i;
+            final Button b = new Button(pluginContext, null, 0, R.style.TakwerxButton);
+            b.setText(FOLLOW_UP_NAMES[i]);
+            b.setTextSize(14);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    openFollowUp(which);
+                }
+            });
+            final LinearLayout.LayoutParams flp = new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, i == 0 ? 1.3f : 1f);
+            if (i > 0)
+                flp.leftMargin = dp(4);
+            fu.addView(b, flp);
+            followUps[i] = b;
+        }
+        for (int i = 0; i < STEPS; i++) {
+            final int step = i + 1;
+            final TextView box = new TextView(pluginContext);
+            box.setText(Integer.toString(step));
+            box.setTextSize(18);
+            box.setTypeface(Typeface.DEFAULT_BOLD);
+            box.setGravity(android.view.Gravity.CENTER);
+            box.setContentDescription("Step " + step + ": " + STEP_NAMES[i]);
+            box.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    goToStep(step, false);
+                }
+            });
+            final LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(dp(38),
+                    LinearLayout.LayoutParams.MATCH_PARENT);
+            if (i > 0)
+                blp.leftMargin = dp(4);
+            boxes.addView(box, blp);
+            stepBoxes[i] = box;
+        }
+        stepsBar.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                nextStep();
+            }
+        });
+        tally[0] = root.findViewById(R.id.iwi_tally_red);
+        tally[1] = root.findViewById(R.id.iwi_tally_yellow);
+        tally[2] = root.findViewById(R.id.iwi_tally_green);
+        tally[3] = root.findViewById(R.id.iwi_tally_black);
+        tallyTotal = root.findViewById(R.id.iwi_tally_total);
+        root.findViewById(R.id.iwi_btn_wide).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                IwiPane.this.exits.toggleWide();
             }
         });
         styleTally();
-        confirmBlock = root.findViewById(R.id.confirm_block);
-        confirmTitle = root.findViewById(R.id.confirm_title);
-        confirmWhere = root.findViewById(R.id.confirm_where);
-        confirmButton = root.findViewById(R.id.btn_confirm);
-        reportScroll = (View) root.findViewById(R.id.report_container).getParent();
+        for (int i = 0; i < tally.length; i++) {
+            final String c = Patient.COLORS[i];
+            tally[i].setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    openPatients(c);
+                }
+            });
+        }
+        tallyTotal.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openPatients(null);
+            }
+        });
+        confirmBlock = root.findViewById(R.id.iwi_confirm_block);
+        confirmTitle = root.findViewById(R.id.iwi_confirm_title);
+        confirmWhere = root.findViewById(R.id.iwi_confirm_where);
+        confirmSlider = new SlideConfirm(pluginContext);
+        confirmSlider.setColor(color(R.color.triage_red));
+        ((android.view.ViewGroup) root.findViewById(R.id.iwi_confirm_slider))
+                .addView(confirmSlider);
+        clearBlock = root.findViewById(R.id.iwi_clear_block);
+        clearSlider = new SlideConfirm(pluginContext);
+        clearSlider.setColor(color(R.color.state_off));
+        clearSlider.setLabel("Slide to Clear IWI");
+        ((android.view.ViewGroup) root.findViewById(R.id.iwi_clear_slider))
+                .addView(clearSlider);
+        reportScroll = (View) root.findViewById(R.id.iwi_report_container).getParent();
         preview = new PreviewMarker(mapView, new PreviewMarker.OnMoved() {
             @Override
             public void onMoved(final GeoPoint p) {
@@ -149,13 +296,27 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                 });
             }
         });
-        confirmButton.setOnClickListener(new View.OnClickListener() {
+        confirmSlider.setOnConfirmed(new SlideConfirm.OnConfirmed() {
             @Override
-            public void onClick(View v) {
+            public void onConfirmed() {
                 confirmPending();
             }
         });
-        root.findViewById(R.id.btn_confirm_cancel).setOnClickListener(
+        clearSlider.setOnConfirmed(new SlideConfirm.OnConfirmed() {
+            @Override
+            public void onConfirmed() {
+                clearNow();
+            }
+        });
+        root.findViewById(R.id.iwi_btn_clear_cancel).setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        hideClear();
+                        updateMain();
+                    }
+                });
+        root.findViewById(R.id.iwi_btn_confirm_cancel).setOnClickListener(
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
@@ -171,7 +332,10 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                 if (picking)
                     cancelPick();
                 else if (state.isLive())
-                    confirmClear();
+                    askClear();
+                else if (firstMissing() > 0)
+                    // The information first: an IWI declared without it is no use.
+                    goToStep(firstMissing(), true);
                 else
                     askWhere(false);
             }
@@ -185,7 +349,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                     askWhere(true);
             }
         });
-        root.findViewById(R.id.btn_go_iwi).setOnClickListener(new View.OnClickListener() {
+        root.findViewById(R.id.iwi_btn_go_iwi).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 final GeoPoint p = state.point();
@@ -193,45 +357,44 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                     IwiPane.this.mapView.getMapController().panTo(p, true);
             }
         });
-        root.findViewById(R.id.btn_settings).setOnClickListener(new View.OnClickListener() {
+        root.findViewById(R.id.iwi_btn_settings).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 trauma.refreshSettings();
-                show(settingsPage);
+                IwiPane.this.exits.openSettings();
             }
         });
-        root.findViewById(R.id.btn_report).setOnClickListener(new View.OnClickListener() {
+        root.findViewById(R.id.iwi_btn_main_back).setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        leave();
+                    }
+                });
+        root.findViewById(R.id.iwi_btn_report).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 form.refresh();
                 show(reportPage);
             }
         });
-        root.findViewById(R.id.btn_script).setOnClickListener(new View.OnClickListener() {
+        root.findViewById(R.id.iwi_btn_script).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                buildScript();
-                scriptReturn = mainPage;
-                show(scriptPage);
+                openScript(mainPage);
             }
         });
-        final View.OnClickListener back = new View.OnClickListener() {
+        root.findViewById(R.id.iwi_btn_script_back).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                showMain();
-            }
-        };
-        root.findViewById(R.id.btn_settings_back).setOnClickListener(back);
-        root.findViewById(R.id.btn_script_back).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
+                viewUid = null;
                 if (scriptReturn == reportPage)
                     show(reportPage);
                 else
                     showMain();
             }
         });
-        root.findViewById(R.id.btn_report_back).setOnClickListener(new View.OnClickListener() {
+        root.findViewById(R.id.iwi_btn_report_back).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 // The marker carries what the report says, for a phone without IWI.
@@ -240,44 +403,187 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                 showMain();
             }
         });
-        root.findViewById(R.id.btn_report_script).setOnClickListener(
+        root.findViewById(R.id.iwi_btn_report_script).setOnClickListener(
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
                         if (state.isLive())
                             IwiMarker.write(state);
-                        buildScript();
-                        scriptReturn = reportPage;
-                        show(scriptPage);
+                        openScript(reportPage);
                     }
                 });
 
         form = new ReportForm(pluginContext, mapView, state, manager.prefs(),
-                (LinearLayout) root.findViewById(R.id.report_container), this);
-        trauma = new TraumaPane(mapView, root, manager, this, this);
+                (LinearLayout) root.findViewById(R.id.iwi_report_container), this);
+        trauma = new TraumaPane(mapView, root, settingsRoot, manager, this, this);
+        buildSteps((LinearLayout) root.findViewById(R.id.iwi_steps_block), manager);
         updateMain();
         handler.postDelayed(tick, TICK_MS);
     }
 
-    /** The pane opens on the main page every time. */
-    public void onShown() {
-        showMain();
+    /** Whether a tapped map item is this device's IWI marker or the waiting preview. */
+    public static boolean isOurs(TraumaManager manager, String uid) {
+        if (uid == null)
+            return false;
+        final IwiState state = new IwiState(manager.prefs());
+        return PreviewMarker.UID.equals(uid) || (state.isLive() && state.uid().equals(uid));
     }
 
-    public void setWideToggle(Runnable r) {
-        wideToggle = r;
+    /** The IWI tile, or a tap on this device's IWI marker: the IWI page, current. */
+    public void open() {
+        showMain();
+        mainScroll.scrollTo(0, 0);
+    }
+
+    /**
+     * Back: a page of IWI's goes to the IWI page, the way its own Back button does;
+     * the IWI page answers false, and the drop-down closes.
+     */
+    public boolean back() {
+        if (reportPage.getVisibility() == View.VISIBLE) {
+            if (state.isLive())
+                IwiMarker.write(state);
+            showMain();
+        } else if (scriptPage.getVisibility() == View.VISIBLE) {
+            if (scriptReturn == reportPage)
+                show(reportPage);
+            else
+                showMain();
+        } else if (detailsPage.getVisibility() == View.VISIBLE) {
+            showMain();
+        } else {
+            onClosed();
+            return false;
+        }
+        return true;
+    }
+
+    /** Closing: a pick or a waiting location lets go of the map. */
+    private void leave() {
+        onClosed();
+        exits.leaveIwi();
+    }
+
+    /** Settings changed the cruise speed or fetched the data. */
+    public void refreshSettings() {
+        trauma.refreshSettings();
+        trauma.refresh();
     }
 
     /** The pane closed: a pick in progress lets go of the map. */
     public void onClosed() {
         cancelPick();
         cancelPending();
+        hideClear();
     }
 
     public void dispose() {
         cancelPick();
         cancelPending();
         handler.removeCallbacks(tick);
+        feed.dispose();
+    }
+
+    // ---- another device's IWI, read only ----
+
+    /** Whether a map item is an IWI from a device with IWI: it carries the report. */
+    public static boolean carriesReport(MapItem item) {
+        return item != null && item.getMetaString("iwi.report", null) != null;
+    }
+
+    /**
+     * Someone else's IWI: everything they entered, read only (operator, 2026-11-06).
+     * Only the reporter changes it; this page follows each update the feed brings.
+     */
+    public void openView(String uid) {
+        if (!renderView(uid))
+            return;
+        scriptReturn = mainPage;
+        show(scriptPage);
+        scriptToTop();
+    }
+
+    private boolean renderView(String uid) {
+        final MapItem item = mapView.getRootGroup().deepFindUID(uid);
+        final String json = item == null ? null : item.getMetaString("iwi.report", null);
+        if (json == null)
+            return false;
+        viewUid = uid;
+        final android.content.SharedPreferences vp = mapView.getContext()
+                .getSharedPreferences("iwi_view", Context.MODE_PRIVATE);
+        IwiState.importJson(vp, json);
+        final IwiState v = new IwiState(vp);
+        scriptTitle.setText("IWI: Read Only");
+        scriptContainer.removeAllViews();
+        scriptContainer.addView(note("Reported by " + (v.callsign().isEmpty() ? "another device"
+                : v.callsign()) + ". Read only: only the reporter changes it. It updates "
+                + "here as they do."));
+
+        final int red = v.count(IwiState.RED), yellow = v.count(IwiState.YELLOW);
+        final int green = v.count(IwiState.GREEN), black = v.count(IwiState.BLACK);
+        scriptContainer.addView(line("Red " + red + "   Yellow " + yellow + "   Green " + green
+                + "   Black " + black + "   Total " + v.patientCount(), 18, Color.WHITE));
+        final StringBuilder when = new StringBuilder();
+        if (v.declaredMs() > 0)
+            when.append("Declared ").append(Clock.hhmm(v.declaredMs()));
+        long reported = 0;
+        try {
+            reported = Long.parseLong(v.text(IwiState.REPORTED));
+        } catch (NumberFormatException ignored) {
+        }
+        if (reported > 0)
+            when.append(when.length() > 0 ? ", " : "").append("initial report made ")
+                    .append(Clock.hhmm(reported));
+        if (when.length() > 0)
+            scriptContainer.addView(note(when.toString()));
+
+        final GeoPoint p = v.point();
+        final String coords = p == null ? null : Coords.ddm(p.getLatitude(), p.getLongitude());
+        scriptContainer.addView(heading("Report"));
+        final String report = RadioScript.remarks(v, coords);
+        if (report.isEmpty())
+            scriptContainer.addView(note("Nothing filled in yet."));
+        for (String row : report.split("\n")) {
+            if (row.trim().isEmpty())
+                continue;
+            final TextView t = line(row, 16, Color.WHITE);
+            t.setPadding(0, dp(6), 0, dp(2));
+            scriptContainer.addView(t);
+        }
+        final List<Patient> gone = v.transported();
+        if (!gone.isEmpty()) {
+            scriptContainer.addView(heading("Transported"));
+            for (Patient g : gone)
+                scriptContainer.addView(note(g.label() + " " + Patient.name(g.color) + ", "
+                        + Clock.hhmm(g.transportedMs)));
+        }
+        return true;
+    }
+
+    private void showFeed() {
+        feedButton.setText("Data Sync Feed: " + feed.describe());
+    }
+
+    /** A feed picked or dropped: the markers go to it now, not at the next change. */
+    private void feedChanged() {
+        showFeed();
+        if (state.isLive())
+            IwiMarker.write(state);
+        final String evacUid = state.text(IwiState.EVAC_UID);
+        final GeoPoint ep = evacPoint();
+        if (!evacUid.isEmpty() && ep != null)
+            EvacMarker.write(evacUid, ep);
+        if (feed.isSet())
+            status("Sharing in " + feed.name() + ".");
+    }
+
+    /** Where the evac marker is, read off the map. */
+    private GeoPoint evacPoint() {
+        final String uid = state.text(IwiState.EVAC_UID);
+        if (uid.isEmpty())
+            return null;
+        final com.atakmap.android.maps.MapItem it = mapView.getRootGroup().deepFindUID(uid);
+        return it instanceof PointMapItem ? ((PointMapItem) it).getPoint() : null;
     }
 
     // ---- pages ----
@@ -288,7 +594,6 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         if (page != mainPage && !picking)
             status(null);
         mainPage.setVisibility(page == mainPage ? View.VISIBLE : View.GONE);
-        settingsPage.setVisibility(page == settingsPage ? View.VISIBLE : View.GONE);
         detailsPage.setVisibility(page == detailsPage ? View.VISIBLE : View.GONE);
         reportPage.setVisibility(page == reportPage ? View.VISIBLE : View.GONE);
         scriptPage.setVisibility(page == scriptPage ? View.VISIBLE : View.GONE);
@@ -357,6 +662,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     @Override
     public void countsChanged() {
         refreshTally();
+        refreshSteps();
     }
 
     private void refreshTally() {
@@ -374,22 +680,39 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private void updateMain() {
         refreshTally();
         final boolean live = state.isLive();
-        if (picking) {
+        if (picking && !pickEvac) {
             // The button that started the pick is the one that stops it.
             (pickMoves ? moveButton : declareButton).setText("Cancel");
             (pickMoves ? moveButton : declareButton).setTextColor(color(R.color.amber));
         }
-        if (!picking || pickMoves) {
-            declareButton.setText(live ? "Clear IWI" : "Declare IWI");
-            declareButton.setTextColor(live ? color(R.color.state_off) : Color.WHITE);
+        final int left = stepsLeft();
+        if (!picking || pickEvac || pickMoves) {
+            if (live) {
+                declareButton.setText("Clear IWI");
+                declareButton.setTextColor(color(R.color.state_off));
+            } else if (left > 0) {
+                declareButton.setText("Declare IWI: " + left
+                        + (left == 1 ? " step left" : " steps left"));
+                declareButton.setTextColor(color(R.color.guide_grey));
+            } else {
+                declareButton.setText("Declare IWI");
+                declareButton.setTextColor(Color.WHITE);
+            }
         }
-        if (!picking || !pickMoves) {
-            moveButton.setText("Change location");
+        refreshSteps();
+        // Declared with every step filled in: the call is next, until it is made.
+        scriptButton.setTextColor(live && left == 0 && reportedMs() == 0
+                ? color(R.color.state_on) : Color.WHITE);
+        if (!picking || pickEvac || !pickMoves) {
+            moveButton.setText("Change Location");
             moveButton.setTextColor(Color.WHITE);
         }
         // While a location waits, the confirm above is the only Declare on the page.
         final boolean waiting = pendingPoint != null;
-        declareButton.setVisibility(waiting ? View.GONE : View.VISIBLE);
+        if (!live)
+            hideClear();
+        final boolean clearing = clearBlock.getVisibility() == View.VISIBLE;
+        declareButton.setVisibility(waiting || clearing ? View.GONE : View.VISIBLE);
         moveButton.setEnabled(!waiting);
         liveBlock.setVisibility(live ? View.VISIBLE : View.GONE);
         updateLive();
@@ -401,11 +724,13 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             return;
         final long at = state.declaredMs();
         final String clock = Clock.hhmm(at);
-        liveTime.setText("Declared " + clock + ", " + ago(System.currentTimeMillis() - at));
+        final long made = reportedMs();
+        liveTime.setText("Declared " + clock + ", " + ago(System.currentTimeMillis() - at)
+                + (made > 0 ? "\nInitial report made " + Clock.hhmm(made) : ""));
         final GeoPoint p = state.point();
         liveWhere.setText(Coords.ddm(p.getLatitude(), p.getLongitude()) + "\n"
                 + (IwiState.SOURCE_MAP.equals(state.source())
-                        ? "Set on the map" : "My Location when declared"));
+                        ? "Set on the map" : "My Location at the time"));
         final String who = RadioScript.summary(state);
         livePatients.setText(who.isEmpty() ? "No patients counted yet" : who);
     }
@@ -454,13 +779,15 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         // A map tap is already in view; My Location may not be.
         if (IwiState.SOURCE_SELF.equals(source))
             mapView.getMapController().panTo(p, true);
-        confirmTitle.setText(move ? "Move the IWI here?" : "Declare the IWI here?");
+        confirmTitle.setText(move ? "Move the IWI here?" : "Confirm the IWI location");
         showWhere();
-        confirmButton.setText(move ? "Move IWI" : "Declare IWI");
+        confirmSlider.setLabel(move ? "Slide to Move IWI" : "Slide to Confirm IWI");
+        confirmSlider.reset();
+        hideClear();
         confirmBlock.setVisibility(View.VISIBLE);
         status(null);
         show(mainPage);
-        mainPage.scrollTo(0, 0);
+        mainScroll.scrollTo(0, 0);
         updateMain();
     }
 
@@ -480,6 +807,9 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         cancelPending();
         if (p == null)
             return;
+        // A new IWI goes nowhere until the question at Declare is answered.
+        if (!move)
+            feed.holdForDeclare();
         if (move)
             state.move(p, source);
         else
@@ -491,6 +821,13 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         form.refresh();
         updateMain();
         if (!move) {
+            // Where it goes, asked right here (FOBS way); nothing set up beforehand.
+            feed.askAtDeclare(new IwiFeed.Then() {
+                @Override
+                public void done() {
+                    feedChanged();
+                }
+            });
             // Declared: straight on to the initial report.
             form.openInitial();
             show(reportPage);
@@ -516,28 +853,252 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         confirmBlock.setVisibility(View.GONE);
     }
 
-    // ---- clear: two selections ----
+    // ---- steps: the information first, then Declare, then the call ----
 
-    private void confirmClear() {
-        new AlertDialog.Builder(mapView.getContext())
-                .setTitle("Clear this IWI?")
-                .setMessage("This removes the IWI marker from your map and erases the "
-                        + "patient details in the report on this phone.\n\n"
-                        + "Who you call and the frequencies (items 1 and 6) are kept for "
-                        + "the next one.\n\n"
-                        + "It does not remove the marker from anyone you sent it to.")
-                .setPositiveButton("Clear IWI", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        IwiMarker.remove(mapView, state.uid());
-                        state.clear();
-                        form.refresh();
-                        status("IWI cleared.");
-                        updateMain();
-                    }
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+    private void buildSteps(LinearLayout body, TraumaManager manager) {
+        for (int i = 0; i < STEPS; i++) {
+            final int step = i + 1;
+            final Button row = new Button(ctx, null, 0, R.style.TakwerxButton);
+            row.setGravity(android.view.Gravity.START | android.view.Gravity.CENTER_VERTICAL);
+            row.setSingleLine(false);
+            row.setMaxLines(2);
+            row.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    goToStep(step, false);
+                }
+            });
+            final LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            rlp.topMargin = dp(4);
+            body.addView(row, rlp);
+            stepRows[i] = row;
+        }
+    }
+
+    /** Each row: its number and name, then what it says, or what is missing. */
+    private void refreshSteps() {
+        if (stepRows[0] == null)
+            return;
+        final int left = stepsLeft();
+        final int first = firstMissing();
+        final long reported = state.isLive() ? reportedMs() : 0L;
+        // The call is made: the six steps are done with; the follow-ups take their place.
+        stepBoxesRow.setVisibility(reported > 0 ? View.GONE : View.VISIBLE);
+        stepsBar.setVisibility(reported > 0 ? View.GONE : View.VISIBLE);
+        followUpBar.setVisibility(reported > 0 ? View.VISIBLE : View.GONE);
+        ((View) stepRows[0].getParent()).setVisibility(reported > 0 ? View.GONE : View.VISIBLE);
+        if (reported > 0) {
+            final boolean[] done = {
+                    patientsDone(),
+                    RadioScript.evacPlan(state).complete(),
+                    RadioScript.contingency(state).complete()
+            };
+            for (int i = 0; i < followUps.length; i++)
+                followUps[i].setTextColor(done[i] ? color(R.color.state_on)
+                        : color(R.color.state_off));
+        } else {
+            final String next = first > 0 ? first + ". " + STEP_NAMES[first - 1]
+                    : !state.isLive() ? "Declare IWI" : "Radio Script";
+            // The count done in green, the way the boxes beside it are (operator,
+            // 2026-11-06).
+            final SpannableStringBuilder t = new SpannableStringBuilder(
+                    Integer.toString(STEPS - left));
+            if (STEPS - left > 0)
+                t.setSpan(new ForegroundColorSpan(color(R.color.state_on)), 0, t.length(),
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            t.append(" of " + STEPS + "   Next: " + next);
+            stepsBar.setText(t);
+        }
+        stepsBar.setTextColor(left == 0 ? color(R.color.state_on) : Color.WHITE);
+        for (int i = 0; i < STEPS; i++) {
+            final boolean done = stepDone(i + 1);
+            final android.graphics.drawable.GradientDrawable box =
+                    new android.graphics.drawable.GradientDrawable();
+            box.setCornerRadius(dp(4));
+            if (done) {
+                box.setColor(color(R.color.state_on));
+                stepBoxes[i].setTextColor(Color.BLACK);
+            } else {
+                box.setColor(0xFF1E1E1E);
+                box.setStroke(dp(2), color(R.color.state_off));
+                stepBoxes[i].setTextColor(color(R.color.state_off));
+            }
+            stepBoxes[i].setBackground(box);
+        }
+        for (int i = 0; i < STEPS; i++) {
+            final int step = i + 1;
+            final boolean done = stepDone(step);
+            final SpannableStringBuilder b = new SpannableStringBuilder(
+                    step + ". " + STEP_NAMES[i]);
+            b.setSpan(new StyleSpan(Typeface.BOLD), 0, b.length(),
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            final String value = done ? stepValue(step) : stepMissing(step);
+            if (!value.isEmpty()) {
+                b.append('\n');
+                final int at = b.length();
+                b.append(value);
+                b.setSpan(new android.text.style.RelativeSizeSpan(0.85f), at, b.length(),
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+            stepRows[i].setText(b);
+            stepRows[i].setTextColor(done ? color(R.color.state_on)
+                    : color(R.color.state_off));
+        }
+    }
+
+    private boolean stepDone(int step) {
+        switch (step) {
+            case 1: return RadioScript.contact(state).complete();
+            case 2: return state.patientCount() > 0;
+            case 3: return !state.text(IwiState.NATURE).isEmpty();
+            case 4: return !state.text(IwiState.EVAC_REQUEST).isEmpty();
+            case 5: return !state.text(IwiState.CARE_ROLE).isEmpty();
+            default: return RadioScript.resources(state).complete();
+        }
+    }
+
+    private String stepValue(int step) {
+        switch (step) {
+            case 1: return RadioScript.calling(state);
+            case 2: return RadioScript.summary(state);
+            case 3: return Vocab.labels(state.text(IwiState.NATURE), Vocab.MEDICAL,
+                    Vocab.TRAUMA);
+            case 4: return RadioScript.evacLabels(state);
+            case 5: return Vocab.labels(state.text(IwiState.CARE_ROLE), Vocab.CARE);
+            default: return Vocab.labels(state.text(IwiState.RESOURCES), Vocab.RESOURCES);
+        }
+    }
+
+    private String stepMissing(int step) {
+        switch (step) {
+            case 1: return Vocab.CONTACT.index(state.text(IwiState.CONTACT_TO)) < 0
+                    ? "Communications or Dispatch" : "Set your callsign in ATAK";
+            case 2: return "Count them by triage color";
+            case 3: return "Medical or trauma: pick from the list";
+            case 4: return "Air ambulance, short-haul, ground...";
+            case 5: return "None, EMT or Paramedic";
+            default: return "What you need, or None needed";
+        }
+    }
+
+    /** Every patient's card filled in, and at least one patient. */
+    private boolean patientsDone() {
+        final List<Patient> list = state.patients();
+        if (list.isEmpty())
+            return false;
+        for (Patient p : list)
+            if (!RadioScript.patient(state, p).complete())
+                return false;
+        return true;
+    }
+
+    private void openFollowUp(int which) {
+        if (pendingPoint != null || picking)
+            return;
+        form.refresh();
+        show(reportPage);
+        if (which == 0)
+            form.openPatients(null);
+        else
+            form.openItem(which == 1 ? 4 : 7);
+    }
+
+    /** When the initial call was acknowledged, or 0 when it has not been made. */
+    private long reportedMs() {
+        try {
+            return Long.parseLong(state.text(IwiState.REPORTED));
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
+    }
+
+    /** 0 when every step is filled in. */
+    private int firstMissing() {
+        for (int step = 1; step <= STEPS; step++)
+            if (!stepDone(step))
+                return step;
+        return 0;
+    }
+
+    private int stepsLeft() {
+        int n = 0;
+        for (int step = 1; step <= STEPS; step++)
+            if (!stepDone(step))
+                n++;
+        return n;
+    }
+
+    /** The pinned bar: the first missing step, else Declare, else the call. */
+    private void nextStep() {
+        final int first = firstMissing();
+        if (first > 0) {
+            goToStep(first, false);
+        } else if (!state.isLive()) {
+            showMain();
+            mainScroll.scrollTo(0, 0);
+            if (!picking && pendingPoint == null)
+                askWhere(false);
+        } else if (reportedMs() > 0) {
+            // Made: what comes next is the follow-ups, in the report.
+            form.refresh();
+            show(reportPage);
+        } else {
+            openScript(mainPage);
+        }
+    }
+
+    /** A count box: the report at that color's patients, or all of them for Total. */
+    private void openPatients(String color) {
+        if (pendingPoint != null || picking)
+            return;
+        form.refresh();
+        show(reportPage);
+        form.openPatients(color);
+    }
+
+    /** The report, opened at that step's spot. */
+    private void goToStep(int step, boolean fromDeclare) {
+        form.refresh();
+        show(reportPage);
+        form.openStep(step);
+        if (fromDeclare) {
+            final int left = stepsLeft();
+            status("Fill in the steps first: " + left + (left == 1 ? " left." : " left.")
+                    + " Then Declare.");
+        }
+    }
+
+    // ---- clear: Clear IWI, then a slide ----
+
+    private void askClear() {
+        clearSlider.reset();
+        clearBlock.setVisibility(View.VISIBLE);
+        status(null);
+        updateMain();
+        mainScroll.scrollTo(0, 0);
+    }
+
+    private void hideClear() {
+        clearBlock.setVisibility(View.GONE);
+    }
+
+    private void clearNow() {
+        hideClear();
+        IwiMarker.remove(mapView, state.uid());
+        IwiMarker.remove(mapView, state.text(IwiState.EVAC_UID));
+        // Out of the feed too: Clear is the reporter's own act.
+        IwiFeed.withdraw(state.uid());
+        IwiFeed.withdraw(state.text(IwiState.EVAC_UID));
+        state.clear();
+        // Back to how a first IWI looks: every drop-down closed (operator, 2026-11-06).
+        form.closeAll();
+        trauma.closeFold();
+        form.refresh();
+        reportScroll.scrollTo(0, 0);
+        status("IWI cleared.");
+        updateMain();
     }
 
     // ---- a tap on the map ----
@@ -567,11 +1128,15 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                         return;
                     final GeoPoint chosen = new GeoPoint(gp.getLatitude(), gp.getLongitude());
                     final boolean move = pickMoves;
+                    final boolean evac = pickEvac;
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
                             endPick();
-                            placePending(chosen, IwiState.SOURCE_MAP, move);
+                            if (evac)
+                                setEvac(chosen);
+                            else
+                                placePending(chosen, IwiState.SOURCE_MAP, move);
                         }
                     });
                 }
@@ -580,6 +1145,50 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private void beginPick(boolean move, boolean noFix) {
         if (picking)
             return;
+        if (!takeMap())
+            return;
+        picking = true;
+        pickMoves = move;
+        exits.narrow();
+        status((noFix ? "No position for My Location yet. " : "")
+                + "Tap the patient's location on the map.");
+        updateMain();
+    }
+
+    /** Item 4's Pick on Map: the next tap is the evacuation location. */
+    @Override
+    public void pickEvac() {
+        if (picking || pendingPoint != null)
+            return;
+        if (!takeMap())
+            return;
+        picking = true;
+        pickEvac = true;
+        exits.narrow();
+        pickMoves = false;
+        form.evacPicking(true);
+    }
+
+    @Override
+    public void cancelEvacPick() {
+        endPick();
+    }
+
+    /** The evac spot: its lat/long in item 4 and a marker on the map, moved if set. */
+    private void setEvac(GeoPoint p) {
+        String uid = state.text(IwiState.EVAC_UID);
+        if (uid.isEmpty()) {
+            uid = java.util.UUID.randomUUID().toString();
+            state.set(IwiState.EVAC_UID, uid);
+        }
+        state.set(IwiState.EVAC_LOCATION, Coords.ddm(p.getLatitude(), p.getLongitude()));
+        EvacMarker.write(uid, p);
+        if (state.isLive())
+            IwiMarker.write(state);
+        form.refresh();
+    }
+
+    private boolean takeMap() {
         try {
             final MapEventDispatcher d = mapView.getMapEventDispatcher();
             d.pushListeners();
@@ -589,21 +1198,21 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             d.addMapEventListener(MapEvent.MAP_CLICK, pickListener);
             d.addMapEventListener(MapEvent.ITEM_CLICK, pickListener);
             mapView.getMapTouchController().setToolActive(true);
+            return true;
         } catch (RuntimeException e) {
             Log.w(TAG, "could not take the map for a tap", e);
-            return;
+            return false;
         }
-        picking = true;
-        pickMoves = move;
-        status((noFix ? "No position for My Location yet. " : "")
-                + "Tap the patient's location on the map.");
-        updateMain();
     }
 
     private void endPick() {
         if (!picking)
             return;
         picking = false;
+        if (pickEvac) {
+            pickEvac = false;
+            form.evacPicking(false);
+        }
         try {
             mapView.getMapEventDispatcher().popListeners();
             mapView.getMapTouchController().setToolActive(false);
@@ -622,6 +1231,28 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     }
 
     // ---- the radio scripts ----
+
+    /** The Radio Script, rebuilt and always from its first line: it is read top down. */
+    private void openScript(View returnTo) {
+        viewUid = null;
+        scriptTitle.setText(R.string.iwi_radio_script);
+        buildScript();
+        scriptReturn = returnTo;
+        show(scriptPage);
+        scriptToTop();
+    }
+
+    /** A script is read top down, so it always opens at its first line. */
+    private void scriptToTop() {
+        final View sv = (View) scriptContainer.getParent();
+        sv.scrollTo(0, 0);
+        sv.post(new Runnable() {
+            @Override
+            public void run() {
+                sv.scrollTo(0, 0);
+            }
+        });
+    }
 
     /** The Radio Script page: the initial report, then whatever the follow-ups say. */
     private void buildScript() {
@@ -642,6 +1273,42 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             anyMissing |= render(more);
         }
         finishScript(anyMissing);
+        addReportedSlider();
+    }
+
+    /**
+     * The end of the script: "I made the call" (operator, 2026-11-06). Slid once the
+     * initial report is acknowledged; the time is kept and the Steps bar stops pointing
+     * at the Radio Script.
+     */
+    private void addReportedSlider() {
+        if (!state.isLive())
+            return;
+        final long reported = reportedMs();
+        if (reported > 0) {
+            final TextView done = line("Initial report made " + Clock.hhmm(reported) + ".",
+                    16, color(R.color.state_on));
+            done.setTypeface(Typeface.DEFAULT_BOLD);
+            scriptContainer.addView(done);
+            return;
+        }
+        scriptContainer.addView(heading("When the call is acknowledged"));
+        final SlideConfirm slider = new SlideConfirm(ctx);
+        slider.setColor(color(R.color.state_on));
+        slider.setLabel("Slide: Initial Report Made");
+        slider.setOnConfirmed(new SlideConfirm.OnConfirmed() {
+            @Override
+            public void onConfirmed() {
+                state.set(IwiState.REPORTED, Long.toString(System.currentTimeMillis()));
+                showMain();
+                status("Initial report made " + Clock.hhmm(reportedMs()) + ".");
+            }
+        });
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(8);
+        lp.bottomMargin = dp(8);
+        scriptContainer.addView(slider, lp);
     }
 
     /** One patient's follow-up, from its card's Radio update. */
@@ -652,6 +1319,8 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         final Patient patient = state.patient(n);
         if (patient == null)
             return;
+        viewUid = null;
+        scriptTitle.setText(R.string.iwi_radio_script);
         scriptContainer.removeAllViews();
         scriptContainer.addView(note(ctx.getString(R.string.script_how)));
         scriptContainer.addView(heading("Update: " + patient.label()));
@@ -664,6 +1333,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         finishScript(render(list));
         scriptReturn = reportPage;
         show(scriptPage);
+        scriptToTop();
     }
 
     /** @return whether anything in them is not filled in */

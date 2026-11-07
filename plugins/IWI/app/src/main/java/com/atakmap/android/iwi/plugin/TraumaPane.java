@@ -1,5 +1,6 @@
 package com.atakmap.android.iwi.plugin;
 
+
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
@@ -51,12 +52,19 @@ public final class TraumaPane implements TraumaManager.Listener {
     private final Pages pages;
 
     private final Fold fold;
+
+    /** After Clear: the trauma center row closed again. */
+    void closeFold() {
+        fold.setOpen(false);
+    }
     private final TextView line1;
     private final TextView line2;
     private final TextView note;
     private final Button speedButton;
     private final TextView dataDetail;
     private final Button downloadButton;
+    /** The download's progress and result, under the button that started it. */
+    private final TextView dataResult;
     private final TextView detailsTitle;
     private final TextView detailsSubtitle;
     private final TextView detailsBody;
@@ -67,27 +75,28 @@ public final class TraumaPane implements TraumaManager.Listener {
     private TraumaFinder.Result better;
     private TraumaFinder.Result showing;
 
-    public TraumaPane(MapView mapView, View root, TraumaManager manager, PointSource source,
-            Pages pages) {
+    public TraumaPane(MapView mapView, View root, View settingsRoot, TraumaManager manager,
+            PointSource source, Pages pages) {
         this.mapView = mapView;
         this.manager = manager;
         this.source = source;
         this.pages = pages;
         final SharedPreferences prefs = manager.prefs();
 
-        fold = new Fold(root, R.id.fold_trauma_head, R.id.fold_trauma_chev,
-                R.id.fold_trauma_body, prefs, "iwi.fold.trauma");
-        line1 = root.findViewById(R.id.trauma_line1);
-        line2 = root.findViewById(R.id.trauma_line2);
-        note = root.findViewById(R.id.trauma_note);
-        speedButton = root.findViewById(R.id.btn_cruise_speed);
-        dataDetail = root.findViewById(R.id.data_detail);
-        downloadButton = root.findViewById(R.id.btn_download);
-        detailsTitle = root.findViewById(R.id.details_title);
-        detailsSubtitle = root.findViewById(R.id.details_subtitle);
-        detailsBody = root.findViewById(R.id.details_body);
+        fold = new Fold(root, R.id.iwi_fold_trauma_head, R.id.iwi_fold_trauma_chev,
+                R.id.iwi_fold_trauma_body, prefs, "iwi.fold.trauma");
+        line1 = root.findViewById(R.id.iwi_trauma_line1);
+        line2 = root.findViewById(R.id.iwi_trauma_line2);
+        note = root.findViewById(R.id.iwi_trauma_note);
+        speedButton = settingsRoot.findViewById(R.id.iwi_btn_cruise_speed);
+        dataDetail = settingsRoot.findViewById(R.id.iwi_data_detail);
+        downloadButton = settingsRoot.findViewById(R.id.iwi_btn_download);
+        dataResult = settingsRoot.findViewById(R.id.iwi_data_result);
+        detailsTitle = root.findViewById(R.id.iwi_details_title);
+        detailsSubtitle = root.findViewById(R.id.iwi_details_subtitle);
+        detailsBody = root.findViewById(R.id.iwi_details_body);
 
-        root.findViewById(R.id.btn_details_back).setOnClickListener(
+        root.findViewById(R.id.iwi_btn_details_back).setOnClickListener(
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
@@ -95,7 +104,7 @@ public final class TraumaPane implements TraumaManager.Listener {
                         TraumaPane.this.pages.showMain();
                     }
                 });
-        root.findViewById(R.id.btn_go_to).setOnClickListener(new View.OnClickListener() {
+        root.findViewById(R.id.iwi_btn_go_to).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 if (showing != null)
@@ -127,15 +136,16 @@ public final class TraumaPane implements TraumaManager.Listener {
             @Override
             public void onClick(View v) {
                 downloadButton.setEnabled(false);
+                showResult("Downloading trauma center data...");
                 TraumaPane.this.pages.status("Downloading trauma center data...");
                 TraumaPane.this.manager.download();
             }
         });
 
-        speedFold = new Fold(root, R.id.fold_speed_head, R.id.fold_speed_chev,
-                R.id.fold_speed_body, prefs, "iwi.fold.speed");
-        dataFold = new Fold(root, R.id.fold_data_head, R.id.fold_data_chev,
-                R.id.fold_data_body, prefs, "iwi.fold.data");
+        speedFold = new Fold(settingsRoot, R.id.iwi_fold_speed_head, R.id.iwi_fold_speed_chev,
+                R.id.iwi_fold_speed_body, prefs, "iwi.fold.speed");
+        dataFold = new Fold(settingsRoot, R.id.iwi_fold_data_head, R.id.iwi_fold_data_chev,
+                R.id.iwi_fold_data_body, prefs, "iwi.fold.data");
 
         manager.setListener(this);
         refresh();
@@ -153,27 +163,27 @@ public final class TraumaPane implements TraumaManager.Listener {
         line2.setVisibility(View.GONE);
 
         if (centers == null || centers.isEmpty()) {
-            fold.label("Nearest trauma center", "no data on this phone");
-            line1.setText("No trauma center data on this phone");
-            note.setText(manager.busy() ? "Downloading..." : "Settings > Trauma center data");
+            fold.label("Nearest Trauma Center", "no data on this device");
+            line1.setText("No trauma center data on this device");
+            note.setText(manager.busy() ? "Downloading..." : "Settings > Trauma Center Data");
             return;
         }
         if (from == null) {
-            fold.label("Nearest trauma center", "no position yet");
+            fold.label("Nearest Trauma Center", "no position yet");
             line1.setText("No position yet");
             note.setText("Needs a declared IWI or a GPS fix.");
             return;
         }
         first = TraumaFinder.nearest(centers, from);
         if (first == null) {
-            fold.label("Nearest trauma center",
+            fold.label("Nearest Trauma Center",
                     "none within " + Units.distance(TraumaFinder.CAP_M));
             line1.setText("None within " + Units.distance(TraumaFinder.CAP_M) + " "
                     + source.label());
             note.setText(estimateNote());
             return;
         }
-        fold.label("Nearest trauma center", first.center.levelLabel() + ", "
+        fold.label("Nearest Trauma Center", first.center.levelLabel() + ", "
                 + Units.distance(first.meters) + " " + cardinal(first.bearing));
         line1.setText(lineText(first));
         better = TraumaFinder.nearestBetter(centers, from, first.center.level);
@@ -295,15 +305,21 @@ public final class TraumaPane implements TraumaManager.Listener {
     // ---- settings ----
 
     public void refreshSettings() {
-        speedFold.label("Helicopter cruise speed", manager.cruiseKt() + " kt");
+        speedFold.label("Helicopter Cruise Speed", manager.cruiseKt() + " kt");
         speedButton.setText(manager.cruiseKt() + " kt");
         final TraumaPack.Index index = manager.index();
         final boolean have = manager.centers() != null && !manager.centers().isEmpty();
-        dataFold.label("Trauma center data", have ? "on this phone" : "none on this phone");
+        dataFold.label("Trauma Center Data", have ? "on this device" : "none on this device");
         dataDetail.setText(have ? TraumaManager.describe(index)
-                : "No trauma center data on this phone. Download it once; after that the line works with no network.");
+                : "No trauma center data on this device. Download it once; after that the line works with no network.");
         downloadButton.setEnabled(!manager.busy());
-        downloadButton.setText(have ? "Check for an update" : "Download now");
+        downloadButton.setText(have ? "Check for an Update" : "Download Now");
+    }
+
+    private void showResult(String message) {
+        final boolean has = message != null && !message.isEmpty();
+        dataResult.setText(has ? message : "");
+        dataResult.setVisibility(has ? View.VISIBLE : View.GONE);
     }
 
     private void pickSpeed() {
@@ -316,7 +332,7 @@ public final class TraumaPane implements TraumaManager.Listener {
                 checked = i;
         }
         new AlertDialog.Builder(mapView.getContext())
-                .setTitle("Helicopter cruise speed")
+                .setTitle("Helicopter Cruise Speed")
                 .setSingleChoiceItems(labels, checked, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
@@ -340,6 +356,7 @@ public final class TraumaPane implements TraumaManager.Listener {
 
     @Override
     public void onStatus(String message) {
+        showResult(message);
         pages.status(message);
         downloadButton.setEnabled(true);
     }

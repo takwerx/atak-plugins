@@ -1,7 +1,9 @@
 package com.atakmap.android.iwi.plugin;
 
+
 import com.atakmap.coremap.filesystem.FileSystemUtils;
 import com.atakmap.coremap.log.Log;
+
 
 import org.json.JSONObject;
 
@@ -37,6 +39,10 @@ public final class TraumaPack {
 
     /** The most the pack may inflate to. The real one is about half a megabyte. */
     private static final int MAX_INFLATED = 16 * 1024 * 1024;
+    /** The pack is under 100 KB gzipped; an answer many times that is not the pack. */
+    private static final int MAX_DOWNLOAD = 4 * 1024 * 1024;
+    /** The manifest is under a kilobyte. */
+    private static final int MAX_MANIFEST = 64 * 1024;
 
     private final File dir;
 
@@ -83,7 +89,7 @@ public final class TraumaPack {
                 && System.currentTimeMillis() - file.lastModified() < MANIFEST_MAX_AGE_MS;
         if (network && !fresh) {
             try {
-                write(file, Http.get(BASE + MANIFEST));
+                write(file, Http.get(BASE + MANIFEST, MAX_MANIFEST));
             } catch (Exception e) {
                 Log.d(TAG, "manifest refresh failed, using what is on disk: " + e);
             }
@@ -135,7 +141,7 @@ public final class TraumaPack {
                 // The manifest names a newer pack. Fetch it, and only on success replace
                 // what is held: a phone with no network keeps the old one.
                 try {
-                    final byte[] fresh = Http.get(BASE + FILE);
+                    final byte[] fresh = fetch(sha);
                     write(file, fresh);
                     gz = fresh;
                 } catch (IOException e) {
@@ -144,8 +150,8 @@ public final class TraumaPack {
             }
         } else {
             if (!network)
-                throw new IOException("no pack on this phone");
-            gz = Http.get(BASE + FILE);
+                throw new IOException("no pack on this device");
+            gz = fetch(sha);
             write(file, gz);
         }
         try {
@@ -157,6 +163,18 @@ public final class TraumaPack {
                 Log.w(TAG, "could not drop the unreadable pack");
             throw new IOException("the pack was not readable");
         }
+    }
+
+    /**
+     * The pack from the depot, refused unless it is the one the manifest names: a
+     * truncated or swapped answer is never written over a good pack (added in LCES;
+     * the lessons catalog is checked the same way).
+     */
+    private static byte[] fetch(String sha) throws IOException {
+        final byte[] body = Http.get(BASE + FILE, MAX_DOWNLOAD);
+        if (sha != null && !sha.isEmpty() && !sha.equalsIgnoreCase(sha256(body)))
+            throw new IOException("the pack does not match its manifest");
+        return body;
     }
 
     private static String sha256(byte[] body) {

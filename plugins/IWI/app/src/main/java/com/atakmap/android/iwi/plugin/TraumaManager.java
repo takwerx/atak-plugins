@@ -1,5 +1,6 @@
 package com.atakmap.android.iwi.plugin;
 
+
 import android.content.Context;
 import android.content.SharedPreferences;
 
@@ -16,6 +17,7 @@ import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+
 
 /**
  * Owns the trauma center pack for the plugin's life: the copy in memory, the one worker
@@ -139,7 +141,7 @@ public final class TraumaManager {
         worker.shutdownNow();
     }
 
-    /** The centers in memory, or null when there is no pack on this phone. */
+    /** The centers in memory, or null when there is no pack on this device. */
     public List<TraumaCenter> centers() {
         return centers;
     }
@@ -168,7 +170,7 @@ public final class TraumaManager {
     /** "1,800 centers, helipads as of Oct 1, 2026, hospitals 2020", for Settings. */
     public static String describe(TraumaPack.Index index) {
         if (index == null || index.isEmpty())
-            return "No trauma center data on this phone";
+            return "No trauma center data on this device";
         final StringBuilder b = new StringBuilder();
         b.append(NumberFormat.getIntegerInstance(Locale.US).format(index.count))
                 .append(" trauma centers");

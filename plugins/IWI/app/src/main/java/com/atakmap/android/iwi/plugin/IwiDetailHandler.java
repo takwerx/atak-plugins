@@ -1,6 +1,7 @@
 
 package com.atakmap.android.iwi.plugin;
 
+
 import com.atakmap.android.cot.detail.CotDetailHandler;
 import com.atakmap.android.maps.MapItem;
 import com.atakmap.comms.CommsMapComponent;
@@ -24,6 +25,13 @@ import java.util.List;
  * <p>The key list is fixed and explicit, the way ATAK's own
  * MedicalDetailHandler does it, so a stale metadata key can never be resurrected
  * into a report.
+ *
+ * <p>Lived in LCES from 2026-11-03 to 2026-11-07 with the detail name,
+ * the attribute list and the metadata keys unchanged, so a marker either plugin wrote
+ * reads the same in the other. ATAK runs every handler registered for a detail name,
+ * so on a device that also has the IWI plugin loaded both handlers see each marker:
+ * reading twice writes the same keys, but writing twice would put two {@code _iwi_}
+ * children in one event. This one adds nothing when the event already has one.
  */
 public class IwiDetailHandler extends CotDetailHandler {
 
@@ -45,7 +53,9 @@ public class IwiDetailHandler extends CotDetailHandler {
             "incident_name",
             "onscene_ic",
             "patient_care",
-            "declared");
+            "declared",
+            // The whole IWI as JSON, for a device with IWI to read (2026-11-06).
+            "report");
 
     public IwiDetailHandler() {
         super(DETAIL);
@@ -66,6 +76,8 @@ public class IwiDetailHandler extends CotDetailHandler {
 
     @Override
     public boolean toCotDetail(MapItem item, CotEvent event, CotDetail root) {
+        if (root.getFirstChildByName(0, DETAIL) != null)
+            return false;
         CotDetail d = new CotDetail(DETAIL);
         boolean any = false;
         for (String a : ATTRS) {

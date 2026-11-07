@@ -9,20 +9,17 @@ import java.net.URL;
 import javax.net.ssl.HttpsURLConnection;
 
 /**
- * Small HTTPS GET client: bounded time, bounded response size, HTTPS only.
+ * Small HTTPS GET client: bounded time, bounded response size, HTTPS only, no
+ * redirects.
  *
- * <p>AirAware's, carried forward. IWI uses it for exactly one thing, fetching the
- * trauma center pack from our own depot, on the manager's worker thread.
- *
- * <p>Anonymous classes rather than lambdas anywhere this grows: the SDK documents lambdas
- * breaking under release proguard, and this ships in release builds.
+ * <p>IWI's (AirAware's before it), carried forward; shared helpers are copy-forward.
+ * IWI uses it on our own depot, on its manager's worker thread:
+ * the Lessons Learned catalog and IWI's trauma center pack.
  */
 public final class Http {
 
     private static final int CONNECT_TIMEOUT_MS = 10_000;
-    private static final int READ_TIMEOUT_MS = 20_000;
-    /** The pack is under 100 KB gzipped; a response many times that is not the pack. */
-    private static final int MAX_BYTES = 4 * 1024 * 1024;
+    private static final int READ_TIMEOUT_MS = 30_000;
 
     private Http() {
     }
@@ -30,9 +27,10 @@ public final class Http {
     /**
      * Fetch a URL on the calling thread.
      *
-     * @throws IOException with a message already phrased for the operator
+     * @param maxBytes the most this answer may be; more is not the file we asked for
+     * @throws IOException with a message already phrased for a log
      */
-    public static byte[] get(String url) throws IOException {
+    public static byte[] get(String url, int maxBytes) throws IOException {
         final URL parsed = new URL(url);
         if (!"https".equalsIgnoreCase(parsed.getProtocol()))
             throw new IOException("refusing a non-https request");
@@ -52,9 +50,12 @@ public final class Http {
             final int status = conn.getResponseCode();
             if (status != HttpURLConnection.HTTP_OK)
                 throw new IOException("server returned HTTP " + status);
+            final long declared = conn.getContentLengthLong();
+            if (declared > maxBytes)
+                throw new IOException("answer of " + declared + " bytes is too large");
 
             in = conn.getInputStream();
-            return read(in);
+            return read(in, maxBytes);
         } finally {
             if (in != null) {
                 try {
@@ -68,22 +69,21 @@ public final class Http {
         }
     }
 
-    private static byte[] read(InputStream in) throws IOException {
+    private static byte[] read(InputStream in, int maxBytes) throws IOException {
         final ByteArrayOutputStream out = new ByteArrayOutputStream(64 * 1024);
         final byte[] buf = new byte[16384];
         int n;
         int total = 0;
         while ((n = in.read(buf)) > 0) {
             total += n;
-            if (total > MAX_BYTES)
-                throw new IOException("response larger than "
-                        + (MAX_BYTES / (1024 * 1024)) + " MB");
+            if (total > maxBytes)
+                throw new IOException("answer larger than " + maxBytes + " bytes");
             out.write(buf, 0, n);
         }
         return out.toByteArray();
     }
 
-    /** What to put in front of an operator when a fetch fails. */
+    /** What to put in front of an operator when a fetch fails (IWI's). */
     public static String describe(Exception e) {
         if (e instanceof java.net.SocketTimeoutException)
             return "timed out";

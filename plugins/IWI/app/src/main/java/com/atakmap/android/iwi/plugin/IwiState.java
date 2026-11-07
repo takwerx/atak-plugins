@@ -1,5 +1,6 @@
 package com.atakmap.android.iwi.plugin;
 
+
 import android.content.SharedPreferences;
 
 import com.atakmap.coremap.log.Log;
@@ -56,11 +57,15 @@ public final class IwiState implements RadioScript.Source {
     public static final String ASSESSMENT = "assessment";
     public static final String TREATMENT = "treatment";
     public static final String EVAC_LOCATION = "evac_location";
+    /** The evac spot's marker, when the location was picked on the map. */
+    public static final String EVAC_UID = "evac_uid";
     public static final String ETA = "patient_eta";
     public static final String HELISPOT = "helispot";
     public static final String RESOURCES = "resources";
     public static final String CONTINGENCY = "contingency";
     public static final String ADDITIONAL = "additional_info";
+    /** When the reporter slid "Comms acknowledged" on the initial call; gone on Clear. */
+    public static final String REPORTED = "initial_reported_ms";
 
     /** The three rows of item 6, and the five columns of each. */
     public static final String[] COMMS_ROWS = {"cmd", "ag", "tac"};
@@ -68,7 +73,6 @@ public final class IwiState implements RadioScript.Source {
     public static final String[] COMMS_COLS = {"channel", "rx", "rx_tone", "tx", "tx_tone"};
 
     /** Items 1 and 6 belong to the incident, not the patient, and outlive a Clear. */
-    private static final List<String> KEEP_ON_CLEAR = Arrays.asList(CONTACT_TO, CONTACT_FROM);
 
     private static final String K_LIVE = "iwi.live";
     private static final String K_UID = "iwi.uid";
@@ -77,6 +81,8 @@ public final class IwiState implements RadioScript.Source {
     private static final String K_SOURCE = "iwi.source";
     private static final String K_DECLARED = "iwi.declaredMs";
     private static final String FIELD = "iwi.f.";
+    /** Only in a copy of another device's IWI: who reported it. */
+    private static final String K_REPORTER = "iwi.reporter";
     /** The patient cards, as one JSON array. Under FIELD, so a Clear takes them. */
     private static final String K_PATIENTS = FIELD + "patients";
 
@@ -84,6 +90,12 @@ public final class IwiState implements RadioScript.Source {
 
     public IwiState(SharedPreferences prefs) {
         this.prefs = prefs;
+        // Evacuation was one label before 2026-11-06 ("Air Ambulance"); now codes.
+        final String evac = text(EVAC_REQUEST);
+        if (!evac.isEmpty() && Vocab.parse(evac, Vocab.EVAC).isEmpty()) {
+            final int i = java.util.Arrays.asList(Vocab.EVAC.labels).indexOf(evac);
+            set(EVAC_REQUEST, i < 0 ? "" : Vocab.EVAC.codes[i]);
+        }
     }
 
     public static String commsKey(String row, String col) {
@@ -141,7 +153,7 @@ public final class IwiState implements RadioScript.Source {
                 .apply();
     }
 
-    /** Forget the IWI and the patient's half of the report. */
+    /** Forget the IWI and everything in its report. */
     public void clear() {
         final SharedPreferences.Editor e = prefs.edit()
                 .remove(K_LIVE).remove(K_UID).remove(K_LAT).remove(K_LON)
@@ -149,24 +161,24 @@ public final class IwiState implements RadioScript.Source {
         for (String key : prefs.getAll().keySet()) {
             if (!key.startsWith(FIELD))
                 continue;
-            final String field = key.substring(FIELD.length());
-            if (KEEP_ON_CLEAR.contains(field) || isComms(field))
-                continue;
+            // Everything goes: the next IWI starts blank (operator, 2026-11-06).
             e.remove(key);
         }
+        // And every drop-down it opened, except the two on the Settings page.
+        for (String key : prefs.getAll().keySet())
+            if (key.startsWith("iwi.fold.") && !key.equals("iwi.fold.speed")
+                    && !key.equals("iwi.fold.data"))
+                e.remove(key);
         e.apply();
-    }
-
-    private static boolean isComms(String field) {
-        for (String row : COMMS_ROWS)
-            if (field.startsWith(row + "_"))
-                return true;
-        return false;
     }
 
     /** This phone's callsign, from ATAK: the reporter, and the IC unless one is named. */
     @Override
     public String callsign() {
+        // A copy of someone else's IWI: theirs, not this device's.
+        final String reporter = prefs.getString(K_REPORTER, null);
+        if (reporter != null)
+            return reporter;
         try {
             final com.atakmap.android.maps.MapView mv =
                     com.atakmap.android.maps.MapView.getMapView();
@@ -175,6 +187,53 @@ public final class IwiState implements RadioScript.Source {
         } catch (RuntimeException e) {
             return "";
         }
+    }
+
+    // ---- the whole IWI, for another IWI device to read ----
+
+    /**
+     * The IWI and its whole report as one JSON object, carried on the marker so a
+     * device with IWI reads all of it, read only (operator, 2026-11-06). Settings,
+     * drop-downs and the feed choice stay here.
+     */
+    public String exportJson() {
+        final JSONObject o = new JSONObject();
+        try {
+            for (java.util.Map.Entry<String, ?> e : prefs.getAll().entrySet()) {
+                final String k = e.getKey();
+                if (!(k.startsWith(FIELD) || k.equals(K_LIVE) || k.equals(K_UID)
+                        || k.equals(K_LAT) || k.equals(K_LON) || k.equals(K_SOURCE)
+                        || k.equals(K_DECLARED)))
+                    continue;
+                o.put(k, e.getValue());
+            }
+            o.put(K_REPORTER, callsign());
+        } catch (JSONException ex) {
+            Log.w("IWI-State", "could not export the IWI", ex);
+        }
+        return o.toString();
+    }
+
+    /** Replace what is in these prefs with an exported IWI. Only known keys, typed. */
+    public static void importJson(SharedPreferences into, String json) {
+        final SharedPreferences.Editor e = into.edit().clear();
+        try {
+            final JSONObject o = new JSONObject(json);
+            final java.util.Iterator<String> keys = o.keys();
+            while (keys.hasNext()) {
+                final String k = keys.next();
+                if (k.equals(K_LIVE))
+                    e.putBoolean(k, o.optBoolean(k, false));
+                else if (k.equals(K_DECLARED))
+                    e.putLong(k, o.optLong(k, 0L));
+                else if (k.startsWith(FIELD) || k.equals(K_UID) || k.equals(K_LAT)
+                        || k.equals(K_LON) || k.equals(K_SOURCE) || k.equals(K_REPORTER))
+                    e.putString(k, o.optString(k, ""));
+            }
+        } catch (JSONException ex) {
+            Log.w("IWI-State", "the IWI on the marker is unreadable", ex);
+        }
+        e.commit();
     }
 
     // ---- the report ----
@@ -211,9 +270,42 @@ public final class IwiState implements RadioScript.Source {
 
     // ---- patients ----
 
-    /** Every card, in the order they were added. */
+    /** The patients still on scene, in the order they were added. */
     @Override
     public List<Patient> patients() {
+        final List<Patient> out = new ArrayList<>();
+        for (Patient p : all())
+            if (p.transportedMs == 0)
+                out.add(p);
+        return out;
+    }
+
+    /** The patients transported off the scene, in the order they left. */
+    public List<Patient> transported() {
+        final List<Patient> out = new ArrayList<>();
+        for (Patient p : all())
+            if (p.transportedMs > 0)
+                out.add(p);
+        Collections.sort(out, new Comparator<Patient>() {
+            @Override
+            public int compare(Patient a, Patient b) {
+                return Long.compare(a.transportedMs, b.transportedMs);
+            }
+        });
+        return out;
+    }
+
+    /** Off the scene now, or back on it with 0. */
+    public void setTransported(int n, long ms) {
+        final List<Patient> list = all();
+        for (Patient p : list)
+            if (p.n == n)
+                p.transportedMs = ms;
+        save(list);
+    }
+
+    /** Every card, transported or not, in the order they were added. */
+    private List<Patient> all() {
         final List<Patient> out = new ArrayList<>();
         final String json = prefs.getString(K_PATIENTS, "");
         if (json == null || json.isEmpty())
@@ -238,6 +330,7 @@ public final class IwiState implements RadioScript.Source {
                     }
                 }
                 p.updatedMs = o.optLong("updated", 0L);
+                p.transportedMs = o.optLong("transported", 0L);
                 out.add(p);
             }
         } catch (JSONException e) {
@@ -272,6 +365,8 @@ public final class IwiState implements RadioScript.Source {
                     picks.put(e.getKey(), e.getValue());
                 o.put("v", picks);
                 o.put("updated", p.updatedMs);
+                if (p.transportedMs > 0)
+                    o.put("transported", p.transportedMs);
                 a.put(o);
             }
         } catch (JSONException e) {
@@ -283,7 +378,7 @@ public final class IwiState implements RadioScript.Source {
 
     /** A new card of this color, numbered after the highest so far. */
     public Patient addPatient(String color) {
-        final List<Patient> list = patients();
+        final List<Patient> list = all();
         int max = 0;
         for (Patient p : list)
             max = Math.max(max, p.n);
@@ -301,10 +396,10 @@ public final class IwiState implements RadioScript.Source {
      * @return the number taken away, or -1 when every card of that color has notes
      */
     public int removeNewestBlank(String color) {
-        final List<Patient> list = patients();
+        final List<Patient> list = all();
         for (int i = list.size() - 1; i >= 0; i--) {
             final Patient p = list.get(i);
-            if (p.color.equals(color) && !p.hasNotes()) {
+            if (p.transportedMs == 0 && p.color.equals(color) && !p.hasNotes()) {
                 list.remove(i);
                 save(list);
                 return p.n;
@@ -314,7 +409,7 @@ public final class IwiState implements RadioScript.Source {
     }
 
     public void removePatient(int n) {
-        final List<Patient> list = patients();
+        final List<Patient> list = all();
         for (int i = 0; i < list.size(); i++)
             if (list.get(i).n == n) {
                 list.remove(i);
@@ -324,7 +419,7 @@ public final class IwiState implements RadioScript.Source {
     }
 
     public Patient patient(int n) {
-        for (Patient p : patients())
+        for (Patient p : all())
             if (p.n == n)
                 return p;
         return null;
@@ -332,7 +427,7 @@ public final class IwiState implements RadioScript.Source {
 
     /** One field of one card: color, assessment, treatment or weight. */
     public void updatePatient(int n, String field, String value) {
-        final List<Patient> list = patients();
+        final List<Patient> list = all();
         for (Patient p : list) {
             if (p.n != n)
                 continue;

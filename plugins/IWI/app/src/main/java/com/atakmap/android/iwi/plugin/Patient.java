@@ -1,5 +1,6 @@
 package com.atakmap.android.iwi.plugin;
 
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -42,6 +43,13 @@ public final class Patient {
     public String label() {
         return "Patient " + n;
     }
+
+    /**
+     * When the patient left the scene, or 0 while on it. A transported patient is off
+     * the list and out of the counts, and kept so the record says so (operator,
+     * 2026-11-06).
+     */
+    public long transportedMs;
 
     /** When anything on the card last changed, or 0 when nothing has. */
     public long updatedMs;

@@ -1,5 +1,6 @@
 package com.atakmap.android.iwi.plugin;
 
+
 import com.atakmap.android.cot.CotMapComponent;
 import com.atakmap.android.maps.MapItem;
 import com.atakmap.android.maps.MapView;
@@ -68,9 +69,6 @@ public final class IwiMarker {
         final CotDetail med = new CotDetail("_medevac_");
         med.setAttribute("casevac", "true");
         med.setAttribute("title", title);
-        final String freq = s.text(IwiState.commsKey("cmd", "rx"));
-        if (!freq.isEmpty())
-            med.setAttribute("freq", freq);
         final int red = s.count(IwiState.RED);
         final int yellow = s.count(IwiState.YELLOW);
         final int green = s.count(IwiState.GREEN);
@@ -90,7 +88,7 @@ public final class IwiMarker {
             med.setAttribute("medline_remarks", remarks);
         if (!s.text(IwiState.HELISPOT).isEmpty())
             med.setAttribute("hlz_remarks", s.text(IwiState.HELISPOT));
-        final String evac = s.text(IwiState.EVAC_REQUEST);
+        final String evac = RadioScript.evacLabels(s);
         if (!evac.isEmpty()) {
             med.setAttribute("equipment_other", "true");
             med.setAttribute("equipment_detail", evac);
@@ -110,6 +108,7 @@ public final class IwiMarker {
         put(iwi, "onscene_ic", s.text(IwiState.IC));
         put(iwi, "patient_care", Vocab.CARE.label(s.text(IwiState.CARE_ROLE)));
         iwi.setAttribute("declared", new CoordinatedTime(s.declaredMs()).toString());
+        iwi.setAttribute("report", s.exportJson());
         detail.addChild(iwi);
 
         e.setDetail(detail);
@@ -118,6 +117,7 @@ public final class IwiMarker {
             return false;
         }
         CotMapComponent.getInternalDispatcher().dispatch(e);
+        IwiFeed.offer(e);
         return true;
     }
 

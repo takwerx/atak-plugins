@@ -1,362 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One pane, five pages by visibility swap: the main page, Settings, a trauma
-     center's details, the Medical Incident Report and the Radio Script. See
-     PLAN-IWI, "The pane". -->
+<!-- The pane: IWI's pages (iwi_layout.xml, inflated into iwi_host) and the Settings
+     page (iwi_settings.xml, inflated into iwi_settings_host), swapped by visibility.
+     IwiDropDown does the swapping; IwiPane owns everything inside iwi_host. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:paddingLeft="6dp"
     android:paddingRight="6dp">
-
-    <!-- Pinned in the pane root: what just happened, or what to do next. -->
-    <TextView
-        android:id="@+id/status"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingTop="8dp"
-        android:paddingBottom="4dp"
-        android:textSize="13sp"
-        android:textColor="@color/amber"
-        android:visibility="gone" />
-
-    <!-- The patients by triage color, always in view above every page: four filled
-         boxes with their counts, 0 included (operator, 2026-10-14). -->
     <LinearLayout
-        android:id="@+id/tally"
-        android:layout_width="match_parent"
-        android:layout_height="44dp"
-        android:layout_marginTop="6dp"
-        android:orientation="horizontal">
-
-        <TextView
-            android:id="@+id/tally_red"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:textSize="22sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tally_yellow"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:layout_marginLeft="6dp"
-            android:gravity="center"
-            android:textSize="22sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tally_green"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:layout_marginLeft="6dp"
-            android:gravity="center"
-            android:textSize="22sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tally_black"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:layout_marginLeft="6dp"
-            android:gravity="center"
-            android:textSize="22sp"
-            android:textStyle="bold" />
-
-        <!-- Every patient, whatever the color. -->
-        <TextView
-            android:id="@+id/tally_total"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1.6"
-            android:layout_marginLeft="10dp"
-            android:gravity="center"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            android:textColor="@color/white" />
-
-        <!-- Atmosphere's: drag the handle, or tap this, to open the pane wide. -->
-        <ImageButton
-            android:id="@+id/btn_wide"
-            style="@style/TakwerxIconButton"
-            android:layout_width="44dp"
-            android:layout_height="match_parent"
-            android:layout_weight="0"
-            android:layout_marginLeft="6dp"
-            android:layout_marginRight="0dp"
-            android:contentDescription="@string/wide"
-            android:src="@drawable/ic_wide" />
-    </LinearLayout>
-
-    <!-- Main page -->
-    <ScrollView
-        android:id="@+id/main_page"
+        android:id="@+id/iwi_host"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:fadeScrollbars="false"
-        android:focusableInTouchMode="true"
-        android:descendantFocusability="beforeDescendants">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingBottom="12dp">
-
-            <!-- A location set and on the map, waiting to be confirmed here rather
-                 than in a pop-up that would cover the map. -->
-            <LinearLayout
-                android:id="@+id/confirm_block"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingTop="6dp"
-                android:paddingBottom="6dp"
-                android:visibility="gone">
-
-                <TextView
-                    android:id="@+id/confirm_title"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:textSize="17sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/white" />
-
-                <TextView
-                    android:id="@+id/confirm_where"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingTop="2dp"
-                    android:textSize="16sp"
-                    android:textColor="@color/state_on" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingTop="2dp"
-                    android:textSize="13sp"
-                    android:textColor="@color/guide_grey"
-                    android:text="@string/confirm_note" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginTop="6dp">
-
-                    <Button
-                        android:id="@+id/btn_confirm"
-                        style="@style/TakwerxButton"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:textColor="@color/state_on" />
-
-                    <Button
-                        android:id="@+id/btn_confirm_cancel"
-                        style="@style/TakwerxButton"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:layout_marginLeft="6dp"
-                        android:text="@string/cancel" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="6dp">
-
-                <Button
-                    android:id="@+id/btn_declare"
-                    style="@style/TakwerxButton"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:text="@string/declare_iwi" />
-
-                <Button
-                    android:id="@+id/btn_settings"
-                    style="@style/TakwerxButton"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="6dp"
-                    android:text="@string/settings" />
-            </LinearLayout>
-
-            <!-- The declared IWI: when, how long ago, where. -->
-            <LinearLayout
-                android:id="@+id/live_block"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:visibility="gone">
-
-                <TextView
-                    style="@style/TakwerxSectionHeading"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/heading_iwi" />
-
-                <TextView
-                    android:id="@+id/live_time"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/white" />
-
-                <TextView
-                    android:id="@+id/live_patients"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingTop="2dp"
-                    android:textSize="15sp"
-                    android:textColor="@color/white" />
-
-                <TextView
-                    android:id="@+id/live_where"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingTop="2dp"
-                    android:textSize="15sp"
-                    android:textColor="@color/white" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginTop="6dp">
-
-                    <Button
-                        android:id="@+id/btn_go_iwi"
-                        style="@style/TakwerxButton"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:text="@string/go_to" />
-
-                    <Button
-                        android:id="@+id/btn_move"
-                        style="@style/TakwerxButton"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:layout_marginLeft="6dp"
-                        android:text="@string/change_location" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <TextView
-                style="@style/TakwerxSectionHeading"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/heading_report" />
-
-            <Button
-                android:id="@+id/btn_report"
-                style="@style/TakwerxButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/medical_incident_report" />
-
-            <Button
-                android:id="@+id/btn_script"
-                style="@style/TakwerxButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="@string/radio_script" />
-
-            <TextView
-                style="@style/TakwerxSectionHeading"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/heading_reference" />
-
-            <!-- Nearest trauma center, a drop-down row: the head says the nearest,
-                 the body carries both lines and the estimate note. -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginTop="4dp">
-
-                <Button
-                    android:id="@+id/fold_trauma_head"
-                    style="@style/TakwerxButton"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content" />
-
-                <ImageButton
-                    android:id="@+id/fold_trauma_chev"
-                    style="@style/TakwerxIconButton"
-                    android:layout_width="44dp"
-                    android:layout_weight="0"
-                    android:layout_marginRight="0dp"
-                    android:contentDescription="@string/show_settings"
-                    android:src="@drawable/ic_expand" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/fold_trauma_body"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingTop="4dp"
-                android:visibility="gone">
-
-                <TextView
-                    android:id="@+id/trauma_line1"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:minHeight="44dp"
-                    android:gravity="center_vertical"
-                    android:paddingTop="4dp"
-                    android:paddingBottom="4dp"
-                    android:textSize="15sp"
-                    android:textColor="@color/white"
-                    android:clickable="true"
-                    android:focusable="true" />
-
-                <TextView
-                    android:id="@+id/trauma_line2"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:minHeight="44dp"
-                    android:gravity="center_vertical"
-                    android:paddingTop="4dp"
-                    android:paddingBottom="4dp"
-                    android:textSize="15sp"
-                    android:textColor="@color/white"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:id="@+id/trauma_note"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingTop="2dp"
-                    android:paddingBottom="8dp"
-                    android:textSize="12sp"
-                    android:textColor="@color/guide_grey" />
-            </LinearLayout>
-        </LinearLayout>
-    </ScrollView>
-
-    <!-- Settings -->
+        android:orientation="vertical" />
     <LinearLayout
         android:id="@+id/settings_page"
         android:layout_width="match_parent"
@@ -364,14 +21,12 @@
         android:layout_weight="1"
         android:orientation="vertical"
         android:visibility="gone">
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:layout_marginTop="6dp">
-
             <Button
                 android:id="@+id/btn_settings_back"
                 style="@style/TakwerxButton"
@@ -379,7 +34,6 @@
                 android:layout_height="wrap_content"
                 android:minWidth="90dp"
                 android:text="@string/back" />
-
             <TextView
                 android:layout_width="0dp"
                 android:layout_weight="1"
@@ -388,9 +42,19 @@
                 android:textSize="17sp"
                 android:textStyle="bold"
                 android:textColor="@color/white"
-                android:text="@string/settings" />
+                android:text="@string/iwi_settings_title" />
+            <ImageButton
+                android:id="@+id/btn_settings_wide"
+                style="@style/TakwerxIconButton"
+                android:layout_weight="0"
+                android:layout_width="44dp"
+                android:layout_height="match_parent"
+                android:layout_marginLeft="6dp"
+                android:contentDescription="@string/iwi_wide_desc"
+                android:src="@drawable/ic_wide" />
         </LinearLayout>
-
+        <!-- focusableInTouchMode + beforeDescendants: the scroller does not jump to a
+             button that is rebuilt. -->
         <ScrollView
             android:layout_width="match_parent"
             android:layout_height="0dp"
@@ -398,285 +62,12 @@
             android:fadeScrollbars="false"
             android:focusableInTouchMode="true"
             android:descendantFocusability="beforeDescendants">
-
             <LinearLayout
+                android:id="@+id/iwi_settings_host"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:paddingBottom="12dp">
-
-                <!-- Helicopter cruise speed: the one number the flight estimate uses. -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginTop="6dp">
-
-                    <Button
-                        android:id="@+id/fold_speed_head"
-                        style="@style/TakwerxButton"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content" />
-
-                    <ImageButton
-                        android:id="@+id/fold_speed_chev"
-                        style="@style/TakwerxIconButton"
-                        android:layout_width="44dp"
-                        android:layout_weight="0"
-                        android:layout_marginRight="0dp"
-                        android:contentDescription="@string/show_settings"
-                        android:src="@drawable/ic_expand" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/fold_speed_body"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:paddingTop="4dp"
-                    android:visibility="gone">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:textSize="13sp"
-                        android:textColor="@color/white"
-                        android:paddingBottom="6dp"
-                        android:text="@string/cruise_explain" />
-
-                    <Button
-                        android:id="@+id/btn_cruise_speed"
-                        style="@style/TakwerxButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
-                </LinearLayout>
-
-                <!-- Trauma center data: what is on the phone, and a way to fetch it. -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginTop="6dp">
-
-                    <Button
-                        android:id="@+id/fold_data_head"
-                        style="@style/TakwerxButton"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content" />
-
-                    <ImageButton
-                        android:id="@+id/fold_data_chev"
-                        style="@style/TakwerxIconButton"
-                        android:layout_width="44dp"
-                        android:layout_weight="0"
-                        android:layout_marginRight="0dp"
-                        android:contentDescription="@string/show_settings"
-                        android:src="@drawable/ic_expand" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/fold_data_body"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:paddingTop="4dp"
-                    android:visibility="gone">
-
-                    <TextView
-                        android:id="@+id/data_detail"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:textSize="13sp"
-                        android:textColor="@color/white"
-                        android:paddingBottom="6dp" />
-
-                    <Button
-                        android:id="@+id/btn_download"
-                        style="@style/TakwerxButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/download_now" />
-                </LinearLayout>
-            </LinearLayout>
+                android:paddingBottom="12dp" />
         </ScrollView>
     </LinearLayout>
-
-    <!-- One trauma center's details. Back is pinned above the text. -->
-    <LinearLayout
-        android:id="@+id/details_page"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:baselineAligned="false"
-            android:layout_marginTop="6dp">
-
-            <Button
-                android:id="@+id/btn_details_back"
-                style="@style/TakwerxButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/back" />
-
-            <TextView
-                android:id="@+id/details_title"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="8dp"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:textColor="@color/white" />
-
-            <Button
-                android:id="@+id/btn_go_to"
-                style="@style/TakwerxButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/go_to" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/details_subtitle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="13sp"
-            android:textColor="@color/guide_grey"
-            android:paddingBottom="6dp" />
-
-        <ScrollView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:fadeScrollbars="false">
-
-            <TextView
-                android:id="@+id/details_body"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textSize="14sp"
-                android:textColor="@color/white"
-                android:lineSpacingExtra="4dp"
-                android:textIsSelectable="true" />
-        </ScrollView>
-    </LinearLayout>
-
-    <!-- Medical Incident Report: the form is built in code into report_container. -->
-    <LinearLayout
-        android:id="@+id/report_page"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginTop="6dp">
-
-            <Button
-                android:id="@+id/btn_report_back"
-                style="@style/TakwerxButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:minWidth="90dp"
-                android:text="@string/back" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="12dp"
-                android:textSize="17sp"
-                android:textStyle="bold"
-                android:textColor="@color/white"
-                android:text="@string/medical_incident_report" />
-
-            <Button
-                android:id="@+id/btn_report_script"
-                style="@style/TakwerxButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/radio_script" />
-        </LinearLayout>
-
-        <ScrollView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:fadeScrollbars="false">
-
-            <LinearLayout
-                android:id="@+id/report_container"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingBottom="24dp" />
-        </ScrollView>
-    </LinearLayout>
-
-    <!-- Radio Script: built in code from the report each time it opens. -->
-    <LinearLayout
-        android:id="@+id/script_page"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginTop="6dp">
-
-            <Button
-                android:id="@+id/btn_script_back"
-                style="@style/TakwerxButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:minWidth="90dp"
-                android:text="@string/back" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="12dp"
-                android:textSize="17sp"
-                android:textStyle="bold"
-                android:textColor="@color/white"
-                android:text="@string/radio_script" />
-        </LinearLayout>
-
-        <ScrollView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:fadeScrollbars="false">
-
-            <LinearLayout
-                android:id="@+id/script_container"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingBottom="24dp" />
-        </ScrollView>
-    </LinearLayout>
-
 </LinearLayout>

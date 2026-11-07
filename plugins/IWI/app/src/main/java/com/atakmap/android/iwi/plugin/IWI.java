@@ -1,11 +1,9 @@
-
 package com.atakmap.android.iwi.plugin;
 
 import android.content.Context;
-import android.view.View;
-
 import android.content.Intent;
 
+import com.atak.plugins.impl.PluginContextProvider;
 import com.atakmap.android.cot.detail.CotDetailManager;
 import com.atakmap.android.ipc.AtakBroadcast;
 import com.atakmap.android.maps.MapItem;
@@ -14,9 +12,6 @@ import com.atakmap.android.menu.MapMenuEventListener;
 import com.atakmap.android.menu.MapMenuReceiver;
 import com.atakmap.coremap.log.Log;
 
-import com.atak.plugins.impl.PluginContextProvider;
-import com.atak.plugins.impl.PluginLayoutInflater;
-
 import gov.tak.api.plugin.IPlugin;
 import gov.tak.api.plugin.IServiceController;
 import gov.tak.api.ui.IHostUIService;
@@ -24,7 +19,16 @@ import gov.tak.api.ui.ToolbarItem;
 import gov.tak.api.ui.ToolbarItemAdapter;
 import gov.tak.platform.marshal.MarshalManager;
 
+/**
+ * Incident Within an Incident: the NWCG Medical Incident Report, its Radio Script, one
+ * CASEVAC marker with the nearest trauma center, shared through a Data Sync feed.
+ *
+ * <p>Its own plugin again since 2026-11-07, after four days inside LCES (PLAN-LCES
+ * decision 9, reversed); the code written there is the code here.
+ */
 public class IWI implements IPlugin {
+
+    private static final String TAG = "IWI";
 
     IServiceController serviceController;
     Context pluginContext;
@@ -32,12 +36,13 @@ public class IWI implements IPlugin {
     ToolbarItem toolbarItem;
     /** The pane, hosted in a drop-down so it can be dragged out wide. */
     IwiDropDown dropDown;
+    MapView mapView;
+    /** The trauma center pack and the report's saved state, for the plugin's life. */
+    TraumaManager trauma;
+    /** Makes {@code _iwi_} typed rather than opaque on this device. */
     IwiDetailHandler iwiDetailHandler;
-    /** Anything that must outlive a tap lives here, not in a Tool. */
-    TraumaManager traumaManager;
-    IwiPane iwiPane;
-    /** Claims a tap on this phone's own IWI marker for the IWI pane. */
-    MapMenuEventListener menuListener;
+    /** Claims a tap on this device's own IWI marker, or one carrying a report. */
+    MapMenuEventListener iwiTap;
 
     public IWI(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -48,14 +53,10 @@ public class IWI implements IPlugin {
             pluginContext.setTheme(R.style.ATAKPluginTheme);
         }
 
-        // obtain the UI service
         uiService = serviceController.getService(IHostUIService.class);
 
-        // initialize the toolbar button for the plugin
-
-        // create the button and set the identifier to be well known
-        // if you fail to do this, the toolbar configuration will never
-        // be able to find it again after the user moves the icon.
+        // The identifier has to be well known, or the toolbar configuration cannot
+        // find the button again after the user moves it.
         toolbarItem = new ToolbarItem.Builder(
                 pluginContext.getString(R.string.app_name),
                 MarshalManager.marshal(
@@ -65,90 +66,48 @@ public class IWI implements IPlugin {
                 .setListener(new ToolbarItemAdapter() {
                     @Override
                     public void onClick(ToolbarItem item) {
-                        showPane();
+                        showPane(null);
                     }
-                })
+                }).setIdentifier(pluginContext.getPackageName())
                 .build();
     }
 
     @Override
     public void onStart() {
-        // The detail handler is what makes _iwi_ typed rather than opaque on a
-        // phone that has the plugin.
+        if (uiService != null)
+            uiService.addToolbarItem(toolbarItem);
+        mapView = MapView.getMapView();
+        if (mapView == null) {
+            Log.w(TAG, "no map view at start");
+            return;
+        }
         if (iwiDetailHandler == null)
             iwiDetailHandler = new IwiDetailHandler();
         CotDetailManager.getInstance().registerHandler(iwiDetailHandler);
-
-        // The trauma center pack: read from disk on a worker, refreshed from the
-        // depot in the background, kept for the plugin's life.
-        final MapView mapView = MapView.getMapView();
-        if (mapView != null && traumaManager == null) {
-            traumaManager = new TraumaManager(mapView);
-            traumaManager.start();
-        }
-
-        registerTap();
-
-        if (uiService == null)
-            return;
-
-        uiService.addToolbarItem(toolbarItem);
-    }
-
-    @Override
-    public void onStop() {
-        if (menuListener != null) {
-            final MapMenuReceiver menus = MapMenuReceiver.getInstance();
-            if (menus != null)
-                menus.removeEventListener(menuListener);
-            menuListener = null;
-        }
-        if (iwiDetailHandler != null)
-            CotDetailManager.getInstance().unregisterHandler(iwiDetailHandler);
-        if (traumaManager != null) {
-            traumaManager.stop();
-            traumaManager = null;
-        }
-        if (dropDown != null) {
-            // disposeImpl disposes the pane, which lets go of any map pick.
-            dropDown.closeDropDown();
-            dropDown.dispose();
-            dropDown = null;
-        }
-        iwiPane = null;
-
-        // the plugin is stopping, remove the button from the toolbar
-        if (uiService == null)
-            return;
-
-        uiService.removeToolbarItem(toolbarItem);
+        // Read from disk on a worker, refreshed from the depot in the background.
+        trauma = new TraumaManager(mapView);
+        trauma.start();
+        registerIwiTap();
     }
 
     /**
-     * A tap on this phone's IWI marker opens IWI, not ATAK's CASEVAC view (operator,
-     * 2026-10-14: "when i click on it, it opens casevac"). The marker stays a genuine
-     * CASEVAC, so a phone without IWI still opens its own CASEVAC view and reads the
-     * report there; only here is the tap IWI's.
-     *
-     * <p>ATAK asks a {@code MapMenuEventListener} before it opens anything; answering
-     * true stops the radial and tells ATAK the tap was handled (AirAware's path). Only
-     * this phone's own IWI marker and the not-yet-declared preview are claimed; every
-     * other item, a CASEVAC from another phone included, keeps ATAK's own behavior.
+     * A tap on this device's IWI marker opens the IWI page, not ATAK's CASEVAC view
+     * (operator 2026-10-14). The marker stays a genuine CASEVAC, so a device without
+     * IWI opens its own CASEVAC view. Another device's IWI that carries its report
+     * opens read only (2026-11-06). Answering true stops the radial.
      */
-    private void registerTap() {
-        if (menuListener != null || traumaManager == null)
+    private void registerIwiTap() {
+        if (iwiTap != null || trauma == null)
             return;
-        menuListener = new MapMenuEventListener() {
+        iwiTap = new MapMenuEventListener() {
             @Override
             public boolean onShowMenu(MapItem item) {
-                if (item == null || traumaManager == null)
+                if (item == null || trauma == null)
+                    return false;
+                final boolean ours = IwiPane.isOurs(trauma, item.getUID());
+                if (!ours && !IwiPane.carriesReport(item))
                     return false;
                 final String uid = item.getUID();
-                final IwiState state = new IwiState(traumaManager.prefs());
-                final boolean ours = PreviewMarker.UID.equals(uid)
-                        || (state.isLive() && state.uid().equals(uid));
-                if (!ours)
-                    return false;
                 // A moment later: a pick from ATAK's Select Item list posts its own
                 // show-details after this, which would close a pane opened inline.
                 final MapView mv = MapView.getMapView();
@@ -157,9 +116,7 @@ public class IWI implements IPlugin {
                         @Override
                         public void run() {
                             clearAtakSelection();
-                            showPane();
-                            if (iwiPane != null)
-                                iwiPane.showMain();
+                            showPane(ours ? null : uid);
                         }
                     }, 250);
                 }
@@ -172,9 +129,9 @@ public class IWI implements IPlugin {
         };
         final MapMenuReceiver menus = MapMenuReceiver.getInstance();
         if (menus != null)
-            menus.addEventListener(menuListener);
+            menus.addEventListener(iwiTap);
         else
-            Log.w("IWI", "no radial menu receiver; a tap keeps ATAK's own CASEVAC view");
+            Log.w(TAG, "no radial menu receiver; a tap on the IWI marker keeps ATAK's view");
     }
 
     /** Take ATAK's own focus and callout off the map, as its list items do. */
@@ -185,27 +142,48 @@ public class IWI implements IPlugin {
             AtakBroadcast.getInstance().sendBroadcast(
                     new Intent("com.atakmap.android.maps.HIDE_DETAILS"));
         } catch (RuntimeException e) {
-            Log.d("IWI", "could not clear ATAK's selection: " + e);
+            Log.d(TAG, "could not clear ATAK's selection: " + e);
         }
     }
 
-    private void showPane() {
-        final MapView mapView = MapView.getMapView();
-        if (mapView == null || traumaManager == null)
-            return;
-        if (dropDown == null) {
-            final View v = PluginLayoutInflater.inflate(pluginContext,
-                    R.layout.main_layout, null);
-            iwiPane = new IwiPane(pluginContext, mapView, v, traumaManager);
-            dropDown = new IwiDropDown(mapView, v, iwiPane);
-            iwiPane.setWideToggle(new Runnable() {
-                @Override
-                public void run() {
-                    if (dropDown != null)
-                        dropDown.toggleWide();
-                }
-            });
+    @Override
+    public void onStop() {
+        if (iwiTap != null) {
+            final MapMenuReceiver menus = MapMenuReceiver.getInstance();
+            if (menus != null)
+                menus.removeEventListener(iwiTap);
+            iwiTap = null;
         }
-        dropDown.show();
+        // A pane whose buttons point at a stopped instance does nothing when tapped;
+        // disposeImpl disposes the pane, which lets go of any map pick.
+        if (dropDown != null) {
+            dropDown.closeDropDown();
+            dropDown.dispose();
+            dropDown = null;
+        }
+        if (iwiDetailHandler != null)
+            CotDetailManager.getInstance().unregisterHandler(iwiDetailHandler);
+        if (trauma != null) {
+            trauma.stop();
+            trauma = null;
+        }
+        if (uiService != null)
+            uiService.removeToolbarItem(toolbarItem);
+    }
+
+    /** The IWI page, or with a uid, another device's IWI read only. */
+    private void showPane(String viewUid) {
+        if (mapView == null)
+            mapView = MapView.getMapView();
+        if (mapView == null || trauma == null) {
+            Log.w(TAG, "no map view; the pane has nothing to show");
+            return;
+        }
+        if (dropDown == null)
+            dropDown = new IwiDropDown(mapView, pluginContext, trauma);
+        if (viewUid == null)
+            dropDown.show();
+        else
+            dropDown.showView(viewUid);
     }
 }

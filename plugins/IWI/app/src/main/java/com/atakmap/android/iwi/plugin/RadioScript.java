@@ -1,5 +1,6 @@
 package com.atakmap.android.iwi.plugin;
 
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -148,7 +149,7 @@ public final class RadioScript {
         for (Patient p : bySeverity(s.patients()))
             if (p.hasNotes())
                 out.add(patient(s, p));
-        final Section[] rest = {evacPlan(s), comms(s), contingency(s), additional(s)};
+        final Section[] rest = {evacPlan(s), contingency(s), additional(s)};
         for (Section x : rest)
             if (x.hasContent())
                 out.add(x);
@@ -181,8 +182,12 @@ public final class RadioScript {
      */
     public static Section contact(Source s) {
         final String to = calling(s);
+        // Who to call is picked for each IWI, never assumed: a blank report starts with
+        // step 1 to do (operator, 2026-11-06).
+        final String picked = Vocab.CONTACT.index(s.text(IwiState.CONTACT_TO)) >= 0
+                ? to : "";
         final Section one = new Section(1, "Contact Communications / Dispatch")
-                .say(to + ", ")
+                .field(picked, "Communications or Dispatch").say(", ")
                 .field(s.callsign(), "your callsign: set it in ATAK")
                 .say(". Stand-by for Emergency Traffic.");
         // No break: the reporter stops, and Communications clears the air and comes
@@ -260,9 +265,12 @@ public final class RadioScript {
      * Treatment: tourniquet and treated for shock."
      */
     public static Section patient(Source s, Patient p) {
+        if (IwiState.BLACK.equals(p.color))
+            // Dead or dying: no assessment, no treatment, nothing missing.
+            return new Section(3, "Initial Patient Assessment")
+                    .say(p.label() + ", " + Patient.name(p.color) + ".");
         final Section three = new Section(3, "Initial Patient Assessment")
-                .say(p.label() + ", " + Patient.name(p.color)
-                        + (IwiState.BLACK.equals(p.color) ? ". " : " priority. "))
+                .say(p.label() + ", " + Patient.name(p.color) + " priority. ")
                 .field(capital(Vocab.LOC.spoken(p.get(Patient.LOC))), "consciousness")
                 .say(", ")
                 .field(Vocab.BREATHING.spoken(p.get(Patient.BREATHING)), "breathing")
@@ -408,9 +416,6 @@ public final class RadioScript {
         final Section five = resources(s);
         if (five.complete())
             line(b, "5. Resources", said(five));
-        for (int i = 0; i < IwiState.COMMS_ROWS.length; i++)
-            line(b, (i == 0 ? "6. " : "") + IwiState.COMMS_ROW_NAMES[i],
-                    commsRow(s, IwiState.COMMS_ROWS[i]));
         line(b, "7. Contingency", s.text(IwiState.CONTINGENCY));
         line(b, "8. Additional", s.text(IwiState.ADDITIONAL));
         return b.toString().trim();
@@ -501,12 +506,66 @@ public final class RadioScript {
     }
 
     private static String evac(Source s) {
-        return Vocab.EVAC.spoken(s.text(IwiState.EVAC_REQUEST));
+        return evacSaid(s);
+    }
+
+    /** How many of one evac resource are asked for: 1 unless raised (operator, 2026-11-06). */
+    public static int evacCount(Source s, String code) {
+        try {
+            return Math.max(1, Math.min(9, Integer.parseInt(s.text(evacCountKey(code)))));
+        } catch (NumberFormatException e) {
+            return 1;
+        }
+    }
+
+    public static String evacCountKey(String code) {
+        return "evac_n_" + code;
+    }
+
+    private static final String[] NUMBER_WORDS = {"", "one", "two", "three", "four", "five",
+            "six", "seven", "eight", "nine"};
+
+    /** Said: "two air ambulances and one hoist ship", or "air ambulance" for just one. */
+    public static String evacSaid(Source s) {
+        final List<String> words = new ArrayList<>();
+        final java.util.Set<String> picked =
+                Vocab.parse(s.text(IwiState.EVAC_REQUEST), Vocab.EVAC);
+        boolean anyMany = false;
+        for (String c : picked)
+            anyMany |= !"other".equals(c) && evacCount(s, c) > 1;
+        for (String c : picked) {
+            final int n = "other".equals(c) ? 1 : evacCount(s, c);
+            final String one = Vocab.EVAC.spoken(c);
+            if (!anyMany || "other".equals(c))
+                words.add(one);
+            else
+                words.add(NUMBER_WORDS[n] + " " + (n > 1 ? plural(c, one) : single(c, one)));
+        }
+        return Vocab.andList(words);
+    }
+
+    private static String single(String code, String one) {
+        return "hoist".equals(code) || "shorthaul".equals(code) ? one + " ship" : one;
+    }
+
+    private static String plural(String code, String one) {
+        return "hoist".equals(code) || "shorthaul".equals(code) ? one + " ships" : one + "s";
+    }
+
+    /** For a head or the marker: "Air Ambulance x2, Hoist". */
+    public static String evacLabels(Source s) {
+        final StringBuilder b = new StringBuilder();
+        for (String c : Vocab.parse(s.text(IwiState.EVAC_REQUEST), Vocab.EVAC)) {
+            final int n = "other".equals(c) ? 1 : evacCount(s, c);
+            b.append(b.length() > 0 ? ", " : "").append(Vocab.EVAC.label(c))
+                    .append(n > 1 ? " x" + n : "");
+        }
+        return b.toString();
     }
 
     static boolean needsWeight(Source s) {
-        final String v = s.text(IwiState.EVAC_REQUEST);
-        return "Short-Haul".equals(v) || "Hoist".equals(v);
+        final java.util.Set<String> v = Vocab.parse(s.text(IwiState.EVAC_REQUEST), Vocab.EVAC);
+        return v.contains("shorthaul") || v.contains("hoist");
     }
 
     private static String care(Source s) {

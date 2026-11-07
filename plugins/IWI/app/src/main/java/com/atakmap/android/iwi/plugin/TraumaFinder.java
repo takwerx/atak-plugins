@@ -1,5 +1,6 @@
 package com.atakmap.android.iwi.plugin;
 
+
 import com.atakmap.coremap.maps.coords.GeoCalculations;
 import com.atakmap.coremap.maps.coords.GeoPoint;
 

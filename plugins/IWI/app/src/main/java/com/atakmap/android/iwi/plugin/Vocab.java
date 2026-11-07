@@ -1,5 +1,6 @@
 package com.atakmap.android.iwi.plugin;
 
+
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -72,8 +73,8 @@ public final class Vocab {
     public static final Choices MEDICAL = new Choices(
             new String[] {"cardiac_arrest", "chest_pain", "allergic", "respiratory", "heat",
                     "unconscious", "seizure", "diabetic", "other_medical"},
-            new String[] {"Cardiac arrest", "Chest pain", "Allergic reaction", "Respiratory",
-                    "Heat illness", "Unconscious", "Seizure", "Diabetic", "Other medical"},
+            new String[] {"Cardiac Arrest", "Chest Pain", "Allergic Reaction", "Respiratory",
+                    "Heat Illness", "Unconscious", "Seizure", "Diabetic", "Other Medical"},
             new String[] {"cardiac arrest", "chest pain", "allergic reaction",
                     "difficulty breathing", "heat-related illness", "unconscious", "seizure",
                     "diabetic emergency", "other medical"}, null);
@@ -81,15 +82,18 @@ public final class Vocab {
     public static final Choices TRAUMA = new Choices(
             new String[] {"tree_strike", "vehicle", "fall", "rolling_rock", "chainsaw", "burns",
                     "electrical", "other_trauma"},
-            new String[] {"Tree strike", "Vehicle accident", "Fall", "Rolling rock",
-                    "Chainsaw / tool", "Burns", "Electrical", "Other trauma"},
+            new String[] {"Tree Strike", "Vehicle Accident", "Fall", "Rolling Rock",
+                    "Chainsaw / Tool", "Burns", "Electrical", "Other Trauma"},
             new String[] {"struck by a falling tree", "vehicle accident", "fall",
                     "struck by a rolling rock", "cut by a chainsaw or tool", "burns",
                     "electrical contact", "other injury"}, null);
 
-    /** Stored as the label, which is what earlier builds stored. */
+    /**
+     * Pick-many since 2026-11-06 (operator: short-haul to a helispot, then an air
+     * ambulance). Builds before stored one label; {@link IwiState} converts it.
+     */
     public static final Choices EVAC = new Choices(
-            new String[] {"Air Ambulance", "Short-Haul", "Hoist", "Ground Ambulance", "Other"},
+            new String[] {"air", "shorthaul", "hoist", "ground", "other"},
             new String[] {"Air Ambulance", "Short-Haul", "Hoist", "Ground Ambulance", "Other"},
             new String[] {"air ambulance", "short-haul", "hoist", "ground ambulance",
                     "other transport"}, null);
@@ -106,9 +110,9 @@ public final class Vocab {
     public static final Choices RESOURCES = new Choices(
             new String[] {"paramedic", "crew", "litter", "immobilization", "aed", "oxygen",
                     "trauma_bag", "iv", "splints", "rope", "extrication", "hazmat", "none"},
-            new String[] {"Paramedic/EMT", "Crew", "Wheeled litter", "Immobilization", "AED",
-                    "Oxygen", "Trauma bag", "IV fluids", "Splints", "Rope rescue",
-                    "Extrication", "HAZMAT", "None needed"},
+            new String[] {"Paramedic/EMT", "Crew", "Wheeled Litter", "Immobilization", "AED",
+                    "Oxygen", "Trauma Bag", "IV Fluids", "Splints", "Rope Rescue",
+                    "Extrication", "HAZMAT", "None Needed"},
             new String[] {"a paramedic or EMT", "a crew", "a wheeled litter",
                     "immobilization devices", "an AED", "oxygen", "a trauma bag", "IV fluids",
                     "splints", "rope rescue", "extrication", "HAZMAT", "none"}, "none");
@@ -123,7 +127,7 @@ public final class Vocab {
 
     public static final Choices BREATHING = new Choices(
             new String[] {"normal", "labored", "none"},
-            new String[] {"Normal", "Labored", "Not breathing"},
+            new String[] {"Normal", "Labored", "Not Breathing"},
             new String[] {"breathing normal", "labored breathing", "not breathing"}, null);
 
     public static final Choices PULSE = new Choices(
@@ -133,7 +137,7 @@ public final class Vocab {
 
     public static final Choices BLEEDING = new Choices(
             new String[] {"none", "controlled", "uncontrolled"},
-            new String[] {"None", "Controlled", "Not controlled"},
+            new String[] {"None", "Controlled", "Not Controlled"},
             new String[] {"no major bleeding", "bleeding controlled",
                     "bleeding not controlled"}, null);
 
@@ -166,9 +170,9 @@ public final class Vocab {
     public static final Choices TREATMENT = new Choices(
             new String[] {"pressure", "tourniquet", "splint", "spine", "shock", "epi", "burns",
                     "cooling", "cpr", "aed", "oxygen", "eyes", "none_yet"},
-            new String[] {"Direct pressure", "Tourniquet", "Splinted", "Head/neck stabilized",
-                    "Shock care", "Epi assisted", "Burns cooled", "Cooling", "CPR", "AED",
-                    "Oxygen", "Eyes washed", "None yet"},
+            new String[] {"Direct Pressure", "Tourniquet", "Splinted", "Head/Neck",
+                    "Shock Care", "Epi Assisted", "Burns Cooled", "Cooling", "CPR", "AED",
+                    "Oxygen", "Eyes Washed", "None Yet"},
             new String[] {"direct pressure", "tourniquet", "splinted",
                     "head and neck stabilized", "treated for shock", "epinephrine assisted",
                     "burns cooled and wrapped", "active cooling", "CPR in progress",

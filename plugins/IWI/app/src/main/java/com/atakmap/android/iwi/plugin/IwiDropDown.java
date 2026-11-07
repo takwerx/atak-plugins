@@ -3,49 +3,123 @@ package com.atakmap.android.iwi.plugin;
 import android.content.Context;
 import android.content.Intent;
 import android.view.View;
+import android.widget.LinearLayout;
 
+import com.atak.plugins.impl.PluginLayoutInflater;
 import com.atakmap.android.dropdown.DropDown.OnStateListener;
 import com.atakmap.android.dropdown.DropDownReceiver;
 import com.atakmap.android.maps.MapView;
 
 /**
- * The pane's host: a drop-down that opens at half width and can be dragged out to
- * full width, the way Atmosphere's does (operator, 2026-10-14: "allow this to expand
- * out ... like we have for atmosphere ... for like big buttons").
+ * The pane's host: a drop-down that opens at half width and can be dragged or toggled
+ * out to full width and back (Atmosphere's {@code AtmosphereDropDown}), holding IWI's
+ * pages and its Settings page.
  *
  * <p>Not the stable {@code gov.tak.api.ui.Pane}: that carries only a preferred size
- * fixed when it is built and never hears about the handle being dragged. Wide is
- * {@code FULL_WIDTH} less the handle, never {@code FULL_WIDTH} itself: that strip is
- * where the handle lives, and covering it leaves no way back. Back narrows a wide
- * pane first; a second Back closes it.
+ * fixed when it is built and cannot be resized once shown. Wide is {@code FULL_WIDTH}
+ * less the handle, never {@code FULL_WIDTH} itself: that strip is where the handle
+ * lives, and covering it leaves no way back.
+ *
+ * <p>IWI's pages lived inside LCES's pane from 2026-11-03 to 2026-11-07; this class is
+ * the part of LCES's shell IWI needs on its own: the Settings page and the width.
  */
 public class IwiDropDown extends DropDownReceiver implements OnStateListener {
 
     private final View root;
-    private final IwiPane pane;
+    private final View iwiHost;
+    private final View settingsPage;
+    private final IwiPane iwi;
 
     private double currentWidth = HALF_WIDTH;
     private double currentHeight = FULL_HEIGHT;
 
-    public IwiDropDown(MapView mapView, View root, IwiPane pane) {
+    public IwiDropDown(MapView mapView, Context pluginContext, TraumaManager trauma) {
         super(mapView);
-        this.root = root;
-        this.pane = pane;
+        root = PluginLayoutInflater.inflate(pluginContext, R.layout.main_layout, null);
+        iwiHost = root.findViewById(R.id.iwi_host);
+        settingsPage = root.findViewById(R.id.settings_page);
+
+        final View pages = PluginLayoutInflater.inflate(pluginContext, R.layout.iwi_layout,
+                null);
+        ((LinearLayout) iwiHost).addView(pages, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
+        final View settings = PluginLayoutInflater.inflate(pluginContext,
+                R.layout.iwi_settings, null);
+        ((LinearLayout) root.findViewById(R.id.iwi_settings_host)).addView(settings);
+
+        iwi = new IwiPane(pluginContext, mapView, pages, settings, trauma,
+                new IwiPane.Exits() {
+                    @Override
+                    public void leaveIwi() {
+                        closeDropDown();
+                    }
+
+                    @Override
+                    public void openSettings() {
+                        showSettings(true);
+                    }
+
+                    @Override
+                    public void toggleWide() {
+                        IwiDropDown.this.toggleWide();
+                    }
+
+                    @Override
+                    public void narrow() {
+                        if (isWide())
+                            goNarrow();
+                    }
+                });
+
+        root.findViewById(R.id.btn_settings_back).setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        leaveSettings();
+                    }
+                });
+        root.findViewById(R.id.btn_settings_wide).setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        toggleWide();
+                    }
+                });
     }
 
+    /** The toolbar button, or a tap on this device's IWI marker: the IWI page, current. */
     public void show() {
+        showSettings(false);
+        iwi.open();
         if (isVisible())
             return;
-        // Retained under a chooser or another drop-down. ignoreBackButton stays false,
-        // or Back can never close it (Atmosphere, 2026-09-26).
         setRetain(true);
+        // ignoreBackButton false: with it true Back can never close the pane
+        // (Atmosphere, 2026-09-26). onBackButtonPressed() is called either way.
         showDropDown(root, HALF_WIDTH, FULL_HEIGHT, FULL_WIDTH, HALF_HEIGHT, false, this);
-        pane.onShown();
+    }
+
+    /** A tap on another device's IWI marker: their whole report, read only. */
+    public void showView(String uid) {
+        show();
+        iwi.openView(uid);
+    }
+
+    private void showSettings(boolean on) {
+        settingsPage.setVisibility(on ? View.VISIBLE : View.GONE);
+        iwiHost.setVisibility(on ? View.GONE : View.VISIBLE);
+        if (on)
+            iwi.refreshSettings();
+    }
+
+    private void leaveSettings() {
+        showSettings(false);
+        iwi.refreshSettings();
     }
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        // Opened directly by the toolbar item, not by broadcast.
+        // Opened directly by the toolbar item and the marker tap, not by broadcast.
     }
 
     /** The handle was dragged or tapped. ATAK asks, the pane answers. */
@@ -57,8 +131,7 @@ public class IwiDropDown extends DropDownReceiver implements OnStateListener {
             goNarrow();
     }
 
-    /** The pane's own button: wide if narrow, narrow if wide. */
-    public void toggleWide() {
+    void toggleWide() {
         if (isWide())
             goNarrow();
         else
@@ -84,26 +157,33 @@ public class IwiDropDown extends DropDownReceiver implements OnStateListener {
      * half, and the first tap on the wide button read that as already wide and did
      * nothing (s10-dev-1, 2026-10-14).
      */
-    public boolean isWide() {
+    boolean isWide() {
         return !isPortrait()
                 ? currentWidth > (HALF_WIDTH + FULL_WIDTH) / 2
                 : currentHeight > (HALF_HEIGHT + FULL_HEIGHT) / 2;
     }
 
+    /**
+     * Back narrows a wide pane, then leaves Settings or one of IWI's pages for the IWI
+     * page, then closes.
+     */
     @Override
     protected boolean onBackButtonPressed() {
         if (isWide()) {
             goNarrow();
             return true;
         }
-        return false;
+        if (settingsPage.getVisibility() == View.VISIBLE) {
+            leaveSettings();
+            return true;
+        }
+        return iwi.back();
     }
 
     @Override
     public void onDropDownSizeChanged(double width, double height) {
         currentWidth = width;
         currentHeight = height;
-        com.atakmap.coremap.log.Log.d("IWI-DropDown", "size " + width + " x " + height);
     }
 
     @Override
@@ -113,7 +193,7 @@ public class IwiDropDown extends DropDownReceiver implements OnStateListener {
     @Override
     public void onDropDownClose() {
         // An armed map pick holds the map's tap listeners and must let go.
-        pane.onClosed();
+        iwi.onClosed();
     }
 
     @Override
@@ -122,6 +202,6 @@ public class IwiDropDown extends DropDownReceiver implements OnStateListener {
 
     @Override
     protected void disposeImpl() {
-        pane.dispose();
+        iwi.dispose();
     }
 }

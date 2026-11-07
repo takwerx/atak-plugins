@@ -1,5 +1,6 @@
 package com.atakmap.android.iwi.plugin;
 
+
 import java.util.Locale;
 
 /**
