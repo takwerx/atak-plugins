@@ -2,6 +2,9 @@
 <resources>
     <!-- App -->
     <string name="app_name">LCES</string>
+    <string name="manual_title">Plugin Documentation</string>
+    <string name="manual_summary">Open the LCES user guide: the IRPG pages, search, and the Lessons Learned layer</string>
+    <string name="prefs_summary">The IRPG one tap away, and wildland fire lessons learned on the map</string>
     <!-- description -->
     <string name="app_desc">Lookouts, Communications, Escape Routes, Safety Zones: the IRPG and wildland fire lessons learned on the map</string>
 

@@ -25,6 +25,7 @@ import gov.tak.platform.marshal.MarshalManager;
 public class LCES implements IPlugin {
 
     private static final String TAG = "LCES";
+    private static final String PREFS_KEY = "lcesPreference";
 
     IServiceController serviceController;
     Context pluginContext;
@@ -67,6 +68,7 @@ public class LCES implements IPlugin {
     public void onStart() {
         if (uiService != null)
             uiService.addToolbarItem(toolbarItem);
+        registerPreferences();
         mapView = MapView.getMapView();
         if (mapView == null) {
             Log.w(TAG, "no map view at start");
@@ -104,8 +106,32 @@ public class LCES implements IPlugin {
             lessons.stop();
             lessons = null;
         }
+        unregisterPreferences();
         if (uiService != null)
             uiService.removeToolbarItem(toolbarItem);
+    }
+
+    /** The Tool Preferences entry: the only way to open the user guide. */
+    private void registerPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.register(
+                    new com.atakmap.app.preferences.ToolsPreferenceFragment.ToolPreference(
+                            pluginContext.getString(R.string.app_name),
+                            pluginContext.getString(R.string.prefs_summary),
+                            PREFS_KEY,
+                            pluginContext.getResources().getDrawable(R.drawable.ic_toolbar),
+                            new LcesPreferenceFragment(pluginContext)));
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not register preferences: " + notThisBuild);
+        }
+    }
+
+    private void unregisterPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.unregister(PREFS_KEY);
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not unregister preferences: " + notThisBuild);
+        }
     }
 
     private void showPane() {
