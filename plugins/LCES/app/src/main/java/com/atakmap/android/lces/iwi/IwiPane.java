@@ -1035,12 +1035,16 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
 
     // ---- the radio scripts ----
 
-    /** The Radio Script page: the initial report, then whatever the follow-ups say. */
     /** The Radio Script, rebuilt and always from its first line: it is read top down. */
     private void openScript(View returnTo) {
         buildScript();
         scriptReturn = returnTo;
         show(scriptPage);
+        scriptToTop();
+    }
+
+    /** A script is read top down, so it always opens at its first line. */
+    private void scriptToTop() {
         final View sv = (View) scriptContainer.getParent();
         sv.scrollTo(0, 0);
         sv.post(new Runnable() {
@@ -1051,6 +1055,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         });
     }
 
+    /** The Radio Script page: the initial report, then whatever the follow-ups say. */
     private void buildScript() {
         scriptContainer.removeAllViews();
         scriptContainer.addView(note(ctx.getString(R.string.script_how)));
@@ -1127,6 +1132,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         finishScript(render(list));
         scriptReturn = reportPage;
         show(scriptPage);
+        scriptToTop();
     }
 
     /** @return whether anything in them is not filled in */
