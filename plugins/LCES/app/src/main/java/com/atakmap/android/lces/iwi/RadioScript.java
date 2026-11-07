@@ -261,9 +261,12 @@ public final class RadioScript {
      * Treatment: tourniquet and treated for shock."
      */
     public static Section patient(Source s, Patient p) {
+        if (IwiState.BLACK.equals(p.color))
+            // Dead or dying: no assessment, no treatment, nothing missing.
+            return new Section(3, "Initial Patient Assessment")
+                    .say(p.label() + ", " + Patient.name(p.color) + ".");
         final Section three = new Section(3, "Initial Patient Assessment")
-                .say(p.label() + ", " + Patient.name(p.color)
-                        + (IwiState.BLACK.equals(p.color) ? ". " : " priority. "))
+                .say(p.label() + ", " + Patient.name(p.color) + " priority. ")
                 .field(capital(Vocab.LOC.spoken(p.get(Patient.LOC))), "consciousness")
                 .say(", ")
                 .field(Vocab.BREATHING.spoken(p.get(Patient.BREATHING)), "breathing")

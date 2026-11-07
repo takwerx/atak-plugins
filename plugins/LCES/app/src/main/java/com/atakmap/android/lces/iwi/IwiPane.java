@@ -91,7 +91,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     /** After the call: Patients, Evac Plan, Comms, Contingency. */
     private final Button[] followUps = new Button[4];
     private static final String[] FOLLOW_UP_NAMES = {
-            "Patients", "Evac Plan", "Comms", "Contingency"
+            "Patient Update", "Evac Plan", "Comms", "Contingency"
     };
     private View stepBoxesRow;
     private View followUpBar;

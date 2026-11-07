@@ -636,12 +636,18 @@ final class ReportForm {
             }
             body.addView(colors);
 
+            // Black is dead or dying: there is nothing to assess or treat, so the card
+            // holds only the triage row (operator, 2026-11-06).
+            final LinearLayout assess = block();
+            assess.setVisibility(IwiState.BLACK.equals(p.color) ? View.GONE : View.VISIBLE);
+            body.addView(assess, full());
+
             // IRPG p. 108, Patient Assessment, in its order.
-            pick(body, "Consciousness", Patient.LOC, 2);
-            pick(body, "Breathing", Patient.BREATHING, 3);
-            pick(body, "Pulse", Patient.PULSE, 2);
-            pick(body, "Major bleeding", Patient.BLEEDING, 3);
-            final Fold more = section(body, "iwi.fold.skin." + p.n);
+            pick(assess, "Consciousness", Patient.LOC, 2);
+            pick(assess, "Breathing", Patient.BREATHING, 3);
+            pick(assess, "Pulse", Patient.PULSE, 2);
+            pick(assess, "Major bleeding", Patient.BLEEDING, 3);
+            final Fold more = section(assess, "iwi.fold.skin." + p.n);
             more.label("Skin and Pupils", null);
             final LinearLayout mb = body(more);
             pick(mb, "Skin color", Patient.SKIN_COLOR, 4);
@@ -651,8 +657,8 @@ final class ReportForm {
             pick(mb, "Reaction to light", Patient.REACTION, 3);
 
             // IRPG pp. 110-114, Specific Treatments.
-            body.addView(label("Treatment"));
-            tiles(body, Vocab.TREATMENT, 2, true, cardBinding(Patient.TREATMENT), groups);
+            assess.addView(label("Treatment"));
+            tiles(assess, Vocab.TREATMENT, 2, true, cardBinding(Patient.TREATMENT), groups);
 
             // Short-haul and hoist need the weight (IRPG p. 119): a stepper, not a box.
             final LinearLayout wb = block();
@@ -682,7 +688,7 @@ final class ReportForm {
             }), plp);
             wb.addView(wr);
             weightBlock = wb;
-            body.addView(wb);
+            assess.addView(wb);
             showWeight(p.get(Patient.WEIGHT));
 
             final LinearLayout actions = row();
@@ -787,8 +793,11 @@ final class ReportForm {
                     android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             b.append('\n');
             final int second = b.length();
-            b.append(p.updatedMs > 0 && p.hasNotes()
-                    ? "updated " + Clock.hhmm(p.updatedMs) : "no notes yet");
+            if (IwiState.BLACK.equals(p.color))
+                b.append("deceased, nothing to fill in");
+            else
+                b.append(p.updatedMs > 0 && p.hasNotes()
+                        ? "updated " + Clock.hhmm(p.updatedMs) : "no notes yet");
             if (missing > 0) {
                 b.append(", ");
                 final int left = b.length();
