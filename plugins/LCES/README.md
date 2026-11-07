@@ -50,8 +50,8 @@ server.
 _________________________________________________________________
 STATUS
 
-Version 0.1, first release. Tested on a Samsung Galaxy S10 with ATAK-CIV
-5.8.0.3, release build.
+Version 0.2, first public release. The tak.gov-signed builds were tested on
+official ATAK-CIV 5.6, 5.7 and 5.8.
 
 _________________________________________________________________
 POINT OF CONTACTS
