@@ -101,7 +101,7 @@
     <string name="iwi_cruise_explain">The flight time on the line is straight-line distance at this speed. One number, used for every estimate.</string>
     <string name="iwi_confirm_note">Press and drag the marker to put it exactly where the patient is.</string>
     <string name="iwi_clear_title">Clear this IWI?</string>
-    <string name="iwi_clear_note">This removes the IWI marker from your map and erases the patient details in the report on this device.\n\nWho you call and the frequencies (items 1 and 6) are kept for the next one.\n\nIt does not remove the marker from anyone you sent it to.</string>
+    <string name="iwi_clear_note">This removes the IWI marker from your map and erases everything in the report on this device, so the next IWI starts blank.\n\nIt does not remove the marker from anyone you sent it to.</string>
     <string name="mir_header">FOR A NON-EMERGENCY INCIDENT, WORK THROUGH CHAIN OF COMMAND TO REPORT AND TRANSPORT INJURED PERSONNEL AS NECESSARY.\n\nFOR A MEDICAL EMERGENCY: IDENTIFY ON-SCENE INCIDENT COMMANDER BY NAME AND POSITION AND ANNOUNCE \"MEDICAL EMERGENCY\" TO INITIATE RESPONSE FROM IMT COMMUNICATIONS/DISPATCH.\n\nUse the following items to communicate situation to communications/dispatch.</string>
     <string name="mir_red">RED / PRIORITY 1 Life or limb threatening injury or illness. Evacuation need is IMMEDIATE. Ex: Unconscious, difficulty breathing, bleeding severely, 2° – 3° burns more than 4 palm sizes, heat stroke, disoriented.</string>
     <string name="mir_yellow">YELLOW / PRIORITY 2 Serious injury or illness. Evacuation may be DELAYED if necessary. Ex: Significant trauma, unable to walk, 2° – 3° burns not more than 1-3 palm sizes.</string>

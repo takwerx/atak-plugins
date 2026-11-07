@@ -149,7 +149,7 @@ public final class RadioScript {
         for (Patient p : bySeverity(s.patients()))
             if (p.hasNotes())
                 out.add(patient(s, p));
-        final Section[] rest = {evacPlan(s), comms(s), contingency(s), additional(s)};
+        final Section[] rest = {evacPlan(s), contingency(s), additional(s)};
         for (Section x : rest)
             if (x.hasContent())
                 out.add(x);
@@ -412,9 +412,6 @@ public final class RadioScript {
         final Section five = resources(s);
         if (five.complete())
             line(b, "5. Resources", said(five));
-        for (int i = 0; i < IwiState.COMMS_ROWS.length; i++)
-            line(b, (i == 0 ? "6. " : "") + IwiState.COMMS_ROW_NAMES[i],
-                    commsRow(s, IwiState.COMMS_ROWS[i]));
         line(b, "7. Contingency", s.text(IwiState.CONTINGENCY));
         line(b, "8. Additional", s.text(IwiState.ADDITIONAL));
         return b.toString().trim();

@@ -71,7 +71,6 @@ public final class IwiState implements RadioScript.Source {
     public static final String[] COMMS_COLS = {"channel", "rx", "rx_tone", "tx", "tx_tone"};
 
     /** Items 1 and 6 belong to the incident, not the patient, and outlive a Clear. */
-    private static final List<String> KEEP_ON_CLEAR = Arrays.asList(CONTACT_TO, CONTACT_FROM);
 
     private static final String K_LIVE = "iwi.live";
     private static final String K_UID = "iwi.uid";
@@ -150,7 +149,7 @@ public final class IwiState implements RadioScript.Source {
                 .apply();
     }
 
-    /** Forget the IWI and the patient's half of the report. */
+    /** Forget the IWI and everything in its report. */
     public void clear() {
         final SharedPreferences.Editor e = prefs.edit()
                 .remove(K_LIVE).remove(K_UID).remove(K_LAT).remove(K_LON)
@@ -158,19 +157,10 @@ public final class IwiState implements RadioScript.Source {
         for (String key : prefs.getAll().keySet()) {
             if (!key.startsWith(FIELD))
                 continue;
-            final String field = key.substring(FIELD.length());
-            if (KEEP_ON_CLEAR.contains(field) || isComms(field))
-                continue;
+            // Everything goes: the next IWI starts blank (operator, 2026-11-06).
             e.remove(key);
         }
         e.apply();
-    }
-
-    private static boolean isComms(String field) {
-        for (String row : COMMS_ROWS)
-            if (field.startsWith(row + "_"))
-                return true;
-        return false;
     }
 
     /** This phone's callsign, from ATAK: the reporter, and the IC unless one is named. */

@@ -341,7 +341,12 @@ final class ReportForm {
         field(body, IwiState.ETA, "Patient's ETA to evacuation location", "Ex: 40 min", false);
         field(body, IwiState.HELISPOT, "Helispot / Extraction Site Size and Hazards", "", true);
 
-        comms = section(root, "iwi.fold.r6");
+        // Item 6 is not shown: the crew already has its comms plan, so it was clutter
+        // (operator, 2026-11-06). Built in a hidden holder so the rest stays as it was.
+        final LinearLayout hidden6 = block();
+        hidden6.setVisibility(View.GONE);
+        root.addView(hidden6, full());
+        comms = section(hidden6, "iwi.fold.r6");
         body = body(comms);
         body.addView(guide(s(R.string.mir_6_guide)));
         final String[] names = {"COMMAND", "AIR-TO-GROUND", "TACTICAL"};

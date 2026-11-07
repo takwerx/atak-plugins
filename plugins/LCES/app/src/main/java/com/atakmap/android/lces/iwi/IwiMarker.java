@@ -69,9 +69,6 @@ public final class IwiMarker {
         final CotDetail med = new CotDetail("_medevac_");
         med.setAttribute("casevac", "true");
         med.setAttribute("title", title);
-        final String freq = s.text(IwiState.commsKey("cmd", "rx"));
-        if (!freq.isEmpty())
-            med.setAttribute("freq", freq);
         final int red = s.count(IwiState.RED);
         final int yellow = s.count(IwiState.YELLOW);
         final int green = s.count(IwiState.GREEN);
