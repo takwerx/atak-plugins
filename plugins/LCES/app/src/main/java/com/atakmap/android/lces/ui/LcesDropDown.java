@@ -65,12 +65,6 @@ public class LcesDropDown extends DropDownReceiver implements OnStateListener {
             goWide();
     }
 
-    /** Half width, if wide: a tap on the map is next, and the map has to show. */
-    void narrow() {
-        if (isWide())
-            goNarrow();
-    }
-
     private void goWide() {
         if (!isPortrait())
             resize(FULL_WIDTH - HANDLE_THICKNESS_LANDSCAPE, FULL_HEIGHT);
@@ -105,7 +99,6 @@ public class LcesDropDown extends DropDownReceiver implements OnStateListener {
     public void onDropDownSizeChanged(double width, double height) {
         currentWidth = width;
         currentHeight = height;
-        pane.onResized();
     }
 
     @Override
@@ -114,8 +107,6 @@ public class LcesDropDown extends DropDownReceiver implements OnStateListener {
 
     @Override
     public void onDropDownClose() {
-        // An armed IWI map pick holds the map's tap listeners and must let go.
-        pane.onClosed();
     }
 
     @Override
@@ -124,6 +115,5 @@ public class LcesDropDown extends DropDownReceiver implements OnStateListener {
 
     @Override
     protected void disposeImpl() {
-        pane.dispose();
     }
 }

@@ -14,7 +14,7 @@ import javax.net.ssl.HttpsURLConnection;
  *
  * <p>IWI's (AirAware's before it), carried forward; shared helpers are copy-forward.
  * LCES uses it for two things on our own depot, each on its manager's worker thread:
- * the Lessons Learned catalog and IWI's trauma center pack.
+ * the Lessons Learned catalog.
  */
 public final class Http {
 

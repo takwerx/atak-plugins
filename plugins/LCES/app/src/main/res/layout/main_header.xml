@@ -59,8 +59,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/heading_irpg" />
-    <!-- Two rows of three: the pages read every time, and the report a crew
-         needs in a hurry (IWI, in the red of the medical pages). -->
+    <!-- The pages read every time: three, then Briefing and the whole book. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -92,10 +91,5 @@
             android:layout_width="0dp" android:layout_weight="1"
             android:layout_height="match_parent" android:layout_marginLeft="6dp"
             android:text="@string/tile_irpg" />
-        <Button android:id="@+id/tile_iwi" style="@style/TakwerxButton"
-            android:layout_width="0dp" android:layout_weight="1"
-            android:layout_height="match_parent" android:layout_marginLeft="6dp"
-            android:textColor="@color/tile_iwi"
-            android:text="@string/tile_iwi" />
     </LinearLayout>
 </LinearLayout>

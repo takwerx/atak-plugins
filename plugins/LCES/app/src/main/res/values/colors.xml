@@ -8,16 +8,4 @@
     <color name="state_off">#ff5b52</color>
     <!-- Where a page comes from, under its title: readable, quieter than the text. -->
     <color name="source_gray">#b0b0b0</color>
-
-    <!-- The IWI tile, in the red of the IRPG's medical pages. -->
-    <color name="tile_iwi">#FF6B6B</color>
-
-    <!-- IWI, copied forward. Triage is the one place color is the control, read at
-         arm's length. -->
-    <color name="amber">#FFC107</color>
-    <color name="guide_grey">#BBBBBB</color>
-    <color name="hint_grey">#8A8A8A</color>
-    <color name="triage_red">#FF5252</color>
-    <color name="triage_yellow">#FFD740</color>
-    <color name="triage_green">#69F0AE</color>
 </resources>
