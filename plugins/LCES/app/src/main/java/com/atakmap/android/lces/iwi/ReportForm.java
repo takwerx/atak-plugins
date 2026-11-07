@@ -116,6 +116,7 @@ final class ReportForm {
             new java.util.WeakHashMap<Fold, Boolean>());
     private Fold contact;
     private Button evacPick;
+    private LinearLayout evacCounts;
     private TextView evacHint;
     private boolean evacPicking;
     private Fold status;
@@ -229,6 +230,7 @@ final class ReportForm {
 
     /** Put what is saved back in every box and every card, after a Clear or a reopen. */
     void refresh() {
+        refreshEvacCounts();
         binding = true;
         for (Map.Entry<String, EditText> f : fields.entrySet()) {
             final String v = state.raw(f.getKey());
@@ -307,6 +309,9 @@ final class ReportForm {
         evacLabel = label("Evacuation request");
         body.addView(evacLabel);
         tiles(body, Vocab.EVAC, 2, true, textBinding(IwiState.EVAC_REQUEST), groups);
+        // How many of each: two air ambulances, two hoist ships (operator, 2026-11-06).
+        evacCounts = block();
+        body.addView(evacCounts, full());
 
         body.addView(label("Patient location"));
         latLong = new TextView(ctx);
@@ -405,7 +410,7 @@ final class ReportForm {
 
         head(contact, "1. Contact", RadioScript.contact(state), RadioScript.calling(state));
         final int n = state.patientCount();
-        final String evac = Vocab.labels(state.text(IwiState.EVAC_REQUEST), Vocab.EVAC);
+        final String evac = RadioScript.evacLabels(state);
         head(status, "2. Incident Status", RadioScript.status(state, coords),
                 (n == 1 ? "1 patient" : n + " patients") + (evac.isEmpty() ? "" : ", " + evac));
         head(resources, "5. Resources", RadioScript.resources(state),
@@ -486,6 +491,7 @@ final class ReportForm {
 
     /** After any tap: colors, then heads. */
     private void picked() {
+        refreshEvacCounts();
         refreshChoices();
         refreshHeads();
         // The pinned Steps bar follows every pick.
@@ -1008,6 +1014,50 @@ final class ReportForm {
         final Fold f = new Fold(head, chev, body, prefs, pref);
         folds.add(f);
         return f;
+    }
+
+    /** One row per picked resource, Other aside: its name, the number, minus and plus. */
+    private void refreshEvacCounts() {
+        evacCounts.removeAllViews();
+        for (final String c : Vocab.parse(state.text(IwiState.EVAC_REQUEST), Vocab.EVAC)) {
+            if ("other".equals(c))
+                continue;
+            final int n = RadioScript.evacCount(state, c);
+            final LinearLayout r = row();
+            r.setGravity(Gravity.CENTER_VERTICAL);
+            final TextView name = new TextView(ctx);
+            name.setText(Vocab.EVAC.label(c) + ": " + n);
+            name.setTextSize(17);
+            name.setTypeface(Typeface.DEFAULT_BOLD);
+            name.setTextColor(Color.WHITE);
+            r.addView(name, new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            r.addView(button("\u2212", new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    setEvacCount(c, n - 1);
+                }
+            }), new LinearLayout.LayoutParams(dp(64), LinearLayout.LayoutParams.WRAP_CONTENT));
+            final LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(dp(64),
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            plp.leftMargin = dp(6);
+            r.addView(button("+", new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    setEvacCount(c, n + 1);
+                }
+            }), plp);
+            final LinearLayout.LayoutParams lp = full();
+            lp.topMargin = dp(4);
+            evacCounts.addView(r, lp);
+        }
+    }
+
+    private void setEvacCount(String code, int n) {
+        state.set(RadioScript.evacCountKey(code), Integer.toString(Math.max(1, Math.min(9, n))));
+        refreshEvacCounts();
+        refreshHeads();
+        host.countsChanged();
     }
 
     /** Pick on Map turns into Cancel while the map waits for the tap. */

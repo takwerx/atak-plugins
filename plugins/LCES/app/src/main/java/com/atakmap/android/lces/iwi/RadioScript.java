@@ -506,7 +506,61 @@ public final class RadioScript {
     }
 
     private static String evac(Source s) {
-        return Vocab.saidAnd(s.text(IwiState.EVAC_REQUEST), Vocab.EVAC);
+        return evacSaid(s);
+    }
+
+    /** How many of one evac resource are asked for: 1 unless raised (operator, 2026-11-06). */
+    public static int evacCount(Source s, String code) {
+        try {
+            return Math.max(1, Math.min(9, Integer.parseInt(s.text(evacCountKey(code)))));
+        } catch (NumberFormatException e) {
+            return 1;
+        }
+    }
+
+    public static String evacCountKey(String code) {
+        return "evac_n_" + code;
+    }
+
+    private static final String[] NUMBER_WORDS = {"", "one", "two", "three", "four", "five",
+            "six", "seven", "eight", "nine"};
+
+    /** Said: "two air ambulances and one hoist ship", or "air ambulance" for just one. */
+    public static String evacSaid(Source s) {
+        final List<String> words = new ArrayList<>();
+        final java.util.Set<String> picked =
+                Vocab.parse(s.text(IwiState.EVAC_REQUEST), Vocab.EVAC);
+        boolean anyMany = false;
+        for (String c : picked)
+            anyMany |= !"other".equals(c) && evacCount(s, c) > 1;
+        for (String c : picked) {
+            final int n = "other".equals(c) ? 1 : evacCount(s, c);
+            final String one = Vocab.EVAC.spoken(c);
+            if (!anyMany || "other".equals(c))
+                words.add(one);
+            else
+                words.add(NUMBER_WORDS[n] + " " + (n > 1 ? plural(c, one) : single(c, one)));
+        }
+        return Vocab.andList(words);
+    }
+
+    private static String single(String code, String one) {
+        return "hoist".equals(code) || "shorthaul".equals(code) ? one + " ship" : one;
+    }
+
+    private static String plural(String code, String one) {
+        return "hoist".equals(code) || "shorthaul".equals(code) ? one + " ships" : one + "s";
+    }
+
+    /** For a head or the marker: "Air Ambulance x2, Hoist". */
+    public static String evacLabels(Source s) {
+        final StringBuilder b = new StringBuilder();
+        for (String c : Vocab.parse(s.text(IwiState.EVAC_REQUEST), Vocab.EVAC)) {
+            final int n = "other".equals(c) ? 1 : evacCount(s, c);
+            b.append(b.length() > 0 ? ", " : "").append(Vocab.EVAC.label(c))
+                    .append(n > 1 ? " x" + n : "");
+        }
+        return b.toString();
     }
 
     static boolean needsWeight(Source s) {

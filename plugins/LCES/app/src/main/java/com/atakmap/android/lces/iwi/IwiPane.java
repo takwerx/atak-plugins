@@ -965,7 +965,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             case 2: return RadioScript.summary(state);
             case 3: return Vocab.labels(state.text(IwiState.NATURE), Vocab.MEDICAL,
                     Vocab.TRAUMA);
-            case 4: return Vocab.labels(state.text(IwiState.EVAC_REQUEST), Vocab.EVAC);
+            case 4: return RadioScript.evacLabels(state);
             case 5: return Vocab.labels(state.text(IwiState.CARE_ROLE), Vocab.CARE);
             default: return Vocab.labels(state.text(IwiState.RESOURCES), Vocab.RESOURCES);
         }
