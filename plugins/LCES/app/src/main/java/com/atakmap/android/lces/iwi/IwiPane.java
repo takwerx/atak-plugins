@@ -828,7 +828,8 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
 
     private String stepMissing(int step) {
         switch (step) {
-            case 1: return "Set your callsign in ATAK";
+            case 1: return Vocab.CONTACT.index(state.text(IwiState.CONTACT_TO)) < 0
+                    ? "Communications or Dispatch" : "Set your callsign in ATAK";
             case 2: return "Count them by triage color";
             case 3: return "Medical or trauma: pick from the list";
             case 4: return "Air ambulance, short-haul, ground...";

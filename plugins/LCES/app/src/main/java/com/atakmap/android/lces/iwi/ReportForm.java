@@ -263,12 +263,12 @@ final class ReportForm {
         tiles(body, Vocab.CONTACT, 2, false, new Binding() {
             @Override
             String get() {
-                return RadioScript.calling(state);
+                return state.text(IwiState.CONTACT_TO);
             }
 
             @Override
             void set(String v) {
-                state.set(IwiState.CONTACT_TO, v.isEmpty() ? "Communications" : v);
+                state.set(IwiState.CONTACT_TO, v);
             }
         }, groups);
         callsignLine = guide("");

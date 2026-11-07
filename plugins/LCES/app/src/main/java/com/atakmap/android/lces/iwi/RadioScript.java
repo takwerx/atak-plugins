@@ -182,8 +182,12 @@ public final class RadioScript {
      */
     public static Section contact(Source s) {
         final String to = calling(s);
+        // Who to call is picked for each IWI, never assumed: a blank report starts with
+        // step 1 to do (operator, 2026-11-06).
+        final String picked = Vocab.CONTACT.index(s.text(IwiState.CONTACT_TO)) >= 0
+                ? to : "";
         final Section one = new Section(1, "Contact Communications / Dispatch")
-                .say(to + ", ")
+                .field(picked, "Communications or Dispatch").say(", ")
                 .field(s.callsign(), "your callsign: set it in ATAK")
                 .say(". Stand-by for Emergency Traffic.");
         // No break: the reporter stops, and Communications clears the air and comes
