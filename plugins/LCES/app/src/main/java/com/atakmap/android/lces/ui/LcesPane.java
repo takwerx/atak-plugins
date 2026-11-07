@@ -640,6 +640,8 @@ public final class LcesPane implements PageView.Opener {
             colored(sb, shown ? "ON" : "OFF", pluginContext.getResources().getColor(
                     shown ? R.color.state_on : R.color.state_off));
             final Button b = new Button(pluginContext, null, 0, R.style.TakwerxTwoLineTile);
+            // A long name wraps; ON/OFF must still show on a line of its own.
+            b.setMaxLines(3);
             b.setText(sb);
             b.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -703,6 +705,8 @@ public final class LcesPane implements PageView.Opener {
             colored(sb, isOn ? "ON" : "OFF", pluginContext.getResources().getColor(
                     isOn ? R.color.state_on : R.color.state_off));
             final Button b = new Button(pluginContext, null, 0, R.style.TakwerxTwoLineTile);
+            // A long name wraps; ON/OFF must still show on a line of its own.
+            b.setMaxLines(3);
             b.setText(sb);
             b.setOnClickListener(new View.OnClickListener() {
                 @Override
