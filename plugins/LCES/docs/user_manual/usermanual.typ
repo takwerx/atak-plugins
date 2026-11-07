@@ -43,10 +43,31 @@ lessons other crews learned the hard way on the map, where they happened.
 #v(6pt)
 
 Load it from ATAK's Plugins manager (TAK Package Mgmt) like any other plugin,
-then open it from the toolbar with the LCES icon.
+then open it from the toolbar with the LCES icon:
+
+#v(4pt)
+
+#image("00.png", width: 100%)
 ]
 
-// SHOT 01 (main screen) goes here once it is taken: see SHOTLIST-LCES-manual.md.
+#tak-slide[
+= The main screen
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("01.png", height: 270pt)
+][
+  - *Lessons Learned ON / OFF* puts the lessons on the map or takes them off.
+  - *Settings:* text size, which lessons to show, and the map key.
+  - *Search* covers the IRPG and the lessons at once.
+  - *FROM THE IRPG:* the pages read every shift, one tap away.
+  - *Lessons near the map center:* the closest lessons first, with the
+    distance. *Details* opens one.
+
+  #v(6pt)
+
+  The line at the top says how many lessons the list and the map are showing.
+]
+]
 
 #tak-slide[
 = The IRPG tiles
@@ -140,9 +161,50 @@ then open it from the toolbar with the LCES icon.
 ]
 ]
 
-// SHOTS 07 and 08 (lessons on the map, signed build) go here.
+#tak-slide[
+= Lessons on the map
 
-// SHOT 09 (an incident's page) goes here.
+#image("07.png", width: 100%)
+
+Every lesson is a dot where it happened, in the color of its type. Zoomed
+out, ATAK shows some of the names; zoom in to see them all.
+]
+
+#tak-slide[
+= Zoomed in
+
+#image("08.png", width: 100%)
+
+Each lesson carries its name. Tap a dot to open its page.
+]
+
+#tak-slide[
+= A lesson's page
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("09.png", height: 270pt)
+][
+  - The type, the date, where it happened and how far away, and the
+    toll.
+  - *Show on the map* centers the map on it.
+  - *WHAT HAPPENED* and *FROM THE REPORT:* the Center's own words.
+  - *DETAILS:* the activity, the entrapment and the fire behavior.
+
+  #v(6pt)
+
+  *Open the full report* opens the Center's report in your browser. It needs
+  a network.
+]
+]
+
+#tak-slide[
+= The full report
+
+#image("09b.png", height: 280pt)
+
+The report on lessons.wildfire.gov, the Wildland Fire Lessons Learned Center's
+own site.
+]
 
 #tak-slide[
 = Settings
@@ -207,7 +269,17 @@ then open it from the toolbar with the LCES icon.
 ]
 ]
 
-// SHOT 14 (status line naming what is hidden) goes here.
+#tak-slide[
+= What is not shown
+
+#image("14.png", width: 75%)
+
+#v(6pt)
+
+When a setting hides lessons, the line at the top of the main screen says so,
+here with Near miss turned off in *Types*. The list shows the nearest 100; the
+map shows every lesson the settings allow.
+]
 
 #tak-slide[
 = Opening this guide
