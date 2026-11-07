@@ -110,6 +110,9 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private final TextView[] tally = new TextView[4];
     private final TextView tallyTotal;
     private final Exits exits;
+    private TextView scriptTitle;
+    /** Another device's IWI being read on the script page, or null. */
+    private String viewUid;
     /** The Data Sync feed the IWI's markers go to, if one is chosen. */
     private final IwiFeed feed;
     private final Button feedButton;
@@ -121,6 +124,9 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         @Override
         public void run() {
             updateLive();
+            // Someone else's IWI on screen: the newest version the marker carries.
+            if (viewUid != null && scriptPage.getVisibility() == View.VISIBLE)
+                renderView(viewUid);
             // Anything that waited for the server goes out once it is back.
             feed.flush();
             handler.postDelayed(this, TICK_MS);
@@ -184,6 +190,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         livePatients = root.findViewById(R.id.iwi_live_patients);
         moveButton = root.findViewById(R.id.iwi_btn_move);
         scriptContainer = root.findViewById(R.id.iwi_script_container);
+        scriptTitle = root.findViewById(R.id.iwi_script_title);
         scriptButton = root.findViewById(R.id.iwi_btn_script);
         stepsBar = root.findViewById(R.id.iwi_steps_bar);
         final LinearLayout boxes = root.findViewById(R.id.iwi_steps_boxes);
@@ -382,6 +389,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         root.findViewById(R.id.iwi_btn_script_back).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                viewUid = null;
                 if (scriptReturn == reportPage)
                     show(reportPage);
                 else
@@ -474,6 +482,82 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         cancelPending();
         handler.removeCallbacks(tick);
         feed.dispose();
+    }
+
+    // ---- another device's IWI, read only ----
+
+    /** Whether a map item is an IWI from a device with LCES: it carries the report. */
+    public static boolean carriesReport(MapItem item) {
+        return item != null && item.getMetaString("iwi.report", null) != null;
+    }
+
+    /**
+     * Someone else's IWI: everything they entered, read only (operator, 2026-11-06).
+     * Only the reporter changes it; this page follows each update the feed brings.
+     */
+    public void openView(String uid) {
+        if (!renderView(uid))
+            return;
+        scriptReturn = mainPage;
+        show(scriptPage);
+        scriptToTop();
+    }
+
+    private boolean renderView(String uid) {
+        final MapItem item = mapView.getRootGroup().deepFindUID(uid);
+        final String json = item == null ? null : item.getMetaString("iwi.report", null);
+        if (json == null)
+            return false;
+        viewUid = uid;
+        final android.content.SharedPreferences vp = mapView.getContext()
+                .getSharedPreferences("lces_iwi_view", Context.MODE_PRIVATE);
+        IwiState.importJson(vp, json);
+        final IwiState v = new IwiState(vp);
+        scriptTitle.setText("IWI: Read Only");
+        scriptContainer.removeAllViews();
+        scriptContainer.addView(note("Reported by " + (v.callsign().isEmpty() ? "another device"
+                : v.callsign()) + ". Read only: only the reporter changes it. It updates "
+                + "here as they do."));
+
+        final int red = v.count(IwiState.RED), yellow = v.count(IwiState.YELLOW);
+        final int green = v.count(IwiState.GREEN), black = v.count(IwiState.BLACK);
+        scriptContainer.addView(line("Red " + red + "   Yellow " + yellow + "   Green " + green
+                + "   Black " + black + "   Total " + v.patientCount(), 18, Color.WHITE));
+        final StringBuilder when = new StringBuilder();
+        if (v.declaredMs() > 0)
+            when.append("Declared ").append(Clock.hhmm(v.declaredMs()));
+        long reported = 0;
+        try {
+            reported = Long.parseLong(v.text(IwiState.REPORTED));
+        } catch (NumberFormatException ignored) {
+        }
+        if (reported > 0)
+            when.append(when.length() > 0 ? ", " : "").append("initial report made ")
+                    .append(Clock.hhmm(reported));
+        if (when.length() > 0)
+            scriptContainer.addView(note(when.toString()));
+
+        final GeoPoint p = v.point();
+        final String coords = p == null ? null : Coords.ddm(p.getLatitude(), p.getLongitude());
+        scriptContainer.addView(heading("Report"));
+        final String report = RadioScript.remarks(v, coords);
+        if (report.isEmpty())
+            scriptContainer.addView(note("Nothing filled in yet."));
+        for (String row : report.split("\n")) {
+            if (row.trim().isEmpty())
+                continue;
+            final TextView t = line(row, 16, Color.WHITE);
+            t.setPadding(0, dp(6), 0, dp(2));
+            scriptContainer.addView(t);
+        }
+        final List<Patient> gone = v.transported();
+        if (!gone.isEmpty()) {
+            scriptContainer.addView(heading("Transported"));
+            for (Patient g : gone)
+                scriptContainer.addView(note(g.label() + " " + Patient.name(g.color) + ", "
+                        + Clock.hhmm(g.transportedMs)));
+        }
+        return true;
     }
 
     private void showFeed() {
@@ -1147,6 +1231,8 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
 
     /** The Radio Script, rebuilt and always from its first line: it is read top down. */
     private void openScript(View returnTo) {
+        viewUid = null;
+        scriptTitle.setText(R.string.iwi_radio_script);
         buildScript();
         scriptReturn = returnTo;
         show(scriptPage);
@@ -1230,6 +1316,8 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         final Patient patient = state.patient(n);
         if (patient == null)
             return;
+        viewUid = null;
+        scriptTitle.setText(R.string.iwi_radio_script);
         scriptContainer.removeAllViews();
         scriptContainer.addView(note(ctx.getString(R.string.script_how)));
         scriptContainer.addView(heading("Update: " + patient.label()));

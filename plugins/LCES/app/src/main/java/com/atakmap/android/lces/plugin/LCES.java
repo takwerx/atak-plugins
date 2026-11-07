@@ -127,8 +127,13 @@ public class LCES implements IPlugin {
         iwiTap = new MapMenuEventListener() {
             @Override
             public boolean onShowMenu(MapItem item) {
-                if (item == null || trauma == null || !IwiPane.isOurs(trauma, item.getUID()))
+                if (item == null || trauma == null)
                     return false;
+                final boolean ours = IwiPane.isOurs(trauma, item.getUID());
+                // Another device's IWI with its report on it: read it all, read only.
+                if (!ours && !IwiPane.carriesReport(item))
+                    return false;
+                final String uid = item.getUID();
                 // A moment later: a pick from ATAK's Select Item list posts its own
                 // show-details after this, which would close a pane opened inline.
                 final MapView mv = MapView.getMapView();
@@ -138,8 +143,12 @@ public class LCES implements IPlugin {
                         public void run() {
                             clearAtakSelection();
                             showPane();
-                            if (pane != null)
+                            if (pane == null)
+                                return;
+                            if (ours)
                                 pane.openIwi();
+                            else
+                                pane.openIwiView(uid);
                         }
                     }, 250);
                 }

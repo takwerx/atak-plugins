@@ -358,6 +358,16 @@ public final class LcesPane implements PageView.Opener {
         iwi.open();
     }
 
+    /** A tap on another device's IWI marker: their whole report, read only. */
+    public void openIwiView(String uid) {
+        if (iwi == null)
+            return;
+        hideKeyboard();
+        settingsFromIwi = false;
+        show(iwiHost);
+        iwi.openView(uid);
+    }
+
     /** The drop-down closed: an IWI map pick lets go of the map. */
     void onClosed() {
         if (iwi != null)

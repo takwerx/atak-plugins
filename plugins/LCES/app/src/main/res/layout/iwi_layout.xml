@@ -626,6 +626,7 @@
                 android:textSize="17sp"
                 android:textStyle="bold"
                 android:textColor="@color/white"
+                android:id="@+id/iwi_script_title"
                 android:text="@string/iwi_radio_script" />
         </LinearLayout>
 

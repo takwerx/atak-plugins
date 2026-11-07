@@ -108,6 +108,7 @@ public final class IwiMarker {
         put(iwi, "onscene_ic", s.text(IwiState.IC));
         put(iwi, "patient_care", Vocab.CARE.label(s.text(IwiState.CARE_ROLE)));
         iwi.setAttribute("declared", new CoordinatedTime(s.declaredMs()).toString());
+        iwi.setAttribute("report", s.exportJson());
         detail.addChild(iwi);
 
         e.setDetail(detail);

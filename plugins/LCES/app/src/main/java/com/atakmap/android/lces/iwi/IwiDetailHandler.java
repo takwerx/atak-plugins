@@ -53,7 +53,9 @@ public class IwiDetailHandler extends CotDetailHandler {
             "incident_name",
             "onscene_ic",
             "patient_care",
-            "declared");
+            "declared",
+            // The whole IWI as JSON, for a device with LCES to read (2026-11-06).
+            "report");
 
     public IwiDetailHandler() {
         super(DETAIL);

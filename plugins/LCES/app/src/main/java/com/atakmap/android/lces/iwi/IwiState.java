@@ -81,6 +81,8 @@ public final class IwiState implements RadioScript.Source {
     private static final String K_SOURCE = "iwi.source";
     private static final String K_DECLARED = "iwi.declaredMs";
     private static final String FIELD = "iwi.f.";
+    /** Only in a copy of another device's IWI: who reported it. */
+    private static final String K_REPORTER = "iwi.reporter";
     /** The patient cards, as one JSON array. Under FIELD, so a Clear takes them. */
     private static final String K_PATIENTS = FIELD + "patients";
 
@@ -173,6 +175,10 @@ public final class IwiState implements RadioScript.Source {
     /** This phone's callsign, from ATAK: the reporter, and the IC unless one is named. */
     @Override
     public String callsign() {
+        // A copy of someone else's IWI: theirs, not this device's.
+        final String reporter = prefs.getString(K_REPORTER, null);
+        if (reporter != null)
+            return reporter;
         try {
             final com.atakmap.android.maps.MapView mv =
                     com.atakmap.android.maps.MapView.getMapView();
@@ -181,6 +187,53 @@ public final class IwiState implements RadioScript.Source {
         } catch (RuntimeException e) {
             return "";
         }
+    }
+
+    // ---- the whole IWI, for another LCES device to read ----
+
+    /**
+     * The IWI and its whole report as one JSON object, carried on the marker so a
+     * device with LCES reads all of it, read only (operator, 2026-11-06). Settings,
+     * drop-downs and the feed choice stay here.
+     */
+    public String exportJson() {
+        final JSONObject o = new JSONObject();
+        try {
+            for (java.util.Map.Entry<String, ?> e : prefs.getAll().entrySet()) {
+                final String k = e.getKey();
+                if (!(k.startsWith(FIELD) || k.equals(K_LIVE) || k.equals(K_UID)
+                        || k.equals(K_LAT) || k.equals(K_LON) || k.equals(K_SOURCE)
+                        || k.equals(K_DECLARED)))
+                    continue;
+                o.put(k, e.getValue());
+            }
+            o.put(K_REPORTER, callsign());
+        } catch (JSONException ex) {
+            Log.w("LCES-IWI-State", "could not export the IWI", ex);
+        }
+        return o.toString();
+    }
+
+    /** Replace what is in these prefs with an exported IWI. Only known keys, typed. */
+    public static void importJson(SharedPreferences into, String json) {
+        final SharedPreferences.Editor e = into.edit().clear();
+        try {
+            final JSONObject o = new JSONObject(json);
+            final java.util.Iterator<String> keys = o.keys();
+            while (keys.hasNext()) {
+                final String k = keys.next();
+                if (k.equals(K_LIVE))
+                    e.putBoolean(k, o.optBoolean(k, false));
+                else if (k.equals(K_DECLARED))
+                    e.putLong(k, o.optLong(k, 0L));
+                else if (k.startsWith(FIELD) || k.equals(K_UID) || k.equals(K_LAT)
+                        || k.equals(K_LON) || k.equals(K_SOURCE) || k.equals(K_REPORTER))
+                    e.putString(k, o.optString(k, ""));
+            }
+        } catch (JSONException ex) {
+            Log.w("LCES-IWI-State", "the IWI on the marker is unreadable", ex);
+        }
+        e.commit();
     }
 
     // ---- the report ----
