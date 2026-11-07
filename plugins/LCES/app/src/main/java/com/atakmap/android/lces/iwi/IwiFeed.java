@@ -325,6 +325,11 @@ public final class IwiFeed {
     }
 
     private void send(CotEvent e) {
+        send(e, true);
+    }
+
+    /** @param file whether the UID goes in the feed's contents; a delete never does. */
+    private void send(CotEvent e, boolean file) {
         if (!isSet())
             return;
         final String uid = e.getUID();
@@ -336,7 +341,7 @@ public final class IwiFeed {
         prefs.edit().remove(K_WAIT + uid).apply();
         // commo adds the mission destination itself, to this server only.
         CommsMapComponent.getInstance().sendCoTToServersByMission(server(), name(), e);
-        if (!prefs.getBoolean(K_PUB + uid, false))
+        if (file && !prefs.getBoolean(K_PUB + uid, false))
             addToContents(server(), name(), uid);
     }
 
@@ -350,14 +355,20 @@ public final class IwiFeed {
             final CotEvent e = CotEvent.parse(prefs.getString(k, ""));
             prefs.edit().remove(k).apply();
             if (e != null && e.isValid())
-                send(e);
+                send(e, !"t-x-d-d".equals(e.getType()));
         }
     }
 
     private void remove(String uid) {
         final boolean pub = prefs.getBoolean(K_PUB + uid, false);
         prefs.edit().remove(K_PUB + uid).remove(K_WAIT + uid).apply();
-        if (!pub || !isSet())
+        if (!isSet())
+            return;
+        // Every device in the feed takes the marker off its map, Data Sync or not:
+        // ATAK's own delete, t-x-d-d with __forcedelete (operator, 2026-11-06). Sent
+        // like any other IWI event, so it waits for the server if this device is off.
+        send(deleteEvent(uid), false);
+        if (!pub)
             return;
         final String server = server();
         final String feed = name();
@@ -374,11 +385,61 @@ public final class IwiFeed {
                     final TakHttpResponse r = client.execute(
                             new HttpDelete(FileSystemUtils.sanitizeURL(url)));
                     Log.d(TAG, "DELETE contents -> " + r.getStatusCode());
+                    logContents(client, feed);
                 } catch (Exception ex) {
                     Log.w(TAG, "remove from feed failed", ex);
                 }
             }
         }, TAG + "-delete").start();
+    }
+
+    /** For the log: which IWI items the feed still holds after a Clear. */
+    private static void logContents(TakHttpClient client, String feed) {
+        try {
+            final String json = client.get(client.getUrl("api/missions/"
+                    + Uri.encode(feed)));
+            final JSONArray data = new JSONObject(json).optJSONArray("data");
+            final JSONArray items = data == null || data.length() == 0 ? null
+                    : data.getJSONObject(0).optJSONArray("uids");
+            int iwi = 0;
+            final int n = items == null ? 0 : items.length();
+            for (int i = 0; i < n; i++)
+                if (items.getJSONObject(i).optString("data", "").startsWith("IWI"))
+                    iwi++;
+            Log.d(TAG, "feed holds " + n + " items, " + iwi + " of them IWI");
+        } catch (Exception e) {
+            Log.w(TAG, "could not read the feed back", e);
+        }
+    }
+
+    /** ATAK's delete for a marker (CotDeleteImporter): link to it, forced. */
+    private static CotEvent deleteEvent(String uid) {
+        final CotEvent e = new CotEvent();
+        e.setVersion("2.0");
+        e.setUID("IWI-delete-" + uid);
+        e.setType("t-x-d-d");
+        e.setHow("h-g-i-g-o");
+        final com.atakmap.coremap.maps.time.CoordinatedTime now =
+                new com.atakmap.coremap.maps.time.CoordinatedTime();
+        e.setTime(now);
+        e.setStart(now);
+        e.setStale(new com.atakmap.coremap.maps.time.CoordinatedTime(
+                now.getMilliseconds() + 60L * 60L * 1000L));
+        e.setPoint(new com.atakmap.coremap.cot.event.CotPoint(0, 0,
+                com.atakmap.coremap.cot.event.CotPoint.UNKNOWN,
+                com.atakmap.coremap.cot.event.CotPoint.UNKNOWN,
+                com.atakmap.coremap.cot.event.CotPoint.UNKNOWN));
+        final com.atakmap.coremap.cot.event.CotDetail detail =
+                new com.atakmap.coremap.cot.event.CotDetail("detail");
+        final com.atakmap.coremap.cot.event.CotDetail link =
+                new com.atakmap.coremap.cot.event.CotDetail("link");
+        link.setAttribute("uid", uid);
+        link.setAttribute("relation", "none");
+        link.setAttribute("type", "none");
+        detail.addChild(link);
+        detail.addChild(new com.atakmap.coremap.cot.event.CotDetail("__forcedelete"));
+        e.setDetail(detail);
+        return e;
     }
 
     /** First send of a UID: subscribe, then add it to the contents, as Data Sync does. */
