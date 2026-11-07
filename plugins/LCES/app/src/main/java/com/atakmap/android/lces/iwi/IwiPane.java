@@ -137,6 +137,8 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
 
     /** True while the next tap on the map is the patient's location. */
     private boolean picking;
+    /** The tap being waited for is item 4's evacuation location, not the IWI. */
+    private boolean pickEvac;
     /** Whether that pick moves a declared IWI rather than declaring one. */
     private boolean pickMoves;
 
@@ -545,13 +547,13 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private void updateMain() {
         refreshTally();
         final boolean live = state.isLive();
-        if (picking) {
+        if (picking && !pickEvac) {
             // The button that started the pick is the one that stops it.
             (pickMoves ? moveButton : declareButton).setText("Cancel");
             (pickMoves ? moveButton : declareButton).setTextColor(color(R.color.amber));
         }
         final int left = stepsLeft();
-        if (!picking || pickMoves) {
+        if (!picking || pickEvac || pickMoves) {
             if (live) {
                 declareButton.setText("Clear IWI");
                 declareButton.setTextColor(color(R.color.state_off));
@@ -568,7 +570,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         // Declared with every step filled in: the call is next, until it is made.
         scriptButton.setTextColor(live && left == 0 && reportedMs() == 0
                 ? color(R.color.state_on) : Color.WHITE);
-        if (!picking || !pickMoves) {
+        if (!picking || pickEvac || !pickMoves) {
             moveButton.setText("Change Location");
             moveButton.setTextColor(Color.WHITE);
         }
@@ -942,6 +944,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private void clearNow() {
         hideClear();
         IwiMarker.remove(mapView, state.uid());
+        IwiMarker.remove(mapView, state.text(IwiState.EVAC_UID));
         state.clear();
         // Back to how a first IWI looks: every drop-down closed (operator, 2026-11-06).
         form.closeAll();
@@ -979,11 +982,15 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                         return;
                     final GeoPoint chosen = new GeoPoint(gp.getLatitude(), gp.getLongitude());
                     final boolean move = pickMoves;
+                    final boolean evac = pickEvac;
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
                             endPick();
-                            placePending(chosen, IwiState.SOURCE_MAP, move);
+                            if (evac)
+                                setEvac(chosen);
+                            else
+                                placePending(chosen, IwiState.SOURCE_MAP, move);
                         }
                     });
                 }
@@ -992,6 +999,48 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private void beginPick(boolean move, boolean noFix) {
         if (picking)
             return;
+        if (!takeMap())
+            return;
+        picking = true;
+        pickMoves = move;
+        status((noFix ? "No position for My Location yet. " : "")
+                + "Tap the patient's location on the map.");
+        updateMain();
+    }
+
+    /** Item 4's Pick on Map: the next tap is the evacuation location. */
+    @Override
+    public void pickEvac() {
+        if (picking || pendingPoint != null)
+            return;
+        if (!takeMap())
+            return;
+        picking = true;
+        pickEvac = true;
+        pickMoves = false;
+        form.evacPicking(true);
+    }
+
+    @Override
+    public void cancelEvacPick() {
+        endPick();
+    }
+
+    /** The evac spot: its lat/long in item 4 and a marker on the map, moved if set. */
+    private void setEvac(GeoPoint p) {
+        String uid = state.text(IwiState.EVAC_UID);
+        if (uid.isEmpty()) {
+            uid = java.util.UUID.randomUUID().toString();
+            state.set(IwiState.EVAC_UID, uid);
+        }
+        state.set(IwiState.EVAC_LOCATION, Coords.ddm(p.getLatitude(), p.getLongitude()));
+        EvacMarker.write(uid, p);
+        if (state.isLive())
+            IwiMarker.write(state);
+        form.refresh();
+    }
+
+    private boolean takeMap() {
         try {
             final MapEventDispatcher d = mapView.getMapEventDispatcher();
             d.pushListeners();
@@ -1001,21 +1050,21 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             d.addMapEventListener(MapEvent.MAP_CLICK, pickListener);
             d.addMapEventListener(MapEvent.ITEM_CLICK, pickListener);
             mapView.getMapTouchController().setToolActive(true);
+            return true;
         } catch (RuntimeException e) {
             Log.w(TAG, "could not take the map for a tap", e);
-            return;
+            return false;
         }
-        picking = true;
-        pickMoves = move;
-        status((noFix ? "No position for My Location yet. " : "")
-                + "Tap the patient's location on the map.");
-        updateMain();
     }
 
     private void endPick() {
         if (!picking)
             return;
         picking = false;
+        if (pickEvac) {
+            pickEvac = false;
+            form.evacPicking(false);
+        }
         try {
             mapView.getMapEventDispatcher().popListeners();
             mapView.getMapTouchController().setToolActive(false);

@@ -57,6 +57,12 @@ final class ReportForm {
 
         /** A patient was added, removed or re-triaged: the tally changes. */
         void countsChanged();
+
+        /** Item 4's Pick on Map: the next tap on the map is the evacuation location. */
+        void pickEvac();
+
+        /** The same button again while waiting for the tap. */
+        void cancelEvacPick();
     }
 
     /** Where a tile group reads and writes its value. */
@@ -109,6 +115,9 @@ final class ReportForm {
     private final java.util.Set<Fold> folds = java.util.Collections.newSetFromMap(
             new java.util.WeakHashMap<Fold, Boolean>());
     private Fold contact;
+    private Button evacPick;
+    private TextView evacHint;
+    private boolean evacPicking;
     private Fold status;
     private Fold resources;
     private Fold patients;
@@ -341,6 +350,23 @@ final class ReportForm {
         body = body(evacPlan);
         field(body, IwiState.EVAC_LOCATION, "Evacuation Location (if different)",
                 "Descriptive Location (drop point, intersection, etc.) or Lat. / Long.", false);
+        // Or tap it on the map: the lat/long fills in and a marker goes there.
+        evacPick = button("Pick on Map", new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (evacPicking)
+                    host.cancelEvacPick();
+                else
+                    host.pickEvac();
+            }
+        });
+        final LinearLayout.LayoutParams eplp = full();
+        eplp.topMargin = dp(4);
+        body.addView(evacPick, eplp);
+        evacHint = guide("Tap the evacuation location on the map.");
+        evacHint.setTextColor(color(R.color.amber));
+        evacHint.setVisibility(View.GONE);
+        body.addView(evacHint);
         field(body, IwiState.ETA, "Patient's ETA to evacuation location", "Ex: 40 min", false);
         field(body, IwiState.HELISPOT, "Helispot / Extraction Site Size and Hazards", "", true);
 
@@ -927,6 +953,14 @@ final class ReportForm {
         final Fold f = new Fold(head, chev, body, prefs, pref);
         folds.add(f);
         return f;
+    }
+
+    /** Pick on Map turns into Cancel while the map waits for the tap. */
+    void evacPicking(boolean on) {
+        evacPicking = on;
+        evacPick.setText(on ? "Cancel" : "Pick on Map");
+        evacPick.setTextColor(on ? color(R.color.amber) : Color.WHITE);
+        evacHint.setVisibility(on ? View.VISIBLE : View.GONE);
     }
 
     /** After Clear: every drop-down closed, as if the report had never been opened. */

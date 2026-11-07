@@ -57,6 +57,8 @@ public final class IwiState implements RadioScript.Source {
     public static final String ASSESSMENT = "assessment";
     public static final String TREATMENT = "treatment";
     public static final String EVAC_LOCATION = "evac_location";
+    /** The evac spot's marker, when the location was picked on the map. */
+    public static final String EVAC_UID = "evac_uid";
     public static final String ETA = "patient_eta";
     public static final String HELISPOT = "helispot";
     public static final String RESOURCES = "resources";
