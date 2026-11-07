@@ -348,9 +348,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         root.findViewById(R.id.iwi_btn_script).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                buildScript();
-                scriptReturn = mainPage;
-                show(scriptPage);
+                openScript(mainPage);
             }
         });
         root.findViewById(R.id.iwi_btn_script_back).setOnClickListener(new View.OnClickListener() {
@@ -377,9 +375,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                     public void onClick(View v) {
                         if (state.isLive())
                             IwiMarker.write(state);
-                        buildScript();
-                        scriptReturn = reportPage;
-                        show(scriptPage);
+                        openScript(reportPage);
                     }
                 });
 
@@ -900,9 +896,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             form.refresh();
             show(reportPage);
         } else {
-            buildScript();
-            scriptReturn = mainPage;
-            show(scriptPage);
+            openScript(mainPage);
         }
     }
 
@@ -1034,6 +1028,21 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     // ---- the radio scripts ----
 
     /** The Radio Script page: the initial report, then whatever the follow-ups say. */
+    /** The Radio Script, rebuilt and always from its first line: it is read top down. */
+    private void openScript(View returnTo) {
+        buildScript();
+        scriptReturn = returnTo;
+        show(scriptPage);
+        final View sv = (View) scriptContainer.getParent();
+        sv.scrollTo(0, 0);
+        sv.post(new Runnable() {
+            @Override
+            public void run() {
+                sv.scrollTo(0, 0);
+            }
+        });
+    }
+
     private void buildScript() {
         scriptContainer.removeAllViews();
         scriptContainer.addView(note(ctx.getString(R.string.script_how)));
