@@ -942,7 +942,11 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         hideClear();
         IwiMarker.remove(mapView, state.uid());
         state.clear();
+        // Back to how a first IWI looks: every drop-down closed (operator, 2026-11-06).
+        form.closeAll();
+        trauma.closeFold();
         form.refresh();
+        reportScroll.scrollTo(0, 0);
         status("IWI cleared.");
         updateMain();
     }

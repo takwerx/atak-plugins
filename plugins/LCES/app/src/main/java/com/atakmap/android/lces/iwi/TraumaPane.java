@@ -54,6 +54,11 @@ public final class TraumaPane implements TraumaManager.Listener {
     private final Pages pages;
 
     private final Fold fold;
+
+    /** After Clear: the trauma center row closed again. */
+    void closeFold() {
+        fold.setOpen(false);
+    }
     private final TextView line1;
     private final TextView line2;
     private final TextView note;

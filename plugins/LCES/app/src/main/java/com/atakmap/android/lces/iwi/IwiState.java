@@ -160,6 +160,11 @@ public final class IwiState implements RadioScript.Source {
             // Everything goes: the next IWI starts blank (operator, 2026-11-06).
             e.remove(key);
         }
+        // And every drop-down it opened, except the two on the Settings page.
+        for (String key : prefs.getAll().keySet())
+            if (key.startsWith("iwi.fold.") && !key.equals("iwi.fold.speed")
+                    && !key.equals("iwi.fold.data"))
+                e.remove(key);
         e.apply();
     }
 

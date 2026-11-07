@@ -105,6 +105,9 @@ final class ReportForm {
     private final Map<Fold, Vocab.Choices> natureFolds = new LinkedHashMap<>();
     private final Map<Fold, String> natureNames = new HashMap<>();
 
+    /** Every drop-down on the page, so Clear can close them all; a dropped card goes. */
+    private final java.util.Set<Fold> folds = java.util.Collections.newSetFromMap(
+            new java.util.WeakHashMap<Fold, Boolean>());
     private Fold contact;
     private Fold status;
     private Fold resources;
@@ -624,6 +627,7 @@ final class ReportForm {
             body.setPadding(dp(8), dp(2), 0, dp(6));
             patientsBox.addView(body, full());
             fold = new Fold(head, chev, body, prefs, "iwi.fold.patient." + p.n);
+            folds.add(fold);
 
             body.addView(label("Triage"));
             final LinearLayout colors = row();
@@ -920,7 +924,15 @@ final class ReportForm {
         final LinearLayout body = block();
         body.setPadding(dp(8), dp(2), 0, dp(8));
         into.addView(body, full());
-        return new Fold(head, chev, body, prefs, pref);
+        final Fold f = new Fold(head, chev, body, prefs, pref);
+        folds.add(f);
+        return f;
+    }
+
+    /** After Clear: every drop-down closed, as if the report had never been opened. */
+    void closeAll() {
+        for (Fold f : new ArrayList<>(folds))
+            f.setOpen(false);
     }
 
     private static LinearLayout body(Fold f) {
