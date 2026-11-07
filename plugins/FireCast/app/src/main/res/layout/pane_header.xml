@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The pane's header, above the list: the status, the one button for finding a fire
+    that is not on screen, and three drop-down rows (Feeds, Filters, Map key) that stay
+    closed so the list is right there. The takwerx drop-down row: a head reading
+    "Name: value", an arrow, a body hidden until opened (plugin-ui skill).
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="4dp">
+
+    <TextView
+        android:id="@+id/status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="14sp"
+        android:textColor="#FFFFFF"
+        android:paddingBottom="2dp" />
+
+    <TextView
+        android:id="@+id/status_detail"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="12sp"
+        android:textColor="#BBBBBB"
+        android:paddingBottom="6dp" />
+
+    <!-- The first thing to reach for when the map is not already on the fire: the rest
+         of the pane describes what is in front of you, this finds what is not. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="2dp">
+        <Button
+            android:id="@+id/btn_activity"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Where is it burning?" />
+        <Button
+            android:id="@+id/btn_model"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="Run a Model" />
+    </LinearLayout>
+
+    <!-- Models: other analysts' runs, folded like the feeds so the pane stays short
+         (operator, 2026-10-30). -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="6dp">
+        <Button
+            android:id="@+id/fold_models_head"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Models" />
+        <ImageButton
+            android:id="@+id/fold_models_chev"
+            style="@style/TakwerxIconButton"
+            android:layout_width="44dp"
+            android:layout_weight="0"
+            android:layout_marginRight="0dp"
+            android:contentDescription="Show models"
+            android:src="@drawable/ic_expand" />
+    </LinearLayout>
+    <LinearLayout
+        android:id="@+id/fold_models_body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone">
+        <!-- Other analysts' runs, beside our own: FIRIS publishes California incidents'
+             spread runs for ATAK. A switch that says what it holds; long press says whose. -->
+        <Button
+            android:id="@+id/btn_firis"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="FIRIS Model Runs   OFF" />
+        <TextView
+            android:id="@+id/firis_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#B0B0B0"
+            android:textSize="12sp"
+            android:visibility="gone" />
+        <!-- Where a FIRIS run is by: the run picked from the list, a slider over its rings. -->
+        <LinearLayout
+            android:id="@+id/firis_slider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone" />
+
+        <!-- PyreCast's ELMFIRE forecasts for large fires, by permission: their logo and a
+             link to pyrecast.com sit beside the forecasts whenever they are shown. -->
+        <Button
+            android:id="@+id/btn_pyrecast"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="PyreCast Forecasts   OFF" />
+        <TextView
+            android:id="@+id/pyrecast_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#B0B0B0"
+            android:textSize="12sp"
+            android:visibility="gone" />
+        <LinearLayout
+            android:id="@+id/pyrecast_credit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingTop="4dp"
+            android:paddingBottom="2dp"
+            android:visibility="gone">
+            <ImageView
+                android:id="@+id/pyrecast_logo"
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:adjustViewBounds="true"
+                android:contentDescription="PyreCast"
+                android:src="@drawable/pyrecast_logo" />
+            <TextView
+                android:id="@+id/pyrecast_link"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:paddingLeft="10dp"
+                android:textColor="#B0B0B0"
+                android:textSize="12sp"
+                android:text="Forecasts by PyreCast, used with permission. Tap for pyrecast.com" />
+        </LinearLayout>
+        <!-- PyreCast's own "Predicted Fire Size" choice, in its words: one of five runs
+             ranked by the area burned at the end, the median unless another is picked. -->
+        <Button
+            android:id="@+id/btn_pyrecast_pct"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:text="Predicted Fire Size: Median" />
+        <LinearLayout
+            android:id="@+id/pyrecast_slider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+    <!-- Feeds -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="6dp">
+        <Button
+            android:id="@+id/fold_feeds_head"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Feeds" />
+        <ImageButton
+            android:id="@+id/fold_feeds_chev"
+            style="@style/TakwerxIconButton"
+            android:layout_width="44dp"
+            android:layout_weight="0"
+            android:layout_marginRight="0dp"
+            android:contentDescription="Show feeds"
+            android:src="@drawable/ic_expand" />
+    </LinearLayout>
+    <!-- One button per feed, each carrying its own count: a control says what it costs
+         before it is used. Filled in by the pane, because the feed list is code. -->
+    <LinearLayout
+        android:id="@+id/source_buttons"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:visibility="gone" />
+
+    <!-- Filters -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="6dp">
+        <Button
+            android:id="@+id/fold_filters_head"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Filters" />
+        <ImageButton
+            android:id="@+id/fold_filters_chev"
+            style="@style/TakwerxIconButton"
+            android:layout_width="44dp"
+            android:layout_weight="0"
+            android:layout_marginRight="0dp"
+            android:contentDescription="Show filters"
+            android:src="@drawable/ic_expand" />
+    </LinearLayout>
+    <LinearLayout
+        android:id="@+id/fold_filters_body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:visibility="gone">
+
+        <!-- The area the map and the list answer: what is in view, or a circle around
+             the operator. The same Area control every takwerx plugin carries. -->
+        <Button
+            android:id="@+id/btn_area"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Area: What is in view" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingTop="6dp">
+            <Button
+                android:id="@+id/btn_window"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Last 24 h" />
+            <Button
+                android:id="@+id/btn_confidence"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="6dp"
+                android:text="Any confidence" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingTop="6dp">
+            <Button
+                android:id="@+id/btn_industrial"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Industrial flagged" />
+            <Button
+                android:id="@+id/btn_refresh_every"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="6dp"
+                android:text="Refresh: 10 min" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btn_refresh"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Refresh now" />
+    </LinearLayout>
+
+    <!-- Map key -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="6dp">
+        <Button
+            android:id="@+id/fold_key_head"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Map key" />
+        <ImageButton
+            android:id="@+id/fold_key_chev"
+            style="@style/TakwerxIconButton"
+            android:layout_width="44dp"
+            android:layout_weight="0"
+            android:layout_marginRight="0dp"
+            android:contentDescription="Show map key"
+            android:src="@drawable/ic_expand" />
+    </LinearLayout>
+    <!-- Built in code from the colors the map draws with, so the two cannot drift. -->
+    <LinearLayout
+        android:id="@+id/legend"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="6dp"
+        android:paddingBottom="4dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/list_heading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        style="@style/TakwerxSectionHeading"
+        android:text="In view" />
+</LinearLayout>

@@ -1,10 +1,10 @@
 ATAK Plugin — Traffic
 
-**Download Traffic 0.8** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Traffic 0.9** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/traffic/releases/download/v0.8/ATAK-Plugin-Traffic-0.8--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/traffic/releases/download/v0.8/ATAK-Plugin-Traffic-0.8--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/traffic/releases/download/v0.8/ATAK-Plugin-Traffic-0.8--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/traffic/releases/download/v0.9/ATAK-Plugin-Traffic-0.9--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/traffic/releases/download/v0.9/ATAK-Plugin-Traffic-0.9--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/traffic/releases/download/v0.9/ATAK-Plugin-Traffic-0.9--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/traffic/releases
 
@@ -68,6 +68,12 @@ Road incidents (511), new in 0.7:
 
 _________________________________________________________________
 STATUS
+
+Version 0.9: a tap on a 511 icon opens its details in the side pane, with no
+radial menu in between, and the Traffic Overlay status line no longer repeats
+the ON/OFF the button already shows. Verified as tak.gov-signed builds on
+official ATAK-CIV 5.6.0.18, 5.7.0.5 and 5.8.0.5 (Samsung Galaxy S9+), and as a
+release build on 5.8.0.3 (dev build) on a Samsung Galaxy S10.
 
 Version 0.8: road incidents from all 50 states (see PURPOSE AND CAPABILITIES),
 and highway shields above the traffic colors. The pane offers to add the state

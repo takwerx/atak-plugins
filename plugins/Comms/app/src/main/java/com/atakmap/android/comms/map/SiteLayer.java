@@ -10,8 +10,11 @@ import com.atakmap.android.comms.data.Nets;
 import com.atakmap.android.comms.model.Catalog.Site;
 import com.atakmap.android.ipc.AtakBroadcast;
 import com.atakmap.android.maps.MapGroup;
+import com.atakmap.android.maps.MapItem;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.maps.Marker;
+import com.atakmap.android.menu.MapMenuEventListener;
+import com.atakmap.android.menu.MapMenuReceiver;
 import com.atakmap.android.menu.PluginMenuParser;
 import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.assets.Icon;
@@ -91,6 +94,7 @@ public final class SiteLayer {
     private final List<Site> selected = new ArrayList<>();
     private final Handler main = new Handler(Looper.getMainLooper());
     private Listener listener;
+    private MapMenuEventListener tapListener;
     private Icon icon, iconSeen;
     private String menu;
     /** Site id to how likely it is to answer a handheld here; absent means not checked. */
@@ -119,7 +123,10 @@ public final class SiteLayer {
         }
     };
 
-    /** The radial's Details button arrives here. */
+    /**
+     * The radial's Details button arrives here. The radial only shows when there is
+     * no menu receiver to answer a tap (see {@link #registerTap()}).
+     */
     private final BroadcastReceiver radial = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -151,6 +158,74 @@ public final class SiteLayer {
         } catch (LinkageError | RuntimeException e) {
             Log.w(TAG, "radial actions unavailable", e);
         }
+        registerTap();
+    }
+
+    /**
+     * A tap on a site opens its details in the side pane, with no radial first
+     * (operator, 2026-10-15: "when you click on it no radial. it goes to side pane"),
+     * the way the other takwerx plugins open what is tapped. The radial's pairing
+     * line and polar coordinates are ATAK's own range and bearing tools, which still
+     * reach a site from the toolbar.
+     *
+     * <p>ATAK asks this listener before it opens a radial, and answering true both
+     * stops the radial and tells ATAK the tap was handled, so it leaves no callout
+     * pinned to the map. Only this plugin's markers are claimed; everything else
+     * keeps its radial. The marker keeps its own radial menu as the fallback for a
+     * build with no menu receiver, where a tap still reaches Details in two steps.
+     */
+    private void registerTap() {
+        try {
+            final MapMenuReceiver menus = MapMenuReceiver.getInstance();
+            if (menus == null) {
+                Log.w(TAG, "no radial menu receiver; a tap keeps the site's radial");
+                return;
+            }
+            tapListener = new MapMenuEventListener() {
+                @Override
+                public boolean onShowMenu(MapItem item) {
+                    final Site s = item == null ? null : siteOf(item.getUID());
+                    if (s == null)
+                        return false;
+                    // A moment later, not now: a pick from ATAK's Select Item list
+                    // closes the list and then posts its own show-details, which would
+                    // close a page opened here.
+                    main.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            clearAtakSelection();
+                            if (listener != null)
+                                listener.onDetails(s);
+                        }
+                    }, 250);
+                    return true;
+                }
+
+                @Override
+                public void onHideMenu(MapItem item) {
+                }
+            };
+            menus.addEventListener(tapListener);
+        } catch (LinkageError | RuntimeException e) {
+            Log.w(TAG, "could not take site taps; a tap keeps the site's radial", e);
+            tapListener = null;
+        }
+    }
+
+    /**
+     * Take ATAK's own selection off the map. A pick from the Select Item list selects
+     * the marker before the page opens, and answering the menu question does not reach
+     * that path, so its callout would stay pinned after the page closes.
+     */
+    private static void clearAtakSelection() {
+        try {
+            AtakBroadcast.getInstance().sendBroadcast(
+                    new Intent("com.atakmap.android.maps.UNFOCUS"));
+            AtakBroadcast.getInstance().sendBroadcast(
+                    new Intent("com.atakmap.android.maps.HIDE_DETAILS"));
+        } catch (LinkageError | RuntimeException e) {
+            Log.d(TAG, "could not clear ATAK's selection: " + e);
+        }
     }
 
     public void setListener(Listener l) {
@@ -158,8 +233,18 @@ public final class SiteLayer {
     }
 
     public void dispose() {
-        main.removeCallbacks(gateTick);
+        // The gate tick and any tap still waiting to open a page.
+        main.removeCallbacksAndMessages(null);
         mapView.removeOnMapMovedListener(moved);
+        if (tapListener != null) {
+            try {
+                final MapMenuReceiver menus = MapMenuReceiver.getInstance();
+                if (menus != null)
+                    menus.removeEventListener(tapListener);
+            } catch (LinkageError | RuntimeException ignored) {
+            }
+            tapListener = null;
+        }
         try {
             AtakBroadcast.getInstance().unregisterReceiver(radial);
         } catch (LinkageError | RuntimeException ignored) {

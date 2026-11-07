@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Comms",
-   plugin-version: "0.8",
+   plugin-version: "0.10",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -42,14 +42,18 @@ center, and a radius.
 
 = Site details
 #toolbox.side-by-side(columns: (5fr, 4fr))[
-Tap a row, or Details on a site's radial menu, for county, elevation, distance and
-bearing, and every net on the mountain with the tone that opens that repeater.
+Tap a row, or a site on the map, for county, elevation, distance and bearing, and
+every net on the mountain with the tone that opens that repeater.
 
 One tone per net, and it is the one you transmit to key that repeater. A call plan
 prints two, but the other belongs to the net and is identical at every site on it,
 so it can never tell you which mountain to use. Where this catalog does not hold a
 tone the row says which kind of nothing it is -- a digital trunked channel has no
 CTCSS tone at all, and a plan can withhold one -- rather than leaving you to guess.
+
+A California site shows the tone's number as well as its frequency, "Tone 8
+(103.5)". A site anywhere else shows the frequency alone: other plans number their
+tones differently, and Boise's Tone 9 is 179.9 Hz where California's is 100.0.
 
 A mountain often carries several agencies, each on its own tone.
 ][
@@ -64,8 +68,7 @@ Sites draw as the NWCG repeater symbol, named, once you are zoomed in far enough
 to make sense of them. *Draw on the map* sets that zoom and quotes it as what the
 scale bar reads, so you can match it to how you work rather than to a number.
 
-Tapping a site opens ATAK's radial menu on it, with Details, a pairing line and
-polar.
+Tapping a site opens its details in the side pane, with no radial menu first.
 ][
 #image("4.jpg", width: 100%)
 ]

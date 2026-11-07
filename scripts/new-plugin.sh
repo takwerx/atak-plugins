@@ -113,6 +113,14 @@ sed -i '' 's|^\([[:space:]]*\)defaultConfig.versionCode = getVersionCode()$|\1//
 grep -q 'defaultConfig.versionCode = PLUGIN_VERSION_CODE' "$DEST/app/build.gradle" || {
     echo "error: could not rewrite versionCode in $DEST/app/build.gradle" >&2; exit 1; }
 
+echo "==> removing the template's placeholder user manual"
+# The template ships a manual titled "Plugin Template 0.1", and tak.gov compiles
+# docs/user_manual/ into the APK from the submission zip. Left in place, the
+# plugin ships with the template's manual inside it. Removed here rather than as
+# a `git rm` step afterward: nothing is tracked yet, so `git rm` fails (LCES,
+# 2026-11-02). The original stays in the SDK at samples/plugintemplate/docs.
+rm -rf "$DEST/docs/user_manual"
+
 echo "==> splitting the icon: a dark tile for Android, the bare glyph for ATAK"
 # The SDK template ships ONE icon and wires it to two places: android:icon in the
 # manifest, and the toolbar button. It is a white glyph on transparency, which is

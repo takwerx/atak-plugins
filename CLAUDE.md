@@ -98,6 +98,17 @@ git subtree split --prefix=plugins/<Name> -b <name>-export
 git push https://github.com/takwerx/<plugin-repo>.git <name>-export:refs/heads/main
 ```
 
+That push is refused when the public repo holds a commit the split does not:
+a pull request merged there (the Claude worker opens them), the worker
+workflow, the Market's community list. On 2026-10-31 all 16 public repos did.
+`scripts/sync-public-repo.sh <Plugin>` checks it and `--merge` brings the
+public commits back into `plugins/<Name>`; `/ship` runs it in pre-flight.
+Merging alone is not enough: the plain split drops a parent it was never told
+about, so the script also writes a recorded split (the `--rejoin` commit)
+whose split has the public main as a parent, and that is what makes the next
+push a fast-forward. Do not reach for `split --onto <public> --rejoin`
+instead: it works once per plugin and then dies on every later sync.
+
 ### The plugin page standard — `plss-grid` is the reference
 
 Every plugin's public repo looks the same. `takwerx/plss-grid` is the reference
@@ -359,13 +370,12 @@ anywhere (`worktree.sh` reads `main` for what exists; a name with no plugin on
 ~/GitHub/atak-plugins/scripts/worktree.sh new <Name> <name>-v0.1
 cd ~/GitHub/atak-plugins-<name>
 ./scripts/new-plugin.sh <Name> "Display Name"    # name: letters/digits only
-git rm -r plugins/<Name>/docs/user_manual        # the template's placeholder manual
 git add plugins/<Name> && git commit
 ```
 
 `new-plugin.sh` copies `plugintemplate` out of the SDK, renames the
-package/class/descriptor, sets `rootProject.name`, and writes a gitignored
-`local.properties`. Open the session in that worktree; the plugin lives there
+package/class/descriptor, sets `rootProject.name`, removes the template's
+placeholder manual, and writes a gitignored `local.properties`. Open the session in that worktree; the plugin lives there
 through every release, the branch changing per version. Before its first
 `/ship`, its public repo `takwerx/<plugin-repo>` must exist (see "One public
 repo per plugin") and `refresh_depot.py` must list it (HARD RULE 2).
@@ -546,11 +556,12 @@ rejected or silently-broken submission:
   Verify the manual against tak.gov's own typst version (0.13.1, pinned in
   `typst.gradle`), not whatever is installed locally — the clean-extract build does not
   run typst, because it builds without `ATAK_CI`.
-  **The template ships a placeholder manual** titled "Plugin Template 0.1", and
-  `new-plugin.sh` copies it with everything else. Until the plugin has a manual of
-  its own, `git rm -r docs/user_manual` before the first zip — otherwise tak.gov
-  compiles the template's manual into the APK. FOBS 0.2 caught this one zip away
-  from submission; Weather still carries it.
+  **The template ships a placeholder manual** titled "Plugin Template 0.1".
+  `new-plugin.sh` has removed it since 2026-11-02; a plugin scaffolded before
+  then may still carry it, and until it has a manual of its own,
+  `git rm -r docs/user_manual` before the first zip — otherwise tak.gov compiles
+  the template's manual into the APK. FOBS 0.2 caught this one zip away from
+  submission; Weather still carries it.
 - **Compile against every target SDK before zipping**, not just the one on the dev
   phone. Classes come and go between ATAK releases: `QueryUserTracksRequest2`,
   `HTTPRequestManager2` and `com.atakmap.comms.datadroidlite` exist only in 5.8, and
@@ -920,9 +931,11 @@ was never created, because 1.5 was folded into 1.6 and the block was never
 re-stamped. `scripts/check-download-links.sh <Plugin>` checks the block against
 `PLUGIN_VERSION` with no network, `--live` proves each link returns 200 once the
 release exists, and `.claude/hooks/release-links-guard.sh` blocks the subtree
-push and `gh release create` when the check fails. When a version is skipped
-or folded into the next one, re-stamp the block in the same commit that bumps
-`PLUGIN_VERSION`.
+push and `gh release create` when the check fails. `--fix` re-stamps the
+block to `PLUGIN_VERSION` (download line, guide version header, every asset
+link's tag and APK name, nothing else), and `submission-zip.sh` runs it and
+commits the result before zipping, so the block moves with the bump by itself.
+Cursorwerx 0.3 and 0.4 both reached the ship prompt linking the release before.
 
 ## Downloaded data survives a restart with no network
 

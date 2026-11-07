@@ -62,7 +62,8 @@ public final class StationPage {
     private final MapView mapView;
     private final Host host;
     private final View root;
-    private final LinearLayout filterRow, scopeRow;
+    private final LinearLayout filterRow;
+    private final FilterFold fold;
     private final TextView status;
     private final ListView list;
     private final View detail;
@@ -81,13 +82,18 @@ public final class StationPage {
         this.host = host;
         root = PluginLayoutInflater.inflate(pluginContext, R.layout.page_stations, null);
         filterRow = root.findViewById(R.id.stations_filter_row);
-        scopeRow = root.findViewById(R.id.stations_scope_row);
+        fold = new FilterFold(pluginContext, filterRow);
         status = root.findViewById(R.id.stations_page_status);
         list = root.findViewById(R.id.stations_list);
         list.setAdapter(adapter);
         detail = root.findViewById(R.id.stations_detail);
         detailBody = root.findViewById(R.id.stations_detail_body);
         heading = root.findViewById(R.id.stations_page_heading);
+    }
+
+    /** The folded filter's button, for the heading's line beside the Map switch. */
+    public View filterHead() {
+        return fold.head;
     }
 
     public View view() {
@@ -133,7 +139,6 @@ public final class StationPage {
         shown = keep;
 
         buildFilterRow(counts, starred);
-        buildScopeRow();
         status.setText(summary(counts, from));
         adapter.notifyDataSetChanged();
         // A station being looked at stays looked at while the map moves around it.
@@ -145,15 +150,19 @@ public final class StationPage {
         if (layer == null || !layer.isOn())
             return "Turn the weather stations layer on to see them here.";
         if (from == null)
-            return layer.isFromMe() ? "No position yet — switch to the map center."
-                    : "The map has no center yet.";
+            return layer.originSource().self()
+                    ? "No position yet \u2014 pick Map center at the top."
+                    : "No point to measure from yet \u2014 pick one at the top.";
         final int total = counts[0] + counts[1] + counts[2];
         if (total == 0)
             return "No stations reporting within " + layer.miles() + " mi.";
         final int far = layer.favoritesBeyond();
+        final String hint = com.atakmap.android.atmosphere.compat.ScaleBar.zoomInHint(
+                com.atakmap.android.maps.MapView.getMapView(), layer.stationGate());
         return shown.size() + " of " + total + " stations, nearest first, within "
-                + layer.miles() + " mi of " + (layer.isFromMe() ? "you" : "the map")
-                + (far == 0 ? "" : ", and " + far + " favorites beyond that");
+                + layer.miles() + " mi of " + layer.originSource().words()
+                + (far == 0 ? "" : ", and " + far + " favorites beyond that")
+                + (hint.isEmpty() ? "" : "\n" + hint);
     }
 
     /** All, the two that matter, and the starred, each with what it costs. */
@@ -170,6 +179,25 @@ public final class StationPage {
         final View fav = tile("\u2605 (" + starred + ")", filter == FAV, STAR_ON, FAV);
         ((LinearLayout.LayoutParams) fav.getLayoutParams()).weight = 0.6f;
         filterRow.addView(fav);
+    }
+
+    /**
+     * A filter tile's words on two lines at 12sp, the name over its count, the way
+     * the page button reads: four tiles across a phone-width pane cut "Red Flag (12)"
+     * to "Red Flag (..." (operator, 2026-10-23: "can we have perhaps the text smaller
+     * but two rows"). A tile with no name before its count ("\u2605 (3)") stays on one
+     * line. Shared by the Stations, River Gauges and Buoys pages.
+     */
+    static void nameOverCount(Button b, String label) {
+        final int at = label.lastIndexOf(" (");
+        if (at > 1)
+            b.setText(label.substring(0, at) + "\n" + label.substring(at + 1));
+        b.setSingleLine(false);
+        b.setMaxLines(2);
+        b.setTextSize(12);
+        b.setLineSpacing(0f, 0.9f);
+        final float d = b.getResources().getDisplayMetrics().density;
+        b.setPadding(Math.round(4 * d), Math.round(2 * d), Math.round(4 * d), Math.round(2 * d));
     }
 
     /** Paint one star, wherever it lives. */
@@ -190,33 +218,16 @@ public final class StationPage {
         refresh();
     }
 
-    /** Where "nearest" is measured from. The layer owns it; this only switches it. */
-    private void buildScopeRow() {
-        scopeRow.removeAllViews();
-        final boolean me = layer.isFromMe();
-        scopeRow.addView(scopeTile("My position", me, true));
-        scopeRow.addView(scopeTile("Map center", !me, false));
-    }
-
     private View tile(String label, boolean chosen, final int color, final int value) {
         final Button b = chip(label, chosen, color);
+        nameOverCount(b, label);
+        if (chosen)
+            fold.label(label, color, value != ALL);
         b.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 filter = value;
-                refresh();
-            }
-        });
-        return b;
-    }
-
-    private View scopeTile(String label, boolean chosen, final boolean fromMe) {
-        final Button b = chip(label, chosen, 0);
-        b.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (layer != null)
-                    layer.setFromMe(fromMe);
+                fold.close();
                 refresh();
             }
         });
@@ -403,9 +414,8 @@ public final class StationPage {
 
         detail.setVisibility(View.VISIBLE);
         list.setVisibility(View.GONE);
-        heading.setVisibility(View.GONE);
-        filterRow.setVisibility(View.GONE);
-        scopeRow.setVisibility(View.GONE);
+        headingLine().setVisibility(View.GONE);
+        fold.listShown(false);
         status.setVisibility(View.GONE);
     }
 
@@ -413,9 +423,8 @@ public final class StationPage {
         showing = null;
         detail.setVisibility(View.GONE);
         list.setVisibility(View.VISIBLE);
-        heading.setVisibility(View.VISIBLE);
-        filterRow.setVisibility(View.VISIBLE);
-        scopeRow.setVisibility(View.VISIBLE);
+        headingLine().setVisibility(View.VISIBLE);
+        fold.listShown(true);
         status.setVisibility(View.VISIBLE);
     }
 
@@ -467,5 +476,16 @@ public final class StationPage {
         } catch (RuntimeException e) {
             // A pan that will not happen is not worth a crash.
         }
+    }
+
+    /**
+     * The heading, or the line the pane put it on beside the page's map switch: a
+     * record hides them together, rather than leaving the switch alone on a row.
+     */
+    private View headingLine() {
+        final android.view.ViewParent p = heading.getParent();
+        return p instanceof LinearLayout
+                && ((LinearLayout) p).getOrientation() == LinearLayout.HORIZONTAL
+                ? (View) p : heading;
     }
 }

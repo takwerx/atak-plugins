@@ -1,31 +1,49 @@
 package com.atakmap.android.atmosphere.data;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TimeZone;
+import java.util.TreeSet;
 
 /**
  * The NWS radar rain estimate (MRMS) as it was at a past hour: the Iowa Environmental
- * Mesonet keeps every hour's 1, 24, 48 and 72 hour totals ({@code mesonet.agron.iastate.edu},
- * public domain) and cuts a box out of them, where the NWS service holds only the
- * current hour (operator, 2026-10-14: "can that overlay map also have a date and time
- * picker?").
+ * Mesonet keeps every hour's 1, 24, 48 and 72 hour totals as one national picture, and
+ * takwerx's relay cuts each into 2-degree tiles and keeps them 45 days (notes repo,
+ * tools/iem_radar.py), where the NWS service holds only the current hour (operator,
+ * 2026-10-14: "can that overlay map also have a date and time picker?"). Through 0.17
+ * each phone asked the mesonet for a picture of its view, and the mesonet turns away an
+ * address that asks fast.
  *
- * <p>The picture comes in the mesonet's own color ramp. Each of its 256 colors stands
- * for one amount (its lookup table, rasters.php?rid=6, read 2026-10-14; the three
- * smallest amounts are drawn in blues the table lists as black), so each pixel is read
- * back to inches and painted in the NWS key the rest of Rain Totals uses.
+ * <p>The tiles are the national picture's own pixels, 0.01 degree, in the mesonet's
+ * color ramp. Each of its 256 colors stands for one amount (its lookup table,
+ * rasters.php?rid=6, read 2026-10-14; the three smallest amounts are drawn in blues the
+ * table lists as black), so each pixel is read back to inches and painted in the NWS key
+ * the rest of Rain Totals uses.
  *
  * <p>No Android types; tested.
  */
 public final class IemRadar {
 
-    public static final String HOST = "mesonet.agron.iastate.edu";
-
     /** The stretches kept, hours, and their product names. */
     public static final int[] HOURS = { 1, 24, 48, 72 };
     private static final String[] PRODUCTS = { "p1h", "p24h", "p48h", "p72h" };
+    private static final long HOUR = 3_600_000L;
+
+    /** The national picture: 0.01 degree pixels, 55 N 130 W at its top left. */
+    static final int WIDTH = 7000, HEIGHT = 3500, TILE_PX = 200;
+    private static final double WEST = -130, NORTH = 55, PER_DEGREE = 100;
+    /** The relay's first radar hour: its backfill reached 2026-10-10 20:00 UTC. */
+    static final long SINCE_MS = 1_791_662_400_000L;
+    /** How a pixel outside the radar reads: the ramp's last color, no data. */
+    public static final int NO_DATA = 0xFF909090;
 
     /** The mesonet's colors, by index. */
     static final int[] PALETTE = {
@@ -70,25 +88,211 @@ public final class IemRadar {
             INDEX.put(PALETTE[i], i);
     }
 
-    /**
-     * The box's picture of the {@code hours} ending at {@code endMs}, which is taken
-     * down to its hour: the mesonet keeps one picture an hour, on the hour, UTC.
-     */
-    public static String url(int hours, long endMs, double west, double south, double east, double north,
-            int px, int py) {
-        String product = PRODUCTS[1];
+    /** The oldest hour the relay holds. */
+    public static long since(long now) {
+        return Math.max(SINCE_MS, hourOf(now - IemRelay.KEEP_MS) + HOUR);
+    }
+
+    private static String product(int hours) {
         for (int i = 0; i < HOURS.length; i++)
             if (HOURS[i] == hours)
-                product = PRODUCTS[i];
+                return PRODUCTS[i];
+        return PRODUCTS[1];
+    }
+
+    /** "2026101720": the picture of the hour at or before the moment, UTC. */
+    private static String hourName(long millis) {
         final java.util.Calendar c = java.util.Calendar.getInstance(TimeZone.getTimeZone("UTC"));
-        c.setTimeInMillis(hourOf(endMs));
-        return "https://" + HOST + "/cgi-bin/wms/us/mrms.cgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap"
-                + "&SRS=EPSG:4326" + String.format(Locale.US, "&BBOX=%.4f,%.4f,%.4f,%.4f", west, south, east, north)
-                + "&WIDTH=" + px + "&HEIGHT=" + py + "&FORMAT=image/png&TRANSPARENT=true&LAYERS=mrms-archive"
-                + "&prod=" + product
-                + String.format(Locale.US, "&year=%04d&month=%02d&day=%02d&time=%02d00", c.get(java.util.Calendar.YEAR),
-                        c.get(java.util.Calendar.MONTH) + 1, c.get(java.util.Calendar.DAY_OF_MONTH),
-                        c.get(java.util.Calendar.HOUR_OF_DAY));
+        c.setTimeInMillis(hourOf(millis));
+        return String.format(Locale.US, "%04d%02d%02d%02d", c.get(java.util.Calendar.YEAR),
+                c.get(java.util.Calendar.MONTH) + 1, c.get(java.util.Calendar.DAY_OF_MONTH),
+                c.get(java.util.Calendar.HOUR_OF_DAY));
+    }
+
+    /** The hour's index: which tiles hold rain and which lie outside the radar. */
+    public static String indexUrl(int hours, long endMs) {
+        return IemRelay.BASE + "radar/" + product(hours) + "/" + hourName(endMs) + "/index.json";
+    }
+
+    static String tileUrl(String indexUrl, String tile) {
+        return indexUrl.substring(0, indexUrl.lastIndexOf('/') + 1) + tile + ".png";
+    }
+
+    /**
+     * What a picture of a box is, as one string, so the overlay asks for it as it asks
+     * for any picture: the hour's index, then the box and its size after a '#', which
+     * no request carries.
+     */
+    public static String spec(int hours, long endMs, double west, double south, double east, double north, int px,
+            int py) {
+        return indexUrl(hours, endMs)
+                + String.format(Locale.US, "#%.4f,%.4f,%.4f,%.4f,%d,%d", west, south, east, north, px, py);
+    }
+
+    /** A picture to build from the relay's tiles. */
+    public static final class Spec {
+        public final String indexUrl;
+        public final double west, south, east, north;
+        public final int px, py;
+
+        private Spec(String indexUrl, double west, double south, double east, double north, int px, int py) {
+            this.indexUrl = indexUrl;
+            this.west = west;
+            this.south = south;
+            this.east = east;
+            this.north = north;
+            this.px = px;
+            this.py = py;
+        }
+
+        /** The spec a {@link #spec} string is, or null for any other URL. */
+        public static Spec parse(String s) {
+            if (s == null || !s.startsWith(IemRelay.BASE + "radar/"))
+                return null;
+            final int hash = s.indexOf('#');
+            if (hash < 0 || !s.substring(0, hash).matches(".*/radar/p\\d{1,2}h/\\d{10}/index\\.json"))
+                return null;
+            final String[] f = s.substring(hash + 1).split(",", -1);
+            if (f.length != 6)
+                return null;
+            try {
+                final double w = Double.parseDouble(f[0]), so = Double.parseDouble(f[1]), e = Double.parseDouble(f[2]),
+                        n = Double.parseDouble(f[3]);
+                final int px = Integer.parseInt(f[4]), py = Integer.parseInt(f[5]);
+                if (!(e > w) || !(n > so) || px < 1 || py < 1 || px > 2048 || py > 2048)
+                    return null;
+                return new Spec(s.substring(0, hash), w, so, e, n, px, py);
+            } catch (NumberFormatException ex) {
+                return null;
+            }
+        }
+
+        public String tileUrl(String tile) {
+            return IemRadar.tileUrl(indexUrl, tile);
+        }
+    }
+
+    /** An hour's index: the tiles with rain, and those outside the radar; any other tile is dry. */
+    public static final class Index {
+        public final Set<String> rain, noData;
+
+        private Index(Set<String> rain, Set<String> noData) {
+            this.rain = rain;
+            this.noData = noData;
+        }
+
+        /** {"v": 1, "rain": [tile, ...], "nodata": [tile, ...]}, or null. */
+        public static Index parse(String json) {
+            try {
+                final JSONObject o = new JSONObject(json);
+                final JSONArray r = o.optJSONArray("rain"), n = o.optJSONArray("nodata");
+                if (r == null || n == null)
+                    return null;
+                return new Index(names(r), names(n));
+            } catch (Exception e) {
+                return null;
+            }
+        }
+
+        private static Set<String> names(JSONArray a) {
+            final Set<String> out = new HashSet<>();
+            for (int i = 0; i < a.length(); i++) {
+                final String t = a.optString(i, "");
+                if (t.matches("\\d{2}_-\\d{2,3}"))
+                    out.add(t);
+            }
+            return out;
+        }
+    }
+
+    /**
+     * Where each pixel of a box's picture (a plain lon/lat quad, px across) falls in
+     * the national picture: its column for each of the picture's columns, its row for
+     * each row, -1 outside.
+     */
+    public static final class Plan {
+        public final int px, py;
+        final int[] gx, gy;
+
+        private Plan(int px, int py, int[] gx, int[] gy) {
+            this.px = px;
+            this.py = py;
+            this.gx = gx;
+            this.gy = gy;
+        }
+
+        /** The tiles any pixel falls in. */
+        public List<String> tiles() {
+            final TreeSet<String> out = new TreeSet<>();
+            int lastX = -1;
+            for (int x : gx) {
+                if (x < 0 || x / TILE_PX == lastX)
+                    continue;
+                lastX = x / TILE_PX;
+                int lastY = -2;
+                for (int y : gy) {
+                    if (y < 0 || rowOf(y) == lastY)
+                        continue;
+                    lastY = rowOf(y);
+                    out.add(tileOf(x, y));
+                }
+            }
+            return new ArrayList<>(out);
+        }
+    }
+
+    public static Plan plan(double west, double south, double east, double north, int px, int py) {
+        final int[] gx = new int[px], gy = new int[py];
+        for (int i = 0; i < px; i++) {
+            final double lon = west + (i + 0.5) * (east - west) / px;
+            final int x = (int) Math.floor((lon - WEST) * PER_DEGREE);
+            gx[i] = x < 0 || x >= WIDTH ? -1 : x;
+        }
+        for (int j = 0; j < py; j++) {
+            final double lat = north - (j + 0.5) * (north - south) / py;
+            final int y = (int) Math.floor((NORTH - lat) * PER_DEGREE);
+            gy[j] = y < 0 || y >= HEIGHT ? -1 : y;
+        }
+        return new Plan(px, py, gx, gy);
+    }
+
+    /** The tile rows: the first is the top 100 px (54 to 55 N), every other 200. */
+    private static int rowOf(int y) {
+        return y < 100 ? -1 : (y - 100) / TILE_PX;
+    }
+
+    /** The tile a national pixel is in, by its south-west corner, as the relay names them. */
+    static String tileOf(int x, int y) {
+        final int lon = (int) WEST + 2 * (x / TILE_PX);
+        final int lat = y < 100 ? 54 : 52 - 2 * ((y - 100) / TILE_PX);
+        return lat + "_" + lon;
+    }
+
+    /** A tile's top left in the national picture, and its size: {x0, y0, width, height}. */
+    public static int[] tileBox(String tile) {
+        final String[] f = tile.split("_");
+        final int lat = Integer.parseInt(f[0]), lon = Integer.parseInt(f[1]);
+        final int x0 = (lon - (int) WEST) * 100, y0 = lat >= 54 ? 0 : (53 - lat) * 100;
+        return new int[] { x0, y0, TILE_PX, lat >= 54 ? 100 : TILE_PX };
+    }
+
+    /**
+     * One tile into the picture: every pixel of the plan that falls in it takes the
+     * tile's pixel, or {@code color} when {@code pixels} is null (no data, say).
+     */
+    public static void paint(Plan p, String tile, int[] pixels, int color, int[] out) {
+        final int[] b = tileBox(tile);
+        for (int j = 0; j < p.py; j++) {
+            final int y = p.gy[j] - b[1];
+            if (p.gy[j] < 0 || y < 0 || y >= b[3])
+                continue;
+            for (int i = 0; i < p.px; i++) {
+                final int x = p.gx[i] - b[0];
+                if (p.gx[i] < 0 || x < 0 || x >= b[2])
+                    continue;
+                out[j * p.px + i] = pixels == null ? color : pixels[y * b[2] + x];
+            }
+        }
     }
 
     /** The picture's hour for a moment: the top of the hour at or before it. */

@@ -245,20 +245,6 @@
                         android:textSize="13sp"
                         android:text="" />
 
-                    <TextView
-                        style="@style/TakwerxSectionHeading"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/stations_around_heading" />
-
-                    <!-- Measured from the operator or from the middle of the map, which is
-                         how a crew looks at a fire they are not standing on. -->
-                    <LinearLayout
-                        android:id="@+id/stations_origin_row"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal" />
 
                     <TextView
                         style="@style/TakwerxSectionHeading"
@@ -1511,7 +1497,27 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:visibility="gone" />
+                android:visibility="gone">
+
+                <TextView
+                    style="@style/TakwerxSectionHeading"
+                    android:id="@+id/radar_transparency_label"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/raintotals_opacity_heading" />
+
+                <!-- Transparency is a continuous range, a slider as on Rain Totals
+                     (takwerx/atmosphere#7). It takes the whole gesture, so a drag on it
+                     never turns the page. -->
+                <SeekBar
+                    android:id="@+id/radar_transparency"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="4dp"
+                    android:max="90" />
+            </LinearLayout>
 
             <!-- The GOES satellite picture, infrared or visible, the newest frame, as a
                  picture on the map surface. Not time-enabled. -->
@@ -1985,19 +1991,6 @@
                         android:textSize="13sp"
                         android:text="" />
 
-                    <TextView
-                        style="@style/TakwerxSectionHeading"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/stations_around_heading" />
-
-                    <LinearLayout
-                        android:id="@+id/gauges_origin_row"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:orientation="horizontal" />
 
                     <TextView
                         style="@style/TakwerxSectionHeading"
@@ -2414,19 +2407,6 @@
                         android:textSize="13sp"
                         android:text="" />
 
-                    <TextView
-                        style="@style/TakwerxSectionHeading"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/stations_around_heading" />
-
-                    <LinearLayout
-                        android:id="@+id/buoys_origin_row"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:orientation="horizontal" />
 
                     <TextView
                         style="@style/TakwerxSectionHeading"

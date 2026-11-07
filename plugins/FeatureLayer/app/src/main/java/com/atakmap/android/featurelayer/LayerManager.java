@@ -46,6 +46,12 @@ public class LayerManager {
     private final String clientId;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
+    /**
+     * The land layers fetch side by side: five of them one after another on the single
+     * worker was ten seconds after a pan (operator, 2026-10-16). Each layer holds its
+     * own store and lock, so their refreshes do not touch each other.
+     */
+    private final ExecutorService landPool = Executors.newFixedThreadPool(5);
     private final File root, iconDir, legacyIconDir, layersDir, stateFile;
     private final Map<String, String> nwcgIcons = new HashMap<>();
     private final Map<String, String> sarcopIcons = new HashMap<>();
@@ -213,8 +219,23 @@ public class LayerManager {
         startLog("start: restoring");
         restore();
         startLog("start: restored " + snapshot().size() + " layers, queuing refreshes");
-        for (LoadedLayer l : snapshot())
-            refresh(l);
+        for (LoadedLayer l : snapshot()) {
+            if (!Boundaries.handles(l.spec) || l.isVisible()) {
+                refresh(l);
+                continue;
+            }
+            // A hidden boundary or land layer is reference data the phone already holds:
+            // no download at every start for something nobody is looking at. It fetches
+            // when switched on if it has nothing, an old style, or a square elsewhere.
+            final ExecutorService on = Boundaries.mosaic(l.spec.kind) ? landPool : worker;
+            on.execute(new Runnable() {
+                @Override
+                public void run() {
+                    if (!l.restsHidden())
+                        refreshNow(l);
+                }
+            });
+        }
         // After the refreshes, on the same thread: with no layers, or all of them already
         // redrawn by this build, the old folder goes now.
         worker.execute(new Runnable() {
@@ -261,8 +282,10 @@ public class LayerManager {
                     final LoadedLayer l = find(item.getMetaString("nifs_layer", ""));
                     // Fires and burns are tapped to be read: New Fire Starts, Ongoing Fires,
                     // and Fire History (operator, 2026-10-06: "clicking on these should go
-                    // to the details pane automatically").
-                    if (l == null || !(NewStartsStyles.handles(l.spec) || FireHistoryStyles.handles(l.spec)))
+                    // to the details pane automatically"). Boundaries and land layers too
+                    // (operator, 2026-11-02: "should go right to details pane").
+                    if (l == null || !(NewStartsStyles.handles(l.spec) || FireHistoryStyles.handles(l.spec)
+                            || Boundaries.handles(l.spec)))
                         return false;
                     details.show(item);
                     return true;
@@ -302,6 +325,7 @@ public class LayerManager {
                 a.dispose();
         }
         worker.shutdownNow();
+        landPool.shutdownNow();
     }
 
     // ---- layers -------------------------------------------------------------------
@@ -379,6 +403,26 @@ public class LayerManager {
         });
     }
 
+    /** A Boundaries layer's color, in place from what the phone holds, no network; saved. */
+    public void setColor(final LoadedLayer l, final int rgb) {
+        l.spec.outlineRgb = rgb & 0x00FFFFFF;
+        save();
+        l.busy = true;
+        changed();
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    l.recolor(rgb);
+                } finally {
+                    l.busy = false;
+                    save();
+                    changed();
+                }
+            }
+        });
+    }
+
     /** Fill opacity for one feature type of one layer, in place, no network. */
     public void setSetFill(final LoadedLayer l, final String setName, final int alpha) {
         l.spec.setFill.put(setName, alpha);
@@ -409,6 +453,25 @@ public class LayerManager {
             public void run() {
                 try {
                     refreshNow(l); // in this task, so "Loading" lasts until the redraw
+                } finally {
+                    l.busy = false;
+                    changed();
+                }
+            }
+        });
+    }
+
+    /** The Active only switch; the where clause changes, so this one refetches. */
+    public void setActiveOnly(final LoadedLayer l, final boolean on) {
+        l.spec.activeOnly = on;
+        save();
+        l.busy = true;
+        changed();
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    refreshNow(l);
                 } finally {
                     l.busy = false;
                     changed();
@@ -488,6 +551,8 @@ public class LayerManager {
     private com.atakmap.android.maps.Marker selfWatched;
     /** About a second after the last movement, so a pan asks once, not per frame. */
     private static final long MOVE_SETTLE_MS = 1000;
+    /** How soon a land layer that skipped a move is asked again. */
+    private static final long LAND_RETRY_MS = 1500;
     /** No layer is re-fetched for movement more often than this. */
     private static final long MOVE_MIN_GAP_MS = 20_000;
     private final java.util.Map<String, Long> lastMoveFetch = new java.util.HashMap<>();
@@ -499,23 +564,106 @@ public class LayerManager {
             final long now = System.currentTimeMillis();
             final double res = mapView.getMapResolution();
             boolean followsView = false;
+            boolean landWaits = false;
             for (LoadedLayer l : snapshot()) {
                 l.onMapResolution(res);
                 followsView |= "view".equals(l.spec.scopeKind);
-                if (!l.movedOutOfScope())
+                if (!l.movedOutOfScope()) {
+                    // Still fetching the square it took mid-drag: look again once that is in.
+                    landWaits |= l.landSquareStale();
                     continue;
+                }
                 final Long last = lastMoveFetch.get(l.spec.id);
-                if (last != null && now - last < MOVE_MIN_GAP_MS)
+                // A land layer's square is sized to the view and fetches in a few
+                // seconds; it may follow the map more closely than a live feed.
+                final long gap = Boundaries.handles(l.spec) && Boundaries.mosaic(l.spec.kind) ? 3_000 : MOVE_MIN_GAP_MS;
+                if (last != null && now - last < gap) {
+                    landWaits |= l.landSquareStale();
                     continue;
+                }
                 lastMoveFetch.put(l.spec.id, now);
                 refresh(l);
+            }
+            // A land layer that skipped this move, for the gap or a fetch still running,
+            // is asked again: the map may never move again, and a drag that settled
+            // inside the gap left SRA empty over Los Angeles (dev 2, 2026-10-16).
+            if (landWaits) {
+                main.removeCallbacks(moveTick);
+                main.postDelayed(moveTick, LAND_RETRY_MS);
             }
             // A list scoped to the view is drawn from what is in view now, so the pane
             // redraws in place after every settled move, fetch or no fetch.
             if (followsView)
                 changed();
+            updateWhere(false);
         }
     };
+
+    /** Where "You are in" was last worked out, so a move of a few hundred meters is a no-op. */
+    private volatile double whereLat = Double.NaN, whereLon = Double.NaN;
+    private static final double WHERE_STEP_M = 300;
+
+    /**
+     * "You are in Elko County, NV" for every Boundaries layer that is on: a point-in-
+     * polygon over the memory copy, on the worker, after the self marker has moved
+     * {@link #WHERE_STEP_M} or a layer changed ({@code force}). Main thread.
+     */
+    private void updateWhere(boolean force) {
+        if (!started)
+            return;
+        boolean any = false;
+        for (LoadedLayer l : snapshot())
+            if (Boundaries.handles(l.spec))
+                any = true;
+        if (!any)
+            return;
+        final com.atakmap.android.maps.Marker self = mapView.getSelfMarker();
+        com.atakmap.coremap.maps.coords.GeoPoint p = self == null ? null : self.getPoint();
+        // No fix yet (the self marker reads 0,0 and calls itself valid): the map center
+        // stands in and the line says so, the way the scope control does.
+        final boolean fromCenter = p == null || !p.isValid()
+                || (Math.abs(p.getLatitude()) < 0.01 && Math.abs(p.getLongitude()) < 0.01);
+        if (fromCenter)
+            p = mapView.getPoint().get();
+        if (p == null || !p.isValid())
+            return;
+        final double lat = p.getLatitude(), lon = p.getLongitude();
+        if (!force && !Double.isNaN(whereLat)
+                && p.distanceTo(new com.atakmap.coremap.maps.coords.GeoPoint(whereLat, whereLon)) < WHERE_STEP_M)
+            return;
+        whereLat = lat;
+        whereLon = lon;
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                boolean moved = false;
+                for (LoadedLayer l : snapshot()) {
+                    if (!Boundaries.handles(l.spec))
+                        continue;
+                    final String at = l.isVisible() ? l.nameAt(lat, lon) : null;
+                    final String now = at == null ? null : (fromCenter ? "Map center is in " : "You are in ") + at;
+                    final String was = l.whereLine;
+                    Log.d(TAG, "where: " + l.spec.id + " -> " + now);
+                    if (now == null ? was != null : !now.equals(was)) {
+                        l.whereLine = now;
+                        moved = true;
+                    }
+                }
+                if (moved)
+                    changed();
+            }
+        });
+    }
+
+    /** The same, from the worker: posted so the self marker is read on the main thread. */
+    private void updateWhereLater() {
+        main.post(new Runnable() {
+            @Override
+            public void run() {
+                updateWhere(true);
+            }
+        });
+    }
 
     private void attachFollow() {
         try {
@@ -614,6 +762,7 @@ public class LayerManager {
                 } finally {
                     l.busy = false;
                     changed();
+                    updateWhereLater();
                 }
             }
         });
@@ -633,6 +782,7 @@ public class LayerManager {
                 } finally {
                     l.busy = false;
                     changed();
+                    updateWhereLater();
                 }
             }
         });
@@ -688,7 +838,8 @@ public class LayerManager {
     public void refresh(final LoadedLayer l) {
         if (l.refreshing)
             return;
-        worker.execute(new Runnable() {
+        final ExecutorService on = Boundaries.handles(l.spec) && Boundaries.mosaic(l.spec.kind) ? landPool : worker;
+        on.execute(new Runnable() {
             @Override
             public void run() {
                 refreshNow(l);
@@ -735,6 +886,51 @@ public class LayerManager {
         startLog("refreshNow " + l.spec.id + " done: " + l.status);
         save();
         sweepLegacyIcons();
+        if (Boundaries.handles(l.spec))
+            updateWhereLater();
+    }
+
+    /**
+     * Refresh from the row's button: a land layer takes a new square around where the
+     * map is now, so Refresh is also "load it here" after a drive; every other layer
+     * refreshes as it is.
+     */
+    public void refreshHere(final LoadedLayer l) {
+        if (Boundaries.handles(l.spec) && Boundaries.mosaic(l.spec.kind)) {
+            // Every land layer of the same states moves with it: one Refresh loads the
+            // new area for all of them, not the one whose button was under the thumb
+            // (the operator refreshed Public Access near San Diego and read SRA, still
+            // holding Santa Barbara, as broken, 2026-10-14).
+            final com.atakmap.coremap.maps.coords.GeoBounds vb = mapView.getBounds();
+            if (vb == null) {
+                refresh(l);
+                return;
+            }
+            final double[] box = Boundaries.boxFor(vb);
+            final String key = Boundaries.groupKey(l.spec);
+            for (LoadedLayer o : snapshot()) {
+                if (!Boundaries.handles(o.spec) || !Boundaries.mosaic(o.spec.kind) || !key.equals(Boundaries.groupKey(o.spec)))
+                    continue;
+                o.spec.scopeBox = box.clone();
+                // A hidden one takes the new square and fetches when it is switched on.
+                if (o == l || o.isVisible())
+                    refresh(o);
+            }
+            save();
+            return;
+        }
+        refresh(l);
+    }
+
+    /** Whether the map center lies inside the square a land layer loaded; true for every other layer. */
+    public boolean loadedHere(LoadedLayer l) {
+        if (!Boundaries.handles(l.spec) || !Boundaries.mosaic(l.spec.kind) || l.spec.scopeBox == null)
+            return true;
+        final com.atakmap.coremap.maps.coords.GeoPoint c = mapView.getPoint().get();
+        if (c == null)
+            return true;
+        final double[] b = l.spec.scopeBox;
+        return c.getLatitude() >= b[0] && c.getLatitude() <= b[2] && c.getLongitude() >= b[1] && c.getLongitude() <= b[3];
     }
 
     public void refreshAll() {
@@ -798,6 +994,48 @@ public class LayerManager {
 
     // ---- state --------------------------------------------------------------------
 
+    /**
+     * Cities held the unincorporated communities too until 2026-10-13, when Communities
+     * became a kind of its own. A state whose Cities layer was added before that gets a
+     * Communities layer beside it, on or off as its Cities is, so nothing it showed goes
+     * missing (operator: "where is the community layer?"). Layers picked by name are left
+     * as they are: their picks were cities and communities mixed.
+     */
+    private static JSONArray withCommunities(JSONArray arr) {
+        try {
+            final java.util.Set<String> have = new java.util.HashSet<>();
+            for (int i = 0; i < arr.length(); i++) {
+                final JSONObject sp = arr.getJSONObject(i).optJSONObject("spec");
+                if (sp != null)
+                    have.add(sp.optString("id", ""));
+            }
+            final JSONArray out = new JSONArray();
+            for (int i = 0; i < arr.length(); i++) {
+                final JSONObject o = arr.getJSONObject(i);
+                out.put(o);
+                final JSONObject sp = o.optJSONObject("spec");
+                if (sp == null || !"boundaries".equals(sp.optString("iconSet")) || !Boundaries.KIND_CITIES.equals(sp.optString("kind"))
+                        || sp.optJSONArray("picks") != null)
+                    continue;
+                final String[] states = LayerSpec.fromJson(sp).states;
+                if (states == null || states.length == 0)
+                    continue;
+                final LayerSpec c = Boundaries.layer(Boundaries.KIND_COMMUNITIES, states, null, null);
+                if (have.contains(c.id))
+                    continue;
+                have.add(c.id);
+                final JSONObject n = new JSONObject();
+                n.put("spec", c.toJson());
+                n.put("visible", o.optBoolean("visible", true));
+                out.put(n);
+            }
+            return out;
+        } catch (Exception e) {
+            Log.w(TAG, "communities beside cities: skipped", e);
+            return arr;
+        }
+    }
+
     private void restore() {
         final File bak = new File(stateFile.getPath() + ".bak");
         if (!stateFile.isFile() && !bak.isFile())
@@ -821,6 +1059,7 @@ public class LayerManager {
                     arr = prev;
                 }
             }
+            arr = withCommunities(arr);
             for (int i = 0; i < arr.length(); i++) {
                 final JSONObject o = arr.getJSONObject(i);
                 final LayerSpec spec = LayerSpec.fromJson(o.getJSONObject("spec"));
@@ -830,7 +1069,10 @@ public class LayerManager {
                 // Built-in public sources: the fixed parts follow the current definition.
                 if ("ca-air-intel".equals(spec.id)) {
                     final LayerSpec cur = Sources.caAirIntel();
+                    spec.title = cur.title;
+                    spec.subtitle = cur.subtitle;
                     spec.where = cur.where;
+                    spec.activeWhere = cur.activeWhere;
                     spec.labelField = cur.labelField;
                     spec.setField = cur.setField;
                     spec.timeField = cur.timeField;
@@ -880,6 +1122,7 @@ public class LayerManager {
                             } finally {
                                 l.busy = false;
                                 changed();
+                                updateWhereLater();
                             }
                         }
                     });

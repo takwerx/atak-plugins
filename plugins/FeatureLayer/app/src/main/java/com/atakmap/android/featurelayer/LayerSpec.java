@@ -78,6 +78,8 @@ public class LayerSpec {
      * Fire History reads two services as one layer. Not saved; the source sets it.
      */
     public String[] sourceBases;
+    /** The fields to fetch, comma separated, when the layer needs only a few of a wide table; null is all. Not saved. */
+    public String outFields;
     /** Simplify shapes to the map's resolution when fetching; fire perimeters are megabytes at full detail. Not saved. */
     public boolean generalize;
 
@@ -99,10 +101,19 @@ public class LayerSpec {
      * or fields separated by "|" tried in turn ("incident_name|mission"). Null = keep all.
      */
     public String[] latestBy;
+    /**
+     * The clause that keeps only what is happening now ("displayStatus = 'Active'"), applied
+     * while {@link #activeOnly} is on. Null = the layer has no such switch. From the source, not saved.
+     */
+    public String activeWhere;
+    /** The Active only switch: off shows every perimeter the service holds, active or not. */
+    public boolean activeOnly = true;
 
     /** The where clause to query with right now: the fixed one, plus the time window from the present. */
     public String whereNow() {
-        final String fixed = where == null || where.trim().isEmpty() ? "1=1" : where;
+        String fixed = where == null || where.trim().isEmpty() ? "1=1" : where;
+        if (activeWhere != null && activeOnly)
+            fixed = "(" + fixed + ") AND (" + activeWhere + ")";
         if (timeField == null || (sinceHours <= 0 && minAgeHours <= 0))
             return fixed;
         final long now = System.currentTimeMillis();
@@ -129,6 +140,16 @@ public class LayerSpec {
         return "Last " + (sinceHours / 24) + " days";
     }
     public String iconSet;     // "sarcop" swaps in NAPSG/NWCG icons; null keeps the service symbols
+    /**
+     * A Boundaries layer: which kind (counties, cities, tribal), which states by FIPS
+     * code, and the GEOIDs picked by name (null for every boundary in the states). Saved,
+     * so a restored layer is rebuilt from what was picked ({@link Boundaries#fixed}).
+     */
+    public String kind;
+    public String[] states;
+    public String[] picks;
+    /** The outline color the operator picked for a Boundaries layer, RGB; 0 = the kind's own. */
+    public int outlineRgb;
     public int fillAlpha = 0x40; // polygon fill opacity 0..255; 0 = outline only
     /** Per feature type (set name): fill opacity override, and the geometry kind seen at load. */
     public final java.util.Map<String, Integer> setFill = new java.util.HashMap<>();
@@ -205,12 +226,19 @@ public class LayerSpec {
         o.put("id", id).put("title", title).put("subtitle", subtitle).put("portal", portal)
                 .put("base", base).put("where", where).put("geojson", geojson)
                 .put("profile", profile.name()).put("lat", finite(lat)).put("lon", finite(lon)).put("live", live).put("maxFeatures", maxFeatures).put("iconSet", iconSet).put("fillAlpha", fillAlpha).put("refreshMinutes", refreshMinutes).put("repairStatus", repairStatus).put("labels", labels)
-                .put("timeField", timeField).put("sinceHours", sinceHours).put("setField", setField).put("labelField", labelField).put("gateGsd", gateGsd == Double.MAX_VALUE ? -1 : gateGsd).put("orgName", orgName).put("labelGsd", labelGsd == Double.MAX_VALUE ? 0 : labelGsd);
+                .put("timeField", timeField).put("sinceHours", sinceHours).put("activeOnly", activeOnly).put("setField", setField).put("labelField", labelField).put("gateGsd", gateGsd == Double.MAX_VALUE ? -1 : gateGsd).put("orgName", orgName).put("labelGsd", labelGsd == Double.MAX_VALUE ? 0 : labelGsd);
         final JSONArray ids = new JSONArray();
         for (int i : layerIds)
             ids.put(i);
         o.put("layerIds", ids);
         o.put("layerTitle", layerTitle).put("styleVersion", styleVersion);
+        o.put("kind", kind);
+        if (states != null)
+            o.put("states", new JSONArray(java.util.Arrays.asList(states)));
+        if (picks != null)
+            o.put("picks", new JSONArray(java.util.Arrays.asList(picks)));
+        if (outlineRgb != 0)
+            o.put("outlineRgb", outlineRgb);
         o.put("scopeKind", scopeKind).put("scopeRadiusM", scopeRadiusM).put("scopeRings", scopeRings);
         if (scopeBox != null)
             o.put("scopeBox", new JSONArray(
@@ -252,6 +280,7 @@ public class LayerSpec {
         s.labels = o.optBoolean("labels", true);
         s.timeField = o.isNull("timeField") ? null : o.optString("timeField", null);
         s.sinceHours = o.optInt("sinceHours", 0);
+        s.activeOnly = o.optBoolean("activeOnly", true);
         s.setField = o.isNull("setField") ? null : o.optString("setField", null);
         s.labelField = o.isNull("labelField") ? null : o.optString("labelField", null);
         s.orgName = o.isNull("orgName") ? null : o.optString("orgName", null);
@@ -266,7 +295,7 @@ public class LayerSpec {
         // saved five-mile level equal to the old constant was never chosen, so it moves;
         // a preset the operator picked is computed from the live scale bar and does not
         // hit the constant exactly. DART and FireGuard keep five.
-        final boolean wide = "dart".equals(s.iconSet) || "fireguard".equals(s.iconSet);
+        final boolean wide = "dart".equals(s.iconSet) || "fireguard".equals(s.iconSet) || "boundaries".equals(s.iconSet);
         if (!wide && Math.abs(s.labelGsd - DEFAULT_LABEL_GSD_WIDE) < 1e-9)
             s.labelGsd = DEFAULT_LABEL_GSD;
         if (wide && lab < 0)
@@ -277,6 +306,10 @@ public class LayerSpec {
             s.layerIds[i] = ids.getInt(i);
         s.layerTitle = o.isNull("layerTitle") ? null : o.optString("layerTitle", null);
         s.styleVersion = o.optInt("styleVersion", 0);
+        s.kind = o.isNull("kind") ? null : o.optString("kind", null);
+        s.states = strings(o.optJSONArray("states"));
+        s.picks = strings(o.optJSONArray("picks"));
+        s.outlineRgb = o.optInt("outlineRgb", 0) & 0x00FFFFFF;
         final JSONArray mf = o.optJSONArray("myFires");
         if (mf != null)
             for (int i = 0; i < mf.length() && s.myFires.size() < MY_FIRES_MAX; i++) {
@@ -324,6 +357,19 @@ public class LayerSpec {
             }
         }
         return s;
+    }
+
+    /** A JSON array of strings, or null when absent or empty. */
+    private static String[] strings(JSONArray a) {
+        if (a == null || a.length() == 0)
+            return null;
+        final java.util.List<String> out = new java.util.ArrayList<>();
+        for (int i = 0; i < a.length(); i++) {
+            final String v = a.optString(i, null);
+            if (v != null && !v.isEmpty())
+                out.add(v);
+        }
+        return out.isEmpty() ? null : out.toArray(new String[0]);
     }
 
     /** A file-system-safe name for this layer's store. */

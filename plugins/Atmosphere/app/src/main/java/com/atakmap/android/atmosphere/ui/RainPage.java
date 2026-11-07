@@ -1125,7 +1125,7 @@ public final class RainPage {
 
     /** The rain before a moment, the start of a fire: day, time, then how long before it. */
     private void chooseMoment(final Context ctx) {
-        MomentPicker.pick(ctx, gauges.moment(), RainGaugesOverlay.BEFORE_HOURS, gauges.beforeHours(),
+        MomentPicker.pick(ctx, gauges.moment(), 0L, RainGaugesOverlay.BEFORE_HOURS, gauges.beforeHours(),
                 pluginContext.getString(R.string.rain_window_title), new MomentPicker.Words() {
                     @Override
                     public String of(int hours, long millis) {

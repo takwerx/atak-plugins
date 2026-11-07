@@ -149,6 +149,14 @@ public abstract class ImageOverlay {
         return picture;
     }
 
+    /**
+     * Asks for one picture, the main one or a fill, and answers on main. One GET by
+     * default; Rain Totals builds its past radar from the relay's tiles here.
+     */
+    protected void getPicture(String url, Http.BitmapCallback callback) {
+        Http.getBitmap(url, egress.userAgent(), callback);
+    }
+
     /** A fill picture could not be had; the server's picture stays as it came. */
     protected void fillFailed() {
     }
@@ -354,7 +362,7 @@ public abstract class ImageOverlay {
         final int mine = generation;
         final int wide = px, high = py;
         status("Getting the " + noun() + "…");
-        Http.getBitmap(url(rw, rs, re, rn, px, py), egress.userAgent(), new Http.BitmapCallback() {
+        getPicture(url(rw, rs, re, rn, px, py), new Http.BitmapCallback() {
             @Override
             public void onSuccess(Bitmap bitmap) {
                 if (key.equals(pendingKey))
@@ -419,7 +427,7 @@ public abstract class ImageOverlay {
             status(shown());
             return;
         }
-        Http.getBitmap(urls[i], egress.userAgent(), new Http.BitmapCallback() {
+        getPicture(urls[i], new Http.BitmapCallback() {
             @Override
             public void onSuccess(Bitmap b) {
                 if (mine != generation || !on || region != r) {

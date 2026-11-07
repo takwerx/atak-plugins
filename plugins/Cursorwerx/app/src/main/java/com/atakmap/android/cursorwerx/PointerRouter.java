@@ -73,6 +73,7 @@ public final class PointerRouter {
                 // this runs on the UI thread for every pointer sample.
                 if (event.getAction() != MotionEvent.ACTION_SCROLL)
                     return false;
+                rawWheel(event); // every wheel event, the map's too, keeps the replay in step
                 final boolean overUi = isOverUi(event.getRawX(), event.getRawY());
                 if (!overUi && zoomAtCursor(event))
                     return true;
@@ -111,7 +112,9 @@ public final class PointerRouter {
      * events of 1 where a mouse click is one of 8, so ATAK's Tools list ran 20 to 40 rows a
      * swipe, its whole length, and the plugins in it only flashed past (the operator's
      * MacBook, 2026-10-08). Over UI the event is scrolled here, by its share of a notch,
-     * and never reaches the list; over the map it passes on to the router's zoom.
+     * and never reaches the list; over the map it passes on to the router's zoom. Since
+     * 0.4 the share is of the travel the tablet reported, before Android's acceleration
+     * ({@link WheelAcceleration}), so every event is counted here, the map's included.
      */
     private void hideGuestPointer(boolean hide) {
         if (Build.VERSION.SDK_INT < 24)
@@ -137,13 +140,14 @@ public final class PointerRouter {
                 pointerShroud.setOnGenericMotionListener(new View.OnGenericMotionListener() {
                     @Override
                     public boolean onGenericMotion(View v, MotionEvent event) {
-                        if (event.getAction() != MotionEvent.ACTION_SCROLL
-                                || event.getAxisValue(MotionEvent.AXIS_VSCROLL) == 0f
-                                || !isOverUi(event.getRawX(), event.getRawY()))
+                        if (event.getAction() != MotionEvent.ACTION_SCROLL)
+                            return false;
+                        final float raw = rawWheel(event);
+                        if (raw == 0f || !isOverUi(event.getRawX(), event.getRawY()))
                             return false;
                         final String scrolled = scrollUnder(event);
                         if (verbose)
-                            Log.d(TAG, "wheel " + event.getAxisValue(MotionEvent.AXIS_VSCROLL) + " over "
+                            Log.d(TAG, "wheel " + event.getAxisValue(MotionEvent.AXIS_VSCROLL) + " (raw " + raw + ") over "
                                     + describe(lastHit) + (scrolled != null ? ", scrolled " + scrolled : ", nothing to scroll"));
                         return true;
                     }
@@ -270,8 +274,28 @@ public final class PointerRouter {
      * mouse click as 8; scrcpy and most Android mice report 1.
      */
     private static float notch(MotionEvent event) {
-        final android.view.InputDevice d = event.getDevice();
-        return d != null && "QEMU Virtio Tablet".equals(d.getName()) ? 8f : 1f;
+        return fromEmulatorTablet(event) ? 8f : 1f;
+    }
+
+    private static boolean fromEmulatorTablet(MotionEvent event) {
+        final InputDevice d = event.getDevice();
+        return d != null && EMULATOR_TABLET.equals(d.getName());
+    }
+
+    private final WheelAcceleration wheelAcceleration = new WheelAcceleration();
+
+    /**
+     * The wheel travel the device reported for this event, before Android accelerated it.
+     * Only for the emulator's tablet, the device it was measured on, which reports whole
+     * numbers; any other wheel passes as Android delivered it.
+     */
+    private float rawWheel(MotionEvent event) {
+        final float axis = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
+        if (!fromEmulatorTablet(event))
+            return axis;
+        final long t = Build.VERSION.SDK_INT >= 34 ? event.getEventTimeNanos()
+                : event.getEventTime() * 1_000_000L;
+        return wheelAcceleration.raw(t, axis);
     }
 
     private boolean zoomAtCursor(MotionEvent event) {
@@ -324,11 +348,13 @@ public final class PointerRouter {
      * <p>Travel is counted in notches, as {@link #zoomAtCursor} counts it: under the emulator
      * a mouse click is one event of 8 and a trackpad swipe 20 to 40 events of 1 at 60 Hz
      * (2026-10-08). Until 0.3 the raw value was taken as notches, eight steps a click.
+     * Since 0.4 the travel is the tablet's own, before Android multiplied it by up to four
+     * for speed ({@link #rawWheel}); with it a trackpad swipe ran the Tools list 21 rows.
      *
      * @return what was scrolled and by how much, for the log; null when nothing could.
      */
     private String scrollUnder(MotionEvent event) {
-        final float notches = event.getAxisValue(MotionEvent.AXIS_VSCROLL) / notch(event);
+        final float notches = rawWheel(event) / notch(event);
         if (notches == 0f || lastHit == null)
             return null;
         // Wheel up (positive) brings the content above into view.

@@ -27,8 +27,9 @@ final class MomentPicker {
         String of(int hours, long millis);
     }
 
-    static void pick(final Context ctx, long current, final int[] hours, final int currentHours, final String title,
-            final Words words, final Picked picked) {
+    /** @param earliest the first moment offered, or 0 for any; an earlier time on its day is taken as it */
+    static void pick(final Context ctx, long current, final long earliest, final int[] hours, final int currentHours,
+            final String title, final Words words, final Picked picked) {
         final Calendar c = Calendar.getInstance();
         if (current > 0)
             c.setTimeInMillis(current);
@@ -41,13 +42,16 @@ final class MomentPicker {
                         final Calendar at = Calendar.getInstance();
                         at.clear();
                         at.set(year, month, day, hour, minute);
-                        length(ctx, at.getTimeInMillis(), hours, currentHours, title, words, picked);
+                        length(ctx, Math.max(earliest, at.getTimeInMillis()), hours, currentHours, title, words,
+                                picked);
                     }
                 }, c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE),
                         android.text.format.DateFormat.is24HourFormat(ctx)).show();
             }
         }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH));
         d.getDatePicker().setMaxDate(System.currentTimeMillis());
+        if (earliest > 0)
+            d.getDatePicker().setMinDate(earliest);
         d.show();
     }
 

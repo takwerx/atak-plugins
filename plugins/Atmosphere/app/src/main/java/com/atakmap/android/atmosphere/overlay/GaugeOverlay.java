@@ -49,7 +49,6 @@ public final class GaugeOverlay {
 
     private static final String PREF_ON = "weather.layer.gauges.on";
     private static final String PREF_MILES = "weather.layer.gauges.miles";
-    private static final String PREF_FROM_ME = "weather.layer.gauges.fromme";
     private static final String PREF_UNITS = "weather.units";
 
     /** Most gauges report every fifteen minutes; asking more often gains nothing. */
@@ -103,7 +102,7 @@ public final class GaugeOverlay {
     private int generation;
     private long lastPoll;
     private int miles;
-    private boolean fromMe;
+    private volatile Origin source = Origin.MAP_CENTER;
     private int show;
     private boolean labels;
     /** Coarsest meters per pixel at which each still draws. */
@@ -132,7 +131,6 @@ public final class GaugeOverlay {
                 pluginContext.getResources().getDisplayMetrics().density);
         final SharedPreferences p = MapCompat.prefs();
         miles = p == null ? DEFAULT_MILES : p.getInt(PREF_MILES, DEFAULT_MILES);
-        fromMe = p == null || p.getBoolean(PREF_FROM_ME, true);
         show = p == null ? SHOW_ALL : p.getInt(PREF_SHOW, SHOW_ALL);
         labels = p == null || p.getBoolean(PREF_LABELS, true);
         gate = storedGate(p, PREF_GATE, ALWAYS_GATE);
@@ -349,11 +347,6 @@ public final class GaugeOverlay {
         return miles;
     }
 
-    /** Whether the box is around the operator or around the middle of the map. */
-    public boolean isFromMe() {
-        return fromMe;
-    }
-
     public void setMiles(int value) {
         if (miles == value)
             return;
@@ -365,15 +358,21 @@ public final class GaugeOverlay {
         refresh(true);
     }
 
-    public void setFromMe(boolean value) {
-        if (fromMe == value)
-            return;
-        fromMe = value;
+    /** Measure from the pane's point; see {@link Origin}. */
+    public void setOrigin(Origin origin) {
+        source = origin == null ? Origin.MAP_CENTER : origin;
         fetchedFrom = null;
-        final SharedPreferences p = MapCompat.prefs();
-        if (p != null)
-            p.edit().putBoolean(PREF_FROM_ME, value).apply();
+    }
+
+    /** The pane's point moved to another place or kind: ask around the new one. */
+    public void originChanged() {
+        fetchedFrom = null;
         refresh(true);
+    }
+
+    /** Where the radius is measured from. */
+    public Origin originSource() {
+        return source;
     }
 
     /** The gauges currently held, for a list that must agree with the map. */
@@ -387,7 +386,7 @@ public final class GaugeOverlay {
     }
 
     private GeoPoint origin() {
-        final GeoPoint p = fromMe ? MapCompat.selfPoint() : MapCompat.mapCenter();
+        final GeoPoint p = source.point();
         return p != null && p.isValid() ? p : null;
     }
 
@@ -400,8 +399,8 @@ public final class GaugeOverlay {
             return;
         final GeoPoint from = origin();
         if (from == null) {
-            status(fromMe ? "No position yet — switch to the map, or wait for a fix"
-                    : "The map has no center yet");
+            status(source.self() ? "No position yet \u2014 pick Map center at the top, or wait for a fix"
+                    : "No point to measure from yet \u2014 pick one at the top");
             return;
         }
         lastPoll = now;
@@ -516,7 +515,7 @@ public final class GaugeOverlay {
         });
         Log.d(TAG, String.format(Locale.US,
                 "drew %d of %d gauges within %d mi of %s, %d at or above action stage, took %d ms",
-                n, total, miles, fromMe ? "me" : "the map", high,
+                n, total, miles, source.logWords(), high,
                 android.os.SystemClock.elapsedRealtime() - began));
     }
 
@@ -637,7 +636,7 @@ public final class GaugeOverlay {
      * around the map, and only past a third of the radius.
      */
     private void followMapCenter() {
-        if (fromMe || inFlight)
+        if (!source.followsMap() || inFlight)
             return;
         final GeoPoint now = origin();
         if (now == null)
