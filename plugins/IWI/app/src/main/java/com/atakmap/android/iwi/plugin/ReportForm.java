@@ -341,10 +341,7 @@ final class ReportForm {
         body = body(resources);
         body.addView(guide("The IRPG's example list. Pick everything you need."));
         // Near-square tiles, three across, like what happened (operator, 2026-11-08).
-        final TileGroup rg = tiles(body, Vocab.RESOURCES, 3, true,
-                textBinding(IwiState.RESOURCES), groups);
-        for (Button t : rg.tiles.values())
-            squareTile(t);
+        tiles(body, Vocab.RESOURCES, 3, true, textBinding(IwiState.RESOURCES), groups, true);
 
         root.addView(heading("As you learn more"));
 
@@ -510,6 +507,12 @@ final class ReportForm {
      */
     private TileGroup tiles(LinearLayout into, final Vocab.Choices c, int cols,
             final boolean many, final Binding b, List<TileGroup> registry) {
+        return tiles(into, c, cols, many, b, registry, false);
+    }
+
+    private TileGroup tiles(LinearLayout into, final Vocab.Choices c, int cols,
+            final boolean many, final Binding b, List<TileGroup> registry,
+            final boolean square) {
         final TileGroup g = new TileGroup(c, many, b);
         LinearLayout r = null;
         for (int i = 0; i < c.codes.length; i++) {
@@ -520,7 +523,7 @@ final class ReportForm {
                 into.addView(r, lp);
             }
             final String code = c.codes[i];
-            final Button t = button(c.labels[i], new View.OnClickListener() {
+            final View.OnClickListener tap = new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     final String now = b.get();
@@ -530,8 +533,10 @@ final class ReportForm {
                         b.set(code.equals(now) ? "" : code);
                     picked();
                 }
-            });
-            if (cols >= 3)
+            };
+            final Button t = square ? squareTile(c.labels[i]) : button(c.labels[i], null);
+            t.setOnClickListener(tap);
+            if (cols >= 3 && !square)
                 t.setTextSize(13);
             g.tiles.put(code, t);
             r.addView(t, weighted(i % cols == 0 ? 0 : dp(4)));
@@ -570,38 +575,30 @@ final class ReportForm {
         final Fold group = section(parent, pref);
         natureFolds.put(group, c);
         natureNames.put(group, name);
-        final TileGroup g = tiles(body(group), c, 3, true, textBinding(IwiState.NATURE),
-                groups);
-        for (Button t : g.tiles.values())
-            squareTile(t);
+        tiles(body(group), c, 3, true, textBinding(IwiState.NATURE), groups, true);
     }
 
-    /** A tile whose height follows its width, clamped so a wide pane stays usable. */
-    private void squareTile(final Button t) {
+    /**
+     * A tile whose height follows its width, clamped so a wide pane stays usable. Set
+     * in the measure pass, so a jump to a step scrolls to where things really are.
+     */
+    private Button squareTile(String text) {
+        final int min = dp(72), max = dp(104);
+        final Button t = new Button(ctx, null, 0, R.style.TakwerxButton) {
+            @Override
+            protected void onMeasure(int widthSpec, int heightSpec) {
+                final int w = View.MeasureSpec.getSize(widthSpec);
+                final int h = Math.max(min, Math.min(max, w));
+                super.onMeasure(widthSpec,
+                        View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY));
+            }
+        };
+        t.setText(text);
         t.setSingleLine(false);
         t.setMaxLines(2);
         t.setTextSize(15);
         t.setGravity(Gravity.CENTER);
-        final int min = dp(72), max = dp(104);
-        t.setMinHeight(min);
-        t.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
-            @Override
-            public void onLayoutChange(View v, int l, int top, int r, int bottom,
-                    int ol, int ot, int or, int ob) {
-                final int want = Math.max(min, Math.min(max, r - l));
-                final LinearLayout.LayoutParams lp =
-                        (LinearLayout.LayoutParams) v.getLayoutParams();
-                if (lp.height != want) {
-                    lp.height = want;
-                    v.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            t.setLayoutParams(lp);
-                        }
-                    });
-                }
-            }
-        });
+        return t;
     }
 
     // ---- item 2: the counts make the patients ----
@@ -1064,10 +1061,19 @@ final class ReportForm {
     private void evacRows(LinearLayout into) {
         final Binding b = textBinding(IwiState.EVAC_REQUEST);
         final TileGroup g = new TileGroup(Vocab.EVAC, true, b);
+        // Two across (operator, 2026-11-08): each cell the type's tile with its
+        // [-] n [+] under it, so it fits the narrow pane too.
+        final int cols = 2;
+        LinearLayout r = null;
         for (int i = 0; i < Vocab.EVAC.codes.length; i++) {
             final String code = Vocab.EVAC.codes[i];
-            final LinearLayout r = row();
-            r.setGravity(Gravity.CENTER_VERTICAL);
+            if (i % cols == 0) {
+                r = row();
+                final LinearLayout.LayoutParams lp = full();
+                lp.topMargin = dp(6);
+                into.addView(r, lp);
+            }
+            final LinearLayout cell = block();
             final Button t = button(Vocab.EVAC.labels[i], new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -1077,19 +1083,17 @@ final class ReportForm {
             });
             t.setMinHeight(dp(64));
             g.tiles.put(code, t);
-            r.addView(t, new LinearLayout.LayoutParams(0, dp(64), 1f));
+            cell.addView(t, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, dp(64)));
 
             final LinearLayout step = row();
             step.setGravity(Gravity.CENTER_VERTICAL);
-            final LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(dp(64),
-                    dp(64));
-            mlp.leftMargin = dp(6);
             step.addView(button("\u2212", new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     setEvacCount(code, RadioScript.evacCount(state, code) - 1);
                 }
-            }), mlp);
+            }), new LinearLayout.LayoutParams(0, dp(52), 1f));
             final TextView n = new TextView(ctx);
             n.setTextSize(22);
             n.setTypeface(Typeface.DEFAULT_BOLD);
@@ -1102,20 +1106,23 @@ final class ReportForm {
                 public void onClick(View v) {
                     setEvacCount(code, RadioScript.evacCount(state, code) + 1);
                 }
-            }), new LinearLayout.LayoutParams(dp(64), dp(64)));
-            // Invisible, not gone: every tile keeps one width whatever is picked.
-            step.setVisibility(View.INVISIBLE);
-            r.addView(step, new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT));
+            }), new LinearLayout.LayoutParams(0, dp(52), 1f));
+            step.setVisibility(View.GONE);
+            final LinearLayout.LayoutParams slp = full();
+            slp.topMargin = dp(4);
+            cell.addView(step, slp);
             if (!"other".equals(code)) {
                 evacSteppers.put(code, step);
                 evacNumbers.put(code, n);
+            } else {
+                // Other has no count; its cell needs no room for one.
+                step.setVisibility(View.GONE);
             }
-            final LinearLayout.LayoutParams lp = full();
-            lp.topMargin = dp(4);
-            into.addView(r, lp);
+            r.addView(cell, weighted(i % cols == 0 ? 0 : dp(6)));
         }
+        final int fill = (cols - Vocab.EVAC.codes.length % cols) % cols;
+        for (int i = 0; i < fill; i++)
+            r.addView(new View(ctx), weighted(dp(6)));
         groups.add(g);
     }
 
@@ -1124,7 +1131,13 @@ final class ReportForm {
                 Vocab.parse(state.text(IwiState.EVAC_REQUEST), Vocab.EVAC);
         for (Map.Entry<String, View> e : evacSteppers.entrySet()) {
             final String c = e.getKey();
-            e.getValue().setVisibility(on.contains(c) ? View.VISIBLE : View.INVISIBLE);
+            // Room for [-] n [+] only in a row where something is picked; the
+            // other cell of that row keeps the room so both stay one height.
+            final int at = Vocab.EVAC.index(c);
+            final String partner = (at ^ 1) < Vocab.EVAC.codes.length
+                    ? Vocab.EVAC.codes[at ^ 1] : "";
+            e.getValue().setVisibility(on.contains(c) ? View.VISIBLE
+                    : on.contains(partner) ? View.INVISIBLE : View.GONE);
             evacNumbers.get(c).setText(Integer.toString(RadioScript.evacCount(state, c)));
         }
     }
