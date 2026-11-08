@@ -98,10 +98,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private static final String[] FOLLOW_UP_NAMES = {
             "Patient Update", "Evac Plan", "Contingency"
     };
-    private View stepBoxesRow;
     private View followUpBar;
-    /** 1 to 6 in the pinned bar: green filled in, red edge while missing. */
-    private final TextView[] stepBoxes = new TextView[STEPS];
     private final Button[] stepRows = new Button[STEPS];
     private final Button scriptButton;
     /** Red, Yellow, Green, Black: the count boxes pinned over every page. */
@@ -192,8 +189,6 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         scriptTitle = root.findViewById(R.id.iwi_script_title);
         scriptButton = root.findViewById(R.id.iwi_btn_script);
         stepsBar = root.findViewById(R.id.iwi_steps_bar);
-        final LinearLayout boxes = root.findViewById(R.id.iwi_steps_boxes);
-        stepBoxesRow = boxes;
         final LinearLayout fu = root.findViewById(R.id.iwi_followup_bar);
         followUpBar = fu;
         for (int i = 0; i < followUps.length; i++) {
@@ -213,27 +208,6 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                 flp.leftMargin = dp(4);
             fu.addView(b, flp);
             followUps[i] = b;
-        }
-        for (int i = 0; i < STEPS; i++) {
-            final int step = i + 1;
-            final TextView box = new TextView(pluginContext);
-            box.setText(Integer.toString(step));
-            box.setTextSize(18);
-            box.setTypeface(Typeface.DEFAULT_BOLD);
-            box.setGravity(android.view.Gravity.CENTER);
-            box.setContentDescription("Step " + step + ": " + STEP_NAMES[i]);
-            box.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    goToStep(step, false);
-                }
-            });
-            final LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(dp(38),
-                    LinearLayout.LayoutParams.MATCH_PARENT);
-            if (i > 0)
-                blp.leftMargin = dp(4);
-            boxes.addView(box, blp);
-            stepBoxes[i] = box;
         }
         stepsBar.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -891,7 +865,6 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         final int first = firstMissing();
         final long reported = state.isLive() ? reportedMs() : 0L;
         // The call is made: the six steps are done with; the follow-ups take their place.
-        stepBoxesRow.setVisibility(reported > 0 ? View.GONE : View.VISIBLE);
         stepsBar.setVisibility(reported > 0 ? View.GONE : View.VISIBLE);
         followUpBar.setVisibility(reported > 0 ? View.VISIBLE : View.GONE);
         ((View) stepRows[0].getParent()).setVisibility(reported > 0 ? View.GONE : View.VISIBLE);
@@ -907,8 +880,8 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         } else {
             final String next = first > 0 ? first + ". " + STEP_NAMES[first - 1]
                     : !state.isLive() ? "Declare IWI" : "Radio Script";
-            // The count done in green, the way the boxes beside it are (operator,
-            // 2026-11-06).
+            // The count done in green (operator, 2026-11-06). The 1-6 boxes that sat
+            // beside it are gone: this button pages through the steps (2026-11-08).
             final SpannableStringBuilder t = new SpannableStringBuilder(
                     Integer.toString(STEPS - left));
             if (STEPS - left > 0)
@@ -918,21 +891,6 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             stepsBar.setText(t);
         }
         stepsBar.setTextColor(left == 0 ? color(R.color.state_on) : Color.WHITE);
-        for (int i = 0; i < STEPS; i++) {
-            final boolean done = stepDone(i + 1);
-            final android.graphics.drawable.GradientDrawable box =
-                    new android.graphics.drawable.GradientDrawable();
-            box.setCornerRadius(dp(4));
-            if (done) {
-                box.setColor(color(R.color.state_on));
-                stepBoxes[i].setTextColor(Color.BLACK);
-            } else {
-                box.setColor(0xFF1E1E1E);
-                box.setStroke(dp(2), color(R.color.state_off));
-                stepBoxes[i].setTextColor(color(R.color.state_off));
-            }
-            stepBoxes[i].setBackground(box);
-        }
         for (int i = 0; i < STEPS; i++) {
             final int step = i + 1;
             final boolean done = stepDone(step);

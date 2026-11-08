@@ -86,7 +86,7 @@
 
     <!-- Steps, pinned under the counts on every page (operator, 2026-11-06: "it
          needs to stay at the top"): how many of the six are in and what is next.
-         A tap goes there. -->
+         A tap goes there, page by page; no 1-6 boxes (operator, 2026-11-08). -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -94,12 +94,6 @@
         android:orientation="horizontal"
         android:gravity="center_vertical">
 
-        <!-- 1 to 6, green once filled in (operator, 2026-11-06). Built in code. -->
-        <LinearLayout
-            android:id="@+id/iwi_steps_boxes"
-            android:layout_width="wrap_content"
-            android:layout_height="44dp"
-            android:orientation="horizontal" />
 
         <Button
             android:id="@+id/iwi_steps_bar"
@@ -107,7 +101,6 @@
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="6dp"
             android:gravity="start|center_vertical" />
 
         <!-- After the initial call: the follow-ups, in place of the steps
