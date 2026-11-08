@@ -107,6 +107,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     /** Red, Yellow, Green, Black: the count boxes pinned over every page. */
     private final TextView[] tally = new TextView[4];
     private final TextView tallyTotal;
+    private final View tallySpacer;
     private final Exits exits;
     private TextView scriptTitle;
     /** Another device's IWI being read on the script page, or null. */
@@ -245,6 +246,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         tally[2] = root.findViewById(R.id.iwi_tally_green);
         tally[3] = root.findViewById(R.id.iwi_tally_black);
         tallyTotal = root.findViewById(R.id.iwi_tally_total);
+        tallySpacer = root.findViewById(R.id.iwi_tally_spacer);
         root.findViewById(R.id.iwi_btn_wide).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -666,6 +668,13 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     }
 
     private void refreshTally() {
+        // The count boxes appear at Declare (operator, 2026-11-08); before it, item 2's
+        // counters in the report do the counting.
+        final int vis = state.isLive() ? View.VISIBLE : View.GONE;
+        for (TextView t : tally)
+            t.setVisibility(vis);
+        tallyTotal.setVisibility(vis);
+        tallySpacer.setVisibility(state.isLive() ? View.GONE : View.VISIBLE);
         for (int i = 0; i < tally.length; i++)
             tally[i].setText(Integer.toString(state.count(Patient.COLORS[i])));
         final SpannableStringBuilder b = new SpannableStringBuilder("Total ");
@@ -963,8 +972,8 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         switch (step) {
             case 1: return RadioScript.calling(state);
             case 2: return RadioScript.summary(state);
-            case 3: return Vocab.labels(state.text(IwiState.NATURE), Vocab.MEDICAL,
-                    Vocab.TRAUMA);
+            case 3: return Vocab.labels(state.text(IwiState.NATURE), Vocab.TRAUMA,
+                    Vocab.MEDICAL);
             case 4: return RadioScript.evacLabels(state);
             case 5: return Vocab.labels(state.text(IwiState.CARE_ROLE), Vocab.CARE);
             default: return Vocab.labels(state.text(IwiState.RESOURCES), Vocab.RESOURCES);
@@ -976,7 +985,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             case 1: return Vocab.CONTACT.index(state.text(IwiState.CONTACT_TO)) < 0
                     ? "Communications or Dispatch" : "Set your callsign in ATAK";
             case 2: return "Count them by triage color";
-            case 3: return "Medical or trauma: pick from the list";
+            case 3: return "Trauma or medical: pick from the list";
             case 4: return "Air ambulance, short-haul, ground...";
             case 5: return "None, EMT or Paramedic";
             default: return "What you need, or None needed";

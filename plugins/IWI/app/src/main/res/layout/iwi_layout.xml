@@ -21,8 +21,9 @@
         android:textColor="@color/amber"
         android:visibility="gone" />
 
-    <!-- The patients by triage color, always in view above every page: four filled
-         boxes with their counts, 0 included (operator, 2026-10-14). -->
+    <!-- The patients by triage color, in view above every page once the IWI is
+         declared: four filled boxes with their counts, 0 included (operator,
+         2026-10-14). Before Declare they are hidden (2026-11-08); item 2 counts. -->
     <LinearLayout
         android:id="@+id/iwi_tally"
         android:layout_width="match_parent"
@@ -80,6 +81,15 @@
             android:textSize="22sp"
             android:textStyle="bold"
             android:textColor="@color/white" />
+
+        <!-- Before Declare the count boxes are hidden (operator, 2026-11-08); this
+             keeps the wide button at the right edge meanwhile. -->
+        <View
+            android:id="@+id/iwi_tally_spacer"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:visibility="gone" />
 
         <!-- Atmosphere's: drag the handle, or tap this, to open the pane wide. -->
         <ImageButton

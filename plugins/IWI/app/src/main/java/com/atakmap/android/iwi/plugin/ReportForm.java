@@ -302,8 +302,9 @@ final class ReportForm {
 
         natureLabel = label("What happened");
         body.addView(natureLabel);
-        natureGroup(body, "Medical", Vocab.MEDICAL, "iwi.fold.medical");
+        // Trauma first: the common case on a fireline (operator, 2026-11-08).
         natureGroup(body, "Trauma", Vocab.TRAUMA, "iwi.fold.trauma_list");
+        natureGroup(body, "Medical", Vocab.MEDICAL, "iwi.fold.medical");
 
         evacLabel = label("Evacuation request");
         body.addView(evacLabel);
@@ -556,13 +557,48 @@ final class ReportForm {
 
     /**
      * One group of what-happened tiles as a drop-down row, so a crew with a trauma
-     * patient never scrolls past the medical list. Two across, any number picked.
+     * patient never scrolls past the medical list. Any number picked.
+     *
+     * <p>Three across and near square, not two wide bars (operator, 2026-11-08: "make
+     * it like a square for easier finger button press"): each tile is as tall as it is
+     * wide, between 72 and 104 dp, and its label wraps to two lines.
      */
     private void natureGroup(LinearLayout parent, String name, Vocab.Choices c, String pref) {
         final Fold group = section(parent, pref);
         natureFolds.put(group, c);
         natureNames.put(group, name);
-        tiles(body(group), c, 2, true, textBinding(IwiState.NATURE), groups);
+        final TileGroup g = tiles(body(group), c, 3, true, textBinding(IwiState.NATURE),
+                groups);
+        for (Button t : g.tiles.values())
+            squareTile(t);
+    }
+
+    /** A tile whose height follows its width, clamped so a wide pane stays usable. */
+    private void squareTile(final Button t) {
+        t.setSingleLine(false);
+        t.setMaxLines(2);
+        t.setTextSize(15);
+        t.setGravity(Gravity.CENTER);
+        final int min = dp(72), max = dp(104);
+        t.setMinHeight(min);
+        t.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            @Override
+            public void onLayoutChange(View v, int l, int top, int r, int bottom,
+                    int ol, int ot, int or, int ob) {
+                final int want = Math.max(min, Math.min(max, r - l));
+                final LinearLayout.LayoutParams lp =
+                        (LinearLayout.LayoutParams) v.getLayoutParams();
+                if (lp.height != want) {
+                    lp.height = want;
+                    v.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            t.setLayoutParams(lp);
+                        }
+                    });
+                }
+            }
+        });
     }
 
     // ---- item 2: the counts make the patients ----
@@ -1133,6 +1169,9 @@ final class ReportForm {
                     return;
                 state.set(key, s.toString());
                 refreshHeads();
+                // The follow-up buttons (Evac Plan, Contingency) turn green as the
+                // last box is typed, not at the next tap (operator, 2026-11-08).
+                host.countsChanged();
             }
         });
         fields.put(key, e);
