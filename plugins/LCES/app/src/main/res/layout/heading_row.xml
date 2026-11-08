@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A cyan heading between groups of rows in the list. -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/heading_text"
+    style="@style/TakwerxSectionHeading"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content" />

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App -->
+    <string name="app_name">LCES</string>
+    <string name="manual_title">Plugin Documentation</string>
+    <string name="manual_summary">Open the LCES user guide: the IRPG pages, search, and the Lessons Learned layer</string>
+    <string name="prefs_summary">The IRPG one tap away, and wildland fire lessons learned on the map</string>
+    <!-- description -->
+    <string name="app_desc">Lookouts, Communications, Escape Routes, Safety Zones: the IRPG and wildland fire lessons learned on the map</string>
+
+    <string name="settings">Settings</string>
+    <string name="back">Back</string>
+    <!-- The pane size button names what a tap does, like Atmosphere's. -->
+    <string name="lessons">Lessons Learned</string>
+    <string name="show_settings">Open or close</string>
+
+    <string name="tile_orders">10s &amp; 18s</string>
+    <string name="tile_lces">LCES</string>
+    <string name="tile_briefing">Briefing</string>
+    <string name="tile_denominators">Common Denominators</string>
+    <string name="tile_irpg">IRPG</string>
+
+    <string name="heading_irpg">From the IRPG</string>
+    <string name="heading_lessons_near_you">Lessons near you</string>
+    <string name="heading_lessons_near_center">Lessons near the map center</string>
+    <string name="heading_lessons_search">Lessons that match</string>
+    <string name="heading_irpg_search">In the IRPG</string>
+    <string name="details">Details</string>
+
+    <!-- Lessons Learned status line -->
+    <string name="lessons_loading">Loading the lessons learned…</string>
+    <string name="lessons_map_off">Lessons off the map.</string>
+    <string name="search_map_off">Turn Lessons Learned ON to see them on the map.</string>
+    <string name="lessons_none">No lessons here. Widen the Area or switch on more types or categories in Settings.</string>
+    <string name="lessons_no_fix">No GPS fix, measuring from the map center.</string>
+
+    <!-- Lessons Learned settings -->
+    <string name="heading_lessons">Lessons Learned</string>
+    <string name="area">Area</string>
+    <string name="area_everything">Everything</string>
+    <string name="types">Types</string>
+    <string name="categories">Category</string>
+    <string name="categories_all">All</string>
+    <string name="categories_none">None</string>
+    <string name="map_key">Map key</string>
+    <string name="measuring_from">Measuring from</string>
+    <string name="my_location">My Location</string>
+    <string name="map_center">Map center</string>
+    <string name="check_for_new">Check for new incidents</string>
+    <string name="checking">Checking…</string>
+
+    <!-- Incident page -->
+    <string name="lesson_go_to">Show on the map</string>
+    <string name="lesson_what_happened">What happened</string>
+    <string name="lesson_from_report">From the report</string>
+    <string name="lesson_details">Details</string>
+    <string name="lesson_fire">Fire</string>
+    <string name="lesson_activity">Activity</string>
+    <string name="lesson_entrapment">Entrapment</string>
+    <string name="lesson_behavior">Fire behavior</string>
+    <string name="lesson_open_report">Open the full report</string>
+    <string name="lesson_report_needs_network">Opens the Lessons Learned Center\'s page in the browser. Needs a network.</string>
+    <string name="lesson_no_browser">No browser on this device to open the report.</string>
+    <string name="lesson_source">From the Wildland Fire Lessons Learned Center\'s incident review database.</string>
+    <string name="lesson_source_dated">From the Wildland Fire Lessons Learned Center\'s incident review database, as of %s.</string>
+    <string name="your_location">your location</string>
+    <string name="the_map_center">the map center</string>
+    <string name="show_section">Show this section</string>
+
+    <!-- Search -->
+    <string name="search_hint">Search IRPG &amp; Lessons Learned</string>
+    <string name="clear">Clear</string>
+    <string name="results_some">%1$d pages in the IRPG match “%2$s”.</string>
+    <plurals name="matches">
+        <item quantity="one">%d match</item>
+        <item quantity="other">%d matches</item>
+    </plurals>
+    <string name="results_none">Nothing in the IRPG matches “%s”.</string>
+
+    <!-- Reading -->
+    <string name="previous">Previous</string>
+    <string name="next">Next</string>
+    <string name="continue_reading">Continue: %s</string>
+    <string name="text_size">Text size</string>
+    <string name="text_normal">Normal</string>
+    <string name="text_large">Large</string>
+
+    <string name="wide_desc">Wide or narrow</string>
+</resources>

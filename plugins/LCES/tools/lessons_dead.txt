@@ -1,0 +1,11 @@
+# Report links the LLC's server says do not exist (404/410), from
+# lessons_verify.py --write-dead. lessons_build.py leaves them out.
+https://lessons.wildfire.gov/incident/corral-canyon-simulated-fire-cleveland-nf-firefighter-fall
+https://lessons.wildfire.gov/incident/corta-fire-el-cariso-ihc-member-medevac
+https://lessons.wildfire.gov/incident/dudda-shop-2-prescribed-fire-entrapment-2023
+https://lessons.wildfire.gov/incident/headache-2008
+https://lessons.wildfire.gov/incident/indian-run-2008
+https://lessons.wildfire.gov/incident/milepost-97-fire-object-strikes-crewmember
+https://lessons.wildfire.gov/incident/moody-forest-natural-area-rx-uxo-2023
+https://lessons.wildfire.gov/incident/trinity-fire-contract-firefighter-dehydration
+https://lessons.wildfire.gov/incident/trinity-fire-smokey-bear-hotshot-heat-related-illness
