@@ -90,6 +90,14 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     /** Steps: what the initial call needs, one row each, red until filled in. */
     private Button stepsBar;
     /**
+     * NEXT beside the steps box: grey until the step being filled in is done, then
+     * green; a tap opens the next step not yet filled in, like turning a page
+     * (operator, 2026-11-08).
+     */
+    private Button nextButton;
+    /** The step page last opened, 0 before any. */
+    private int currentStep;
+    /**
      * After the call: Patient Update, Evac Plan, Contingency. No Comms: the crew is
      * already on the incident's channels, so it was clutter (operator, 2026-11-06); item 6
      * is still in the report.
@@ -189,6 +197,13 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         scriptTitle = root.findViewById(R.id.iwi_script_title);
         scriptButton = root.findViewById(R.id.iwi_btn_script);
         stepsBar = root.findViewById(R.id.iwi_steps_bar);
+        nextButton = root.findViewById(R.id.iwi_btn_next);
+        nextButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                nextStep();
+            }
+        });
         final LinearLayout fu = root.findViewById(R.id.iwi_followup_bar);
         followUpBar = fu;
         for (int i = 0; i < followUps.length; i++) {
@@ -866,6 +881,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         final long reported = state.isLive() ? reportedMs() : 0L;
         // The call is made: the six steps are done with; the follow-ups take their place.
         stepsBar.setVisibility(reported > 0 ? View.GONE : View.VISIBLE);
+        nextButton.setVisibility(reported > 0 ? View.GONE : View.VISIBLE);
         followUpBar.setVisibility(reported > 0 ? View.VISIBLE : View.GONE);
         ((View) stepRows[0].getParent()).setVisibility(reported > 0 ? View.GONE : View.VISIBLE);
         if (reported > 0) {
@@ -878,8 +894,14 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                 followUps[i].setTextColor(done[i] ? color(R.color.state_on)
                         : color(R.color.state_off));
         } else {
-            final String next = first > 0 ? first + ". " + STEP_NAMES[first - 1]
+            // The step on the page: the one last opened, else the first one missing.
+            final int cur = currentStep > 0 ? currentStep : first;
+            final String next = cur > 0 ? cur + ". " + STEP_NAMES[cur - 1]
                     : !state.isLive() ? "Declare IWI" : "Radio Script";
+            final boolean ready = cur > 0 ? stepDone(cur) : true;
+            nextButton.setEnabled(ready);
+            nextButton.setTextColor(ready ? color(R.color.state_on)
+                    : color(R.color.guide_grey));
             // The count done in green (operator, 2026-11-06). The 1-6 boxes that sat
             // beside it are gone: this button pages through the steps (2026-11-08).
             final SpannableStringBuilder t = new SpannableStringBuilder(
@@ -887,7 +909,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             if (STEPS - left > 0)
                 t.setSpan(new ForegroundColorSpan(color(R.color.state_on)), 0, t.length(),
                         Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            t.append(" of " + STEPS + "   Next: " + next);
+            t.append(" of " + STEPS + "   " + next);
             stepsBar.setText(t);
         }
         stepsBar.setTextColor(left == 0 ? color(R.color.state_on) : Color.WHITE);
@@ -1024,6 +1046,8 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
 
     /** The report, opened at that step's spot. */
     private void goToStep(int step, boolean fromDeclare) {
+        currentStep = step;
+        refreshSteps();
         form.refresh();
         show(reportPage);
         form.openStep(step);
@@ -1056,6 +1080,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         IwiFeed.withdraw(state.uid());
         IwiFeed.withdraw(state.text(IwiState.EVAC_UID));
         state.clear();
+        currentStep = 0;
         // Back to how a first IWI looks: every drop-down closed (operator, 2026-11-06).
         form.closeAll();
         trauma.closeFold();

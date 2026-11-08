@@ -103,6 +103,18 @@
             android:layout_height="wrap_content"
             android:gravity="start|center_vertical" />
 
+        <!-- NEXT: grey until the step on the page is filled in, then green; a tap
+             turns the page to the next step (operator, 2026-11-08). -->
+        <Button
+            android:id="@+id/iwi_btn_next"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:minWidth="96dp"
+            android:text="@string/iwi_next"
+            android:enabled="false" />
+
         <!-- After the initial call: the follow-ups, in place of the steps
              (operator, 2026-11-06). Built in code. -->
         <LinearLayout
