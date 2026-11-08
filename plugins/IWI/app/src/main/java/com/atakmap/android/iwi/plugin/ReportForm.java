@@ -115,7 +115,9 @@ final class ReportForm {
             new java.util.WeakHashMap<Fold, Boolean>());
     private Fold contact;
     private Button evacPick;
-    private LinearLayout evacCounts;
+    /** Per evacuation type: its [-] n [+], shown once the type is picked. */
+    private final Map<String, View> evacSteppers = new HashMap<>();
+    private final Map<String, TextView> evacNumbers = new HashMap<>();
     private TextView evacHint;
     private boolean evacPicking;
     private Fold status;
@@ -308,10 +310,7 @@ final class ReportForm {
 
         evacLabel = label("Evacuation request");
         body.addView(evacLabel);
-        tiles(body, Vocab.EVAC, 2, true, textBinding(IwiState.EVAC_REQUEST), groups);
-        // How many of each: two air ambulances, two hoist ships (operator, 2026-11-06).
-        evacCounts = block();
-        body.addView(evacCounts, full());
+        evacRows(body);
 
         body.addView(label("Patient location"));
         latLong = new TextView(ctx);
@@ -341,7 +340,11 @@ final class ReportForm {
         resources = section(root, "iwi.fold.r5");
         body = body(resources);
         body.addView(guide("The IRPG's example list. Pick everything you need."));
-        tiles(body, Vocab.RESOURCES, 2, true, textBinding(IwiState.RESOURCES), groups);
+        // Near-square tiles, three across, like what happened (operator, 2026-11-08).
+        final TileGroup rg = tiles(body, Vocab.RESOURCES, 3, true,
+                textBinding(IwiState.RESOURCES), groups);
+        for (Button t : rg.tiles.values())
+            squareTile(t);
 
         root.addView(heading("As you learn more"));
 
@@ -1052,39 +1055,77 @@ final class ReportForm {
     }
 
     /** One row per picked resource, Other aside: its name, the number, minus and plus. */
-    private void refreshEvacCounts() {
-        evacCounts.removeAllViews();
-        for (final String c : Vocab.parse(state.text(IwiState.EVAC_REQUEST), Vocab.EVAC)) {
-            if ("other".equals(c))
-                continue;
-            final int n = RadioScript.evacCount(state, c);
+    /**
+     * Item 2's evacuation request: one row per type, a tall tile to pick it and, once
+     * picked, [-] n [+] on the same row for how many (operator, 2026-11-06: two air
+     * ambulances, two hoist ships; 2026-11-08: "larger buttons with a plus minus").
+     * Other has no count.
+     */
+    private void evacRows(LinearLayout into) {
+        final Binding b = textBinding(IwiState.EVAC_REQUEST);
+        final TileGroup g = new TileGroup(Vocab.EVAC, true, b);
+        for (int i = 0; i < Vocab.EVAC.codes.length; i++) {
+            final String code = Vocab.EVAC.codes[i];
             final LinearLayout r = row();
             r.setGravity(Gravity.CENTER_VERTICAL);
-            final TextView name = new TextView(ctx);
-            name.setText(Vocab.EVAC.label(c) + ": " + n);
-            name.setTextSize(17);
-            name.setTypeface(Typeface.DEFAULT_BOLD);
-            name.setTextColor(Color.WHITE);
-            r.addView(name, new LinearLayout.LayoutParams(0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-            r.addView(button("\u2212", new View.OnClickListener() {
+            final Button t = button(Vocab.EVAC.labels[i], new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    setEvacCount(c, n - 1);
+                    b.set(Vocab.toggle(b.get(), code, Vocab.EVAC));
+                    picked();
                 }
-            }), new LinearLayout.LayoutParams(dp(64), LinearLayout.LayoutParams.WRAP_CONTENT));
-            final LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(dp(64),
-                    LinearLayout.LayoutParams.WRAP_CONTENT);
-            plp.leftMargin = dp(6);
-            r.addView(button("+", new View.OnClickListener() {
+            });
+            t.setMinHeight(dp(64));
+            g.tiles.put(code, t);
+            r.addView(t, new LinearLayout.LayoutParams(0, dp(64), 1f));
+
+            final LinearLayout step = row();
+            step.setGravity(Gravity.CENTER_VERTICAL);
+            final LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(dp(64),
+                    dp(64));
+            mlp.leftMargin = dp(6);
+            step.addView(button("\u2212", new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    setEvacCount(c, n + 1);
+                    setEvacCount(code, RadioScript.evacCount(state, code) - 1);
                 }
-            }), plp);
+            }), mlp);
+            final TextView n = new TextView(ctx);
+            n.setTextSize(22);
+            n.setTypeface(Typeface.DEFAULT_BOLD);
+            n.setTextColor(Color.WHITE);
+            n.setGravity(Gravity.CENTER);
+            step.addView(n, new LinearLayout.LayoutParams(dp(44),
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+            step.addView(button("+", new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    setEvacCount(code, RadioScript.evacCount(state, code) + 1);
+                }
+            }), new LinearLayout.LayoutParams(dp(64), dp(64)));
+            // Invisible, not gone: every tile keeps one width whatever is picked.
+            step.setVisibility(View.INVISIBLE);
+            r.addView(step, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+            if (!"other".equals(code)) {
+                evacSteppers.put(code, step);
+                evacNumbers.put(code, n);
+            }
             final LinearLayout.LayoutParams lp = full();
             lp.topMargin = dp(4);
-            evacCounts.addView(r, lp);
+            into.addView(r, lp);
+        }
+        groups.add(g);
+    }
+
+    private void refreshEvacCounts() {
+        final java.util.Set<String> on =
+                Vocab.parse(state.text(IwiState.EVAC_REQUEST), Vocab.EVAC);
+        for (Map.Entry<String, View> e : evacSteppers.entrySet()) {
+            final String c = e.getKey();
+            e.getValue().setVisibility(on.contains(c) ? View.VISIBLE : View.INVISIBLE);
+            evacNumbers.get(c).setText(Integer.toString(RadioScript.evacCount(state, c)));
         }
     }
 
