@@ -210,7 +210,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         nextButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                nextStep();
+                turnPage();
             }
         });
         final LinearLayout fu = root.findViewById(R.id.iwi_followup_bar);
@@ -905,24 +905,28 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                         : color(R.color.state_off));
         } else {
             // The step on the page: the one last opened, else the first one missing.
-            final int cur = currentStep > 0 ? currentStep : first;
-            final String next = cur > 0 ? cur + ". " + STEP_NAMES[cur - 1]
-                    : !state.isLive() ? "Declare IWI" : "Radio Script";
-            final boolean ready = cur > 0 ? stepDone(cur) : true;
+            // The page the operator is on, like a book: "1 of 6  Who You Call"
+            // (operator, 2026-11-08: it showed how many were done, which read as
+            // the page). Past the last page, what comes after the six.
+            final int page = pageStep();
+            final boolean onStep = page <= STEPS;
+            final boolean ready = !onStep || stepDone(page);
             nextButton.setEnabled(ready);
-            final boolean canBack = pageStep() > 1;
-            prevButton.setEnabled(canBack);
-            prevButton.setTextColor(canBack ? Color.WHITE : color(R.color.guide_grey));
             nextButton.setTextColor(ready ? color(R.color.state_on)
                     : color(R.color.guide_grey));
-            // The count done in green (operator, 2026-11-06). The 1-6 boxes that sat
-            // beside it are gone: this button pages through the steps (2026-11-08).
-            final SpannableStringBuilder t = new SpannableStringBuilder(
-                    Integer.toString(STEPS - left));
-            if (STEPS - left > 0)
-                t.setSpan(new ForegroundColorSpan(color(R.color.state_on)), 0, t.length(),
-                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            t.append(" of " + STEPS + "   " + next);
+            final boolean canBack = page > 1;
+            prevButton.setEnabled(canBack);
+            prevButton.setTextColor(canBack ? Color.WHITE : color(R.color.guide_grey));
+            final SpannableStringBuilder t = new SpannableStringBuilder();
+            if (onStep) {
+                t.append(page + " of " + STEPS);
+                if (ready)
+                    t.setSpan(new ForegroundColorSpan(color(R.color.state_on)), 0,
+                            t.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                t.append("   " + STEP_NAMES[page - 1]);
+            } else {
+                t.append(!state.isLive() ? "Declare IWI" : "Radio Script");
+            }
             stepsBar.setText(t);
         }
         stepsBar.setTextColor(left == 0 ? color(R.color.state_on) : Color.WHITE);
@@ -1036,6 +1040,22 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             return currentStep;
         final int first = firstMissing();
         return first > 0 ? first : STEPS + 1;
+    }
+
+    /**
+     * NEXT: the page after this one, in order like BACK; after page 6, the first step
+     * still missing, else Declare, else the call.
+     */
+    private void turnPage() {
+        if (pendingPoint != null || picking)
+            return;
+        final int step = pageStep();
+        if (step < STEPS) {
+            goToStep(step + 1, false);
+        } else {
+            currentStep = 0;
+            nextStep();
+        }
     }
 
     /** BACK: the page before, whatever it holds. */
