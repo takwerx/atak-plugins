@@ -103,6 +103,18 @@
             android:layout_height="wrap_content"
             android:gravity="start|center_vertical" />
 
+        <!-- BACK: the step before the one on the page; grey on the first
+             (operator, 2026-11-08). -->
+        <Button
+            android:id="@+id/iwi_btn_prev"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:minWidth="96dp"
+            android:text="@string/iwi_prev"
+            android:enabled="false" />
+
         <!-- NEXT: grey until the step on the page is filled in, then green; a tap
              turns the page to the next step (operator, 2026-11-08). -->
         <Button

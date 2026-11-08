@@ -95,6 +95,8 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
      * (operator, 2026-11-08).
      */
     private Button nextButton;
+    /** BACK beside NEXT: the step before the one on the page (operator, 2026-11-08). */
+    private Button prevButton;
     /** The step page last opened, 0 before any. */
     private int currentStep;
     /**
@@ -198,6 +200,13 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         scriptButton = root.findViewById(R.id.iwi_btn_script);
         stepsBar = root.findViewById(R.id.iwi_steps_bar);
         nextButton = root.findViewById(R.id.iwi_btn_next);
+        prevButton = root.findViewById(R.id.iwi_btn_prev);
+        prevButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                prevStep();
+            }
+        });
         nextButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -882,6 +891,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         // The call is made: the six steps are done with; the follow-ups take their place.
         stepsBar.setVisibility(reported > 0 ? View.GONE : View.VISIBLE);
         nextButton.setVisibility(reported > 0 ? View.GONE : View.VISIBLE);
+        prevButton.setVisibility(reported > 0 ? View.GONE : View.VISIBLE);
         followUpBar.setVisibility(reported > 0 ? View.VISIBLE : View.GONE);
         ((View) stepRows[0].getParent()).setVisibility(reported > 0 ? View.GONE : View.VISIBLE);
         if (reported > 0) {
@@ -900,6 +910,9 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                     : !state.isLive() ? "Declare IWI" : "Radio Script";
             final boolean ready = cur > 0 ? stepDone(cur) : true;
             nextButton.setEnabled(ready);
+            final boolean canBack = pageStep() > 1;
+            prevButton.setEnabled(canBack);
+            prevButton.setTextColor(canBack ? Color.WHITE : color(R.color.guide_grey));
             nextButton.setTextColor(ready ? color(R.color.state_on)
                     : color(R.color.guide_grey));
             // The count done in green (operator, 2026-11-06). The 1-6 boxes that sat
@@ -1017,6 +1030,23 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     }
 
     /** The pinned bar: the first missing step, else Declare, else the call. */
+    /** The step on the page; past the last (7) once all six are done and none is open. */
+    private int pageStep() {
+        if (currentStep > 0)
+            return currentStep;
+        final int first = firstMissing();
+        return first > 0 ? first : STEPS + 1;
+    }
+
+    /** BACK: the page before, whatever it holds. */
+    private void prevStep() {
+        if (pendingPoint != null || picking)
+            return;
+        final int step = pageStep();
+        if (step > 1)
+            goToStep(step - 1, false);
+    }
+
     private void nextStep() {
         final int first = firstMissing();
         if (first > 0) {

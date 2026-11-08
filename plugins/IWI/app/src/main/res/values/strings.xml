@@ -45,4 +45,5 @@
     <string name="iwi_clear_note">This removes the IWI marker from your map and erases everything in the report on this device, so the next IWI starts blank.\n\nIt does not remove the marker from anyone you sent it to.</string>
     <string name="iwi_settings_title">IWI Settings</string>
     <string name="iwi_next">NEXT</string>
+    <string name="iwi_prev">BACK</string>
 </resources>
