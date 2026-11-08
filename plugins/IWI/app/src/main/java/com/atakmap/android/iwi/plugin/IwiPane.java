@@ -107,7 +107,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     /** Red, Yellow, Green, Black: the count boxes pinned over every page. */
     private final TextView[] tally = new TextView[4];
     private final TextView tallyTotal;
-    private final View tallySpacer;
+    private final View tallyRow;
     private final Exits exits;
     private TextView scriptTitle;
     /** Another device's IWI being read on the script page, or null. */
@@ -246,7 +246,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         tally[2] = root.findViewById(R.id.iwi_tally_green);
         tally[3] = root.findViewById(R.id.iwi_tally_black);
         tallyTotal = root.findViewById(R.id.iwi_tally_total);
-        tallySpacer = root.findViewById(R.id.iwi_tally_spacer);
+        tallyRow = root.findViewById(R.id.iwi_tally);
         root.findViewById(R.id.iwi_btn_wide).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -670,11 +670,8 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private void refreshTally() {
         // The count boxes appear at Declare (operator, 2026-11-08); before it, item 2's
         // counters in the report do the counting.
-        final int vis = state.isLive() ? View.VISIBLE : View.GONE;
-        for (TextView t : tally)
-            t.setVisibility(vis);
-        tallyTotal.setVisibility(vis);
-        tallySpacer.setVisibility(state.isLive() ? View.GONE : View.VISIBLE);
+        // The whole row goes, so the initial report gets its height back.
+        tallyRow.setVisibility(state.isLive() ? View.VISIBLE : View.GONE);
         for (int i = 0; i < tally.length; i++)
             tally[i].setText(Integer.toString(state.count(Patient.COLORS[i])));
         final SpannableStringBuilder b = new SpannableStringBuilder("Total ");

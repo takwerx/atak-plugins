@@ -82,26 +82,6 @@
             android:textStyle="bold"
             android:textColor="@color/white" />
 
-        <!-- Before Declare the count boxes are hidden (operator, 2026-11-08); this
-             keeps the wide button at the right edge meanwhile. -->
-        <View
-            android:id="@+id/iwi_tally_spacer"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:visibility="gone" />
-
-        <!-- Atmosphere's: drag the handle, or tap this, to open the pane wide. -->
-        <ImageButton
-            android:id="@+id/iwi_btn_wide"
-            style="@style/TakwerxIconButton"
-            android:layout_width="44dp"
-            android:layout_height="match_parent"
-            android:layout_weight="0"
-            android:layout_marginLeft="6dp"
-            android:layout_marginRight="0dp"
-            android:contentDescription="@string/iwi_wide_desc"
-            android:src="@drawable/ic_wide" />
     </LinearLayout>
 
     <!-- Steps, pinned under the counts on every page (operator, 2026-11-06: "it
@@ -139,6 +119,19 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:visibility="gone" />
+
+        <!-- Atmosphere's: drag the handle, or tap this, to open the pane wide. On the
+             steps row so the count row can go before Declare (operator, 2026-11-08). -->
+        <ImageButton
+            android:id="@+id/iwi_btn_wide"
+            style="@style/TakwerxIconButton"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_weight="0"
+            android:layout_marginLeft="6dp"
+            android:layout_marginRight="0dp"
+            android:contentDescription="@string/iwi_wide_desc"
+            android:src="@drawable/ic_wide" />
     </LinearLayout>
 
     <!-- The IWI page: Back to the LCES main screen pinned above its scroller. -->
