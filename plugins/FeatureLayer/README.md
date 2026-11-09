@@ -62,6 +62,11 @@ its attributes, a bloodhound, a range and bearing line, or a marker.
 _________________________________________________________________
 STATUS
 
+0.17, live layers see new data within a minute. A layer set to "All time"
+could show a new perimeter up to an hour late: CA Air Intel missed a FIRIS
+mission that was already in the service. Every check for new data now gets a
+fresh answer from the server. Built for ATAK 5.6, 5.7 and 5.8.
+
 0.16, boundaries on every target, and the land layers. Built for ATAK 5.6,
 5.7 and 5.8. California adds CAL FIRE Responsibility Areas, Protection Areas,
 CAL FIRE Units and Land Ownership; every state adds USGS Public Land and Public
