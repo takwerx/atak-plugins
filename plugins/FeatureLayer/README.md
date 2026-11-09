@@ -1,10 +1,10 @@
 ATAK Plugin — Feature Layer
 
-**Download Feature Layer 0.16** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Feature Layer 0.17** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.16/ATAK-Plugin-FeatureLayer-0.16--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.16/ATAK-Plugin-FeatureLayer-0.16--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.16/ATAK-Plugin-FeatureLayer-0.16--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.17/ATAK-Plugin-FeatureLayer-0.17--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.17/ATAK-Plugin-FeatureLayer-0.17--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.17/ATAK-Plugin-FeatureLayer-0.17--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/feature-layer/releases
 
@@ -61,6 +61,11 @@ its attributes, a bloodhound, a range and bearing line, or a marker.
 
 _________________________________________________________________
 STATUS
+
+0.17, live layers see new data within a minute. A layer set to "All time"
+could show a new perimeter up to an hour late: CA Air Intel missed a FIRIS
+mission that was already in the service. Every check for new data now gets a
+fresh answer from the server. Built for ATAK 5.6, 5.7 and 5.8.
 
 0.16, boundaries on every target, and the land layers. Built for ATAK 5.6,
 5.7 and 5.8. California adds CAL FIRE Responsibility Areas, Protection Areas,
