@@ -107,8 +107,8 @@ final class ReportForm {
     private final Map<Integer, Card> cards = new LinkedHashMap<>();
     private final List<TileGroup> groups = new ArrayList<>();
     /** Medical and Trauma: each a drop-down of its tiles. */
-    private final Map<Fold, Vocab.Choices> natureFolds = new LinkedHashMap<>();
-    private final Map<Fold, String> natureNames = new HashMap<>();
+    private final Map<TextView, Vocab.Choices> natureFolds = new LinkedHashMap<>();
+    private final Map<TextView, String> natureNames = new HashMap<>();
 
     /** Every drop-down on the page, so Clear can close them all; a dropped card goes. */
     private final java.util.Set<Fold> folds = java.util.Collections.newSetFromMap(
@@ -482,12 +482,13 @@ final class ReportForm {
         for (TileGroup g : groups)
             g.recolor();
         final String nature = state.text(IwiState.NATURE);
-        // A group's head is cyan, the section color, until something in it is picked;
-        // then green naming the picks, so a closed row still says it.
-        for (Map.Entry<Fold, Vocab.Choices> g : natureFolds.entrySet()) {
+        // A group's heading is cyan, the section color, until something in it is
+        // picked; then green naming the picks.
+        for (Map.Entry<TextView, Vocab.Choices> g : natureFolds.entrySet()) {
             final String which = Vocab.labels(nature, g.getValue());
-            g.getKey().label(natureNames.get(g.getKey()), which.isEmpty() ? null : which);
-            g.getKey().head.setTextColor(which.isEmpty() ? cyan() : green());
+            final String name = natureNames.get(g.getKey());
+            g.getKey().setText(which.isEmpty() ? name : name + ": " + which);
+            g.getKey().setTextColor(which.isEmpty() ? cyan() : green());
         }
         final boolean weight = RadioScript.needsWeight(state);
         radioContactBlock.setVisibility(weight ? View.VISIBLE : View.GONE);
@@ -578,18 +579,22 @@ final class ReportForm {
     }
 
     /**
-     * One group of what-happened tiles as a drop-down row, so a crew with a trauma
-     * patient never scrolls past the medical list. Any number picked.
+     * One group of what-happened tiles under its own heading. Any number picked.
      *
      * <p>Three across and near square, not two wide bars (operator, 2026-11-08: "make
      * it like a square for easier finger button press"): each tile is as tall as it is
      * wide, between 72 and 104 dp, and its label wraps to two lines.
      */
     private void natureGroup(LinearLayout parent, String name, Vocab.Choices c, String pref) {
-        final Fold group = section(parent, pref);
-        natureFolds.put(group, c);
-        natureNames.put(group, name);
-        tiles(body(group), c, 3, true, textBinding(IwiState.NATURE), groups, true);
+        // Always open, never a drop-down (operator, 2026-11-08): a heading over its
+        // tiles, Trauma then Medical.
+        final TextView head = label(name);
+        head.setTextSize(16);
+        head.setPadding(0, dp(12), 0, dp(2));
+        parent.addView(head);
+        natureFolds.put(head, c);
+        natureNames.put(head, name);
+        tiles(parent, c, 3, true, textBinding(IwiState.NATURE), groups, true);
     }
 
     /**
