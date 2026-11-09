@@ -272,7 +272,8 @@ final class ReportForm {
         body = body(contact);
         body.addView(guide("(Verify correct frequency prior to starting report)"));
         body.addView(label("Calling"));
-        tiles(body, Vocab.CONTACT, 2, false, new Binding() {
+        // Two big targets, read and hit under stress (operator, 2026-11-08).
+        final TileGroup who = tiles(body, Vocab.CONTACT, 2, false, new Binding() {
             @Override
             String get() {
                 return state.text(IwiState.CONTACT_TO);
@@ -282,7 +283,11 @@ final class ReportForm {
             void set(String v) {
                 state.set(IwiState.CONTACT_TO, v);
             }
-        }, groups);
+        }, groups, true);
+        // As big as fits: one line, up to 20 sp in a wide pane and smaller at half
+        // screen, never "Communication / s" over two lines (operator, 2026-11-08).
+        for (Button t : who.tiles.values())
+            fitOneLine(t, 20, 13);
         callsignLine = guide("");
         body.addView(callsignLine);
 
@@ -585,6 +590,42 @@ final class ReportForm {
         natureFolds.put(group, c);
         natureNames.put(group, name);
         tiles(body(group), c, 3, true, textBinding(IwiState.NATURE), groups, true);
+    }
+
+    /**
+     * The biggest text size, from {@code maxSp} down to {@code minSp}, that keeps the
+     * label on one line in the width the tile actually gets.
+     */
+    private void fitOneLine(final Button t, final int maxSp, final int minSp) {
+        t.setMaxLines(1);
+        t.setTextSize(maxSp);
+        t.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            @Override
+            public void onLayoutChange(View v, int l, int top, int r, int bottom,
+                    int ol, int ot, int or, int ob) {
+                final int room = (r - l) - t.getPaddingLeft() - t.getPaddingRight();
+                if (room <= 0 || (r - l) == (or - ol))
+                    return;
+                final String text = t.getText().toString();
+                final android.graphics.Paint p = new android.graphics.Paint(t.getPaint());
+                final float density = t.getResources().getDisplayMetrics().scaledDensity;
+                int sp = maxSp;
+                while (sp > minSp) {
+                    p.setTextSize(sp * density);
+                    if (p.measureText(text) <= room)
+                        break;
+                    sp--;
+                }
+                final int fit = sp;
+                if (Math.abs(t.getTextSize() - fit * density) > 0.5f)
+                    t.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            t.setTextSize(fit);
+                        }
+                    });
+            }
+        });
     }
 
     /**
