@@ -322,7 +322,8 @@ final class ReportForm {
         careLabel = label("Medical on scene");
         body.addView(careLabel);
         body.addView(guide("The highest level of medical training on scene."));
-        tiles(body, Vocab.CARE, 3, false, textBinding(IwiState.CARE_ROLE), groups);
+        // Big tiles like the rest of item 2 (operator, 2026-11-08).
+        tiles(body, Vocab.CARE, 3, false, textBinding(IwiState.CARE_ROLE), groups, true);
 
         final Fold more = section(body, "iwi.fold.more");
         more.label("More, If You Have It", null);
@@ -413,8 +414,16 @@ final class ReportForm {
         final String evac = RadioScript.evacLabels(state);
         head(status, "2. Incident Status", RadioScript.status(state, coords),
                 (n == 1 ? "1 patient" : n + " patients") + (evac.isEmpty() ? "" : ", " + evac));
-        head(resources, "5. Resources", RadioScript.resources(state),
-                Vocab.labels(state.text(IwiState.RESOURCES), Vocab.RESOURCES));
+        // A pick list, not boxes to fill in: name what is requested, or say what to do
+        // (operator, 2026-11-08: "resources requested not 1 to fill in").
+        final RadioScript.Section five = RadioScript.resources(state);
+        if (five.complete())
+            head(resources, "5. Resources Requested", five,
+                    Vocab.labels(state.text(IwiState.RESOURCES), Vocab.RESOURCES));
+        else {
+            resources.label("5. Resources Requested", "pick, or None Needed");
+            resources.complete(false, green());
+        }
 
         final List<Patient> list = state.patients();
         int done = 0;
@@ -1269,6 +1278,8 @@ final class ReportForm {
     private LinearLayout row() {
         final LinearLayout r = new LinearLayout(ctx);
         r.setOrientation(LinearLayout.HORIZONTAL);
+        // Tiles of one and two lines sit level, not on a shared text baseline.
+        r.setBaselineAligned(false);
         return r;
     }
 

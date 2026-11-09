@@ -65,7 +65,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private static final int STEPS = 6;
     private static final String[] STEP_NAMES = {
             "Who You Call", "Patients", "What Happened", "Evacuation Request",
-            "Medical on Scene", "Resources"
+            "Medical on Scene", "Resources Requested"
     };
 
     private final Context ctx;
