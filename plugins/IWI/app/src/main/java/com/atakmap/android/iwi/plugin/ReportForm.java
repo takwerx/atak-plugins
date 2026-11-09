@@ -106,9 +106,23 @@ final class ReportForm {
     private final Map<String, TextView> counts = new HashMap<>();
     private final Map<Integer, Card> cards = new LinkedHashMap<>();
     private final List<TileGroup> groups = new ArrayList<>();
-    /** Medical and Trauma: each a drop-down of its tiles. */
-    private final Map<TextView, Vocab.Choices> natureFolds = new LinkedHashMap<>();
-    private final Map<TextView, String> natureNames = new HashMap<>();
+    /** Trauma and Medical: a big tile each, opening its own list of kinds. */
+    private final List<NatureKind> natureKinds = new ArrayList<>();
+    private LinearLayout natureRow;
+
+    /** One of the two big what-happened tiles and the kinds it opens. */
+    private final class NatureKind {
+        String name;
+        String ask;
+        Vocab.Choices choices;
+        Button big;
+        LinearLayout box;
+        boolean open;
+
+        boolean picked() {
+            return !Vocab.labels(state.text(IwiState.NATURE), choices).isEmpty();
+        }
+    }
 
     /** Every drop-down on the page, so Clear can close them all; a dropped card goes. */
     private final java.util.Set<Fold> folds = java.util.Collections.newSetFromMap(
@@ -309,9 +323,15 @@ final class ReportForm {
 
         natureLabel = label("What happened");
         body.addView(natureLabel);
-        // Trauma first: the common case on a fireline (operator, 2026-11-08).
-        natureGroup(body, "Trauma", Vocab.TRAUMA, "iwi.fold.trauma_list");
-        natureGroup(body, "Medical", Vocab.MEDICAL, "iwi.fold.medical");
+        // Two big choices first, then the kinds of the one tapped (operator,
+        // 2026-11-08: "i dont want people to miss the medical becasue they think its
+        // all trauma"). Trauma first: the common case on a fireline.
+        natureRow = row();
+        final LinearLayout.LayoutParams nlp = full();
+        nlp.topMargin = dp(4);
+        body.addView(natureRow, nlp);
+        natureGroup(body, "Trauma", "What kind of trauma?", Vocab.TRAUMA);
+        natureGroup(body, "Medical", "What kind of medical?", Vocab.MEDICAL);
 
         evacLabel = label("Evacuation request");
         body.addView(evacLabel);
@@ -482,13 +502,12 @@ final class ReportForm {
         for (TileGroup g : groups)
             g.recolor();
         final String nature = state.text(IwiState.NATURE);
-        // A group's heading is cyan, the section color, until something in it is
-        // picked; then green naming the picks.
-        for (Map.Entry<TextView, Vocab.Choices> g : natureFolds.entrySet()) {
-            final String which = Vocab.labels(nature, g.getValue());
-            final String name = natureNames.get(g.getKey());
-            g.getKey().setText(which.isEmpty() ? name : name + ": " + which);
-            g.getKey().setTextColor(which.isEmpty() ? cyan() : green());
+        // A big tile is green once a kind under it is picked, cyan while its kinds
+        // are open and empty, white when closed. Picked kinds always show.
+        for (NatureKind k : natureKinds) {
+            final boolean any = !Vocab.labels(nature, k.choices).isEmpty();
+            k.big.setTextColor(any ? green() : k.open ? cyan() : Color.WHITE);
+            k.box.setVisibility(any || k.open ? View.VISIBLE : View.GONE);
         }
         final boolean weight = RadioScript.needsWeight(state);
         radioContactBlock.setVisibility(weight ? View.VISIBLE : View.GONE);
@@ -579,22 +598,53 @@ final class ReportForm {
     }
 
     /**
-     * One group of what-happened tiles under its own heading. Any number picked.
+     * One big what-happened tile, and under the pair the kinds it opens: a heading
+     * asking what kind, then three across near-square tiles, any number picked.
      *
-     * <p>Three across and near square, not two wide bars (operator, 2026-11-08: "make
-     * it like a square for easier finger button press"): each tile is as tall as it is
-     * wide, between 72 and 104 dp, and its label wraps to two lines.
+     * <p>A tap on a closed tile opens its kinds; a tap on an open one with nothing
+     * picked closes them. Kinds with a pick stay open, so a pick is never hidden.
      */
-    private void natureGroup(LinearLayout parent, String name, Vocab.Choices c, String pref) {
-        // Always open, never a drop-down (operator, 2026-11-08): a heading over its
-        // tiles, Trauma then Medical.
-        final TextView head = label(name);
+    private void natureGroup(LinearLayout parent, String name, String ask,
+            Vocab.Choices c) {
+        final NatureKind k = new NatureKind();
+        k.name = name;
+        k.ask = ask;
+        k.choices = c;
+        k.big = new Button(ctx, null, 0, R.style.TakwerxButton);
+        k.big.setText(name.toUpperCase(java.util.Locale.US));
+        k.big.setTypeface(Typeface.DEFAULT_BOLD);
+        k.big.setGravity(Gravity.CENTER);
+        k.big.setMinHeight(dp(88));
+        fitOneLine(k.big, 24, 14);
+        k.big.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (k.picked())
+                    k.open = true;
+                else
+                    k.open = !k.open;
+                refreshChoices();
+                if (k.open)
+                    k.box.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            k.box.requestRectangleOnScreen(new android.graphics.Rect(0, 0,
+                                    k.box.getWidth(), k.box.getHeight()));
+                        }
+                    });
+            }
+        });
+        natureRow.addView(k.big, weighted(natureKinds.isEmpty() ? 0 : dp(6)));
+        k.box = block();
+        k.box.setVisibility(View.GONE);
+        final TextView head = label(ask);
         head.setTextSize(16);
+        head.setTextColor(cyan());
         head.setPadding(0, dp(12), 0, dp(2));
-        parent.addView(head);
-        natureFolds.put(head, c);
-        natureNames.put(head, name);
-        tiles(parent, c, 3, true, textBinding(IwiState.NATURE), groups, true);
+        k.box.addView(head);
+        tiles(k.box, c, 3, true, textBinding(IwiState.NATURE), groups, true);
+        parent.addView(k.box, full());
+        natureKinds.add(k);
     }
 
     /**
@@ -1216,6 +1266,9 @@ final class ReportForm {
     void closeAll() {
         for (Fold f : new ArrayList<>(folds))
             f.setOpen(false);
+        for (NatureKind k : natureKinds)
+            k.open = false;
+        refreshChoices();
     }
 
     private static LinearLayout body(Fold f) {
