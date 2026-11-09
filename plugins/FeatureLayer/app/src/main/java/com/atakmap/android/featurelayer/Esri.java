@@ -146,7 +146,7 @@ public final class Esri {
         final String params = "where=" + enc(where) + "&outStatistics=" + enc(stats)
                 + "&returnGeometry=false&f=json" + (scope == null ? "" : scope.params());
         final String url = base + "/" + layerId + "/query";
-        final JSONObject d = new JSONObject(scope == null ? get(url + "?" + params, token) : post(url, params, token));
+        final JSONObject d = new JSONObject(scope == null ? get(url + "?" + params + uncached(), token) : post(url, params, token));
         if (d.has("error"))
             throw new IllegalStateException(d.getJSONObject("error").optString("message"));
         final JSONArray feats = d.optJSONArray("features");
@@ -297,7 +297,7 @@ public final class Esri {
                 pbf = false; // this page and the rest as JSON
             }
             final long t0 = System.currentTimeMillis();
-            final String body = scope == null ? get(url + "?" + params, token) : post(url, params, token);
+            final String body = scope == null ? get(url + "?" + params + uncached(), token) : post(url, params, token);
             final long t1 = System.currentTimeMillis();
             final JSONObject page = new JSONObject(body);
             final long t2 = System.currentTimeMillis();
@@ -695,6 +695,17 @@ public final class Esri {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    /**
+     * A parameter the server ignores and the CDN does not: ArcGIS Online answers a plain
+     * GET query with "cache-control: public, max-age=3600", so the same URL asked every
+     * minute got the same answer for up to an hour. CA Air Intel on "All time" has no
+     * time in its where, and said "no change" for 40 minutes while a new FIRIS perimeter
+     * sat in the service (2026-11-08). Tile queries do not use this: they want the CDN.
+     */
+    static String uncached() {
+        return "&_ts=" + System.currentTimeMillis();
     }
 
     public static String get(String url) throws Exception {
