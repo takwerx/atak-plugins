@@ -44,6 +44,9 @@ import java.util.List;
 public final class IwiFeed {
 
     private static final String TAG = "IWI-Feed";
+
+    /** UID prefix of the forced delete; never a feed item (see send). */
+    private static final String DELETE_PREFIX = "IWI-delete-";
     private static final String K_NAME = "iwi.feed.name";
     private static final String K_SERVER = "iwi.feed.server";
     /** The last feed picked, offered by name at the next Declare. */
@@ -339,6 +342,14 @@ public final class IwiFeed {
             return;
         }
         prefs.edit().remove(K_WAIT + uid).apply();
+        if ("t-x-d-d".equals(e.getType())) {
+            // The forced delete goes to the server, never to the feed: TAK Server
+            // keeps every CoT sent to a feed as a feed item, and each Clear left two
+            // "[Untitled]" items behind (S22 Ultra, 2026-11-09). The feed removal
+            // itself is the DELETE on the contents.
+            CommsMapComponent.getInstance().sendCoTToServersOnly(server(), e);
+            return;
+        }
         // commo adds the mission destination itself, to this server only.
         CommsMapComponent.getInstance().sendCoTToServersByMission(server(), name(), e);
         if (file && !prefs.getBoolean(K_PUB + uid, false))
@@ -364,9 +375,9 @@ public final class IwiFeed {
         prefs.edit().remove(K_PUB + uid).remove(K_WAIT + uid).apply();
         if (!isSet())
             return;
-        // Every device in the feed takes the marker off its map, Data Sync or not:
-        // ATAK's own delete, t-x-d-d with __forcedelete (operator, 2026-11-06). Sent
-        // like any other IWI event, so it waits for the server if this device is off.
+        // Every device takes the marker off its map, Data Sync or not: ATAK's own
+        // delete, t-x-d-d with __forcedelete (operator, 2026-11-06), sent to the
+        // server and not to the feed (see send). It waits if this device is off.
         send(deleteEvent(uid), false);
         if (!pub)
             return;
@@ -385,7 +396,7 @@ public final class IwiFeed {
                     final TakHttpResponse r = client.execute(
                             new HttpDelete(FileSystemUtils.sanitizeURL(url)));
                     Log.d(TAG, "DELETE contents -> " + r.getStatusCode());
-                    logContents(client, feed);
+                    tidyContents(client, feed);
                 } catch (Exception ex) {
                     Log.w(TAG, "remove from feed failed", ex);
                 }
@@ -393,20 +404,37 @@ public final class IwiFeed {
         }, TAG + "-delete").start();
     }
 
-    /** For the log: which IWI items the feed still holds after a Clear. */
-    private static void logContents(TakHttpClient client, String feed) {
+    /**
+     * After a Clear: take out the delete events earlier builds left in the feed
+     * (they sent the forced delete to the feed, see send), and log what remains.
+     */
+    private static void tidyContents(TakHttpClient client, String feed) {
         try {
             final String json = client.get(client.getUrl("api/missions/"
                     + Uri.encode(feed)));
             final JSONArray data = new JSONObject(json).optJSONArray("data");
             final JSONArray items = data == null || data.length() == 0 ? null
                     : data.getJSONObject(0).optJSONArray("uids");
-            int iwi = 0;
             final int n = items == null ? 0 : items.length();
-            for (int i = 0; i < n; i++)
-                if (items.getJSONObject(i).optString("data", "").startsWith("IWI"))
-                    iwi++;
-            Log.d(TAG, "feed holds " + n + " items, " + iwi + " of them IWI");
+            int iwi = 0, junk = 0;
+            for (int i = 0; i < n; i++) {
+                final String uid = items.getJSONObject(i).optString("data", "");
+                if (!uid.startsWith(DELETE_PREFIX)) {
+                    if (uid.startsWith("IWI"))
+                        iwi++;
+                    continue;
+                }
+                final String url = Uri.parse(client.getUrl("api/missions/"
+                        + Uri.encode(feed) + "/contents")).buildUpon()
+                        .appendQueryParameter("uid", uid)
+                        .appendQueryParameter("creatorUid", MapView.getDeviceUid())
+                        .build().toString();
+                if (client.execute(new HttpDelete(FileSystemUtils.sanitizeURL(url)))
+                        .getStatusCode() == 200)
+                    junk++;
+            }
+            Log.d(TAG, "feed holds " + (n - junk) + " items, " + iwi
+                    + " of them IWI; removed " + junk + " old delete items");
         } catch (Exception e) {
             Log.w(TAG, "could not read the feed back", e);
         }
@@ -416,7 +444,7 @@ public final class IwiFeed {
     private static CotEvent deleteEvent(String uid) {
         final CotEvent e = new CotEvent();
         e.setVersion("2.0");
-        e.setUID("IWI-delete-" + uid);
+        e.setUID(DELETE_PREFIX + uid);
         e.setType("t-x-d-d");
         e.setHow("h-g-i-g-o");
         final com.atakmap.coremap.maps.time.CoordinatedTime now =
