@@ -170,15 +170,18 @@ public final class TraumaManager {
     /** "1,800 centers, helipads as of Oct 1, 2026, hospitals 2020", for Settings. */
     public static String describe(TraumaPack.Index index) {
         if (index == null || index.isEmpty())
-            return "No trauma center data on this device";
+            return "No hospital data on this device";
         final StringBuilder b = new StringBuilder();
         b.append(NumberFormat.getIntegerInstance(Locale.US).format(index.count))
-                .append(" trauma centers");
+                .append(" hospitals");
+        if (!index.states.isEmpty())
+            b.append(", state lists for ").append(android.text.TextUtils.join(", ",
+                    index.states.keySet()));
         final String cycle = date(index.cycle);
         if (!cycle.isEmpty())
             b.append(", helipads as of ").append(cycle);
         if (index.hospitalsDate.length() >= 4)
-            b.append(", hospital list ").append(index.hospitalsDate.substring(0, 4));
+            b.append(", other states ").append(index.hospitalsDate.substring(0, 4));
         return b.toString();
     }
 

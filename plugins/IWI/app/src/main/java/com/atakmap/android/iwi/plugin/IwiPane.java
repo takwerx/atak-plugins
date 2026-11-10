@@ -79,6 +79,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private final View detailsPage;
     private final View reportPage;
     private final View scriptPage;
+    private final View hospitalsPage;
     private final TextView status;
     private final Button declareButton;
     private final View liveBlock;
@@ -104,9 +105,10 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
      * already on the incident's channels, so it was clutter (operator, 2026-11-06); item 6
      * is still in the report.
      */
-    private final Button[] followUps = new Button[3];
+    private final Button[] followUps = new Button[4];
+    /** Hospitals: the nearest trauma centers with a helipad (operator, 2026-11-09). */
     private static final String[] FOLLOW_UP_NAMES = {
-            "Patient Update", "Evac Plan", "Contingency"
+            "Patient Update", "Evac Plan", "Contingency", "Hospitals"
     };
     private View followUpBar;
     private final Button[] stepRows = new Button[STEPS];
@@ -161,12 +163,15 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private boolean pickEvac;
     /** Whether that pick moves a declared IWI rather than declaring one. */
     private boolean pickMoves;
+    /** The hospital pack, for the hospitals that go to the feed with the IWI. */
+    private final TraumaManager hospitals;
 
     public IwiPane(Context pluginContext, MapView mapView, View root, View settingsRoot,
             TraumaManager manager, Exits exits) {
         this.ctx = pluginContext;
         this.mapView = mapView;
         this.state = new IwiState(manager.prefs());
+        this.hospitals = manager;
         this.exits = exits;
         this.feed = new IwiFeed(mapView, manager.prefs());
         feedButton = settingsRoot.findViewById(R.id.iwi_btn_feed);
@@ -188,6 +193,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         detailsPage = root.findViewById(R.id.iwi_details_page);
         reportPage = root.findViewById(R.id.iwi_report_page);
         scriptPage = root.findViewById(R.id.iwi_script_page);
+        hospitalsPage = root.findViewById(R.id.iwi_hospitals_page);
         status = root.findViewById(R.id.iwi_status);
         declareButton = root.findViewById(R.id.iwi_btn_declare);
         liveBlock = root.findViewById(R.id.iwi_live_block);
@@ -399,7 +405,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             public void onClick(View v) {
                 // The marker carries what the report says, for a phone without IWI.
                 if (state.isLive())
-                    IwiMarker.write(state);
+                    writeMarker();
                 showMain();
             }
         });
@@ -408,7 +414,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                     @Override
                     public void onClick(View v) {
                         if (state.isLive())
-                            IwiMarker.write(state);
+                            writeMarker();
                         openScript(reportPage);
                     }
                 });
@@ -442,7 +448,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     public boolean back() {
         if (reportPage.getVisibility() == View.VISIBLE) {
             if (state.isLive())
-                IwiMarker.write(state);
+                writeMarker();
             showMain();
         } else if (scriptPage.getVisibility() == View.VISIBLE) {
             if (scriptReturn == reportPage)
@@ -568,7 +574,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private void feedChanged() {
         showFeed();
         if (state.isLive())
-            IwiMarker.write(state);
+            writeMarker();
         final String evacUid = state.text(IwiState.EVAC_UID);
         final GeoPoint ep = evacPoint();
         if (!evacUid.isEmpty() && ep != null)
@@ -597,6 +603,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         detailsPage.setVisibility(page == detailsPage ? View.VISIBLE : View.GONE);
         reportPage.setVisibility(page == reportPage ? View.VISIBLE : View.GONE);
         scriptPage.setVisibility(page == scriptPage ? View.VISIBLE : View.GONE);
+        hospitalsPage.setVisibility(page == hospitalsPage ? View.VISIBLE : View.GONE);
     }
 
     @Override
@@ -608,6 +615,24 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     @Override
     public void showDetails() {
         show(detailsPage);
+    }
+
+    @Override
+    public void showHospitals() {
+        show(hospitalsPage);
+    }
+
+    @Override
+    public void hospitalsChanged() {
+        HospitalSet.sync(mapView, state, hospitals.centers());
+    }
+
+    /** The IWI marker, then the hospitals that go with it: both follow the report. */
+    private boolean writeMarker() {
+        final boolean ok = IwiMarker.write(state);
+        if (ok)
+            HospitalSet.sync(mapView, state, hospitals.centers());
+        return ok;
     }
 
     @Override
@@ -818,7 +843,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             state.move(p, source);
         else
             state.declare(p, source);
-        if (!IwiMarker.write(state))
+        if (!writeMarker())
             status("Could not put the IWI marker on the map.");
         else
             status(move ? "IWI moved." : null);
@@ -900,7 +925,8 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                     RadioScript.evacPlan(state).complete(),
                     RadioScript.contingency(state).complete()
             };
-            for (int i = 0; i < followUps.length; i++)
+            // Hospitals is a lookup, not a report section: it keeps the plain color.
+            for (int i = 0; i < done.length; i++)
                 followUps[i].setTextColor(done[i] ? color(R.color.state_on)
                         : color(R.color.state_off));
         } else {
@@ -1000,6 +1026,10 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private void openFollowUp(int which) {
         if (pendingPoint != null || picking)
             return;
+        if (which == 3) {
+            trauma.showList();
+            return;
+        }
         form.refresh();
         show(reportPage);
         if (which == 0)
@@ -1126,6 +1156,8 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         hideClear();
         IwiMarker.remove(mapView, state.uid());
         IwiMarker.remove(mapView, state.text(IwiState.EVAC_UID));
+        IwiMarker.remove(mapView, HospitalMarker.UID);
+        HospitalSet.clear(mapView, state);
         // Out of the feed too: Clear is the reporter's own act.
         IwiFeed.withdraw(state.uid());
         IwiFeed.withdraw(state.text(IwiState.EVAC_UID));
@@ -1223,7 +1255,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         state.set(IwiState.EVAC_LOCATION, Coords.ddm(p.getLatitude(), p.getLongitude()));
         EvacMarker.write(uid, p);
         if (state.isLive())
-            IwiMarker.write(state);
+            writeMarker();
         form.refresh();
     }
 
@@ -1354,7 +1386,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     @Override
     public void patientScript(int n) {
         if (state.isLive())
-            IwiMarker.write(state);
+            writeMarker();
         final Patient patient = state.patient(n);
         if (patient == null)
             return;

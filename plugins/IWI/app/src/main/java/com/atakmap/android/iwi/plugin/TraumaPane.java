@@ -43,6 +43,12 @@ public final class TraumaPane implements TraumaManager.Listener {
 
         void showDetails();
 
+        /** The Hospitals page (operator, 2026-11-09). */
+        void showHospitals();
+
+        /** The hospitals in memory changed: the IWI's hospital markers follow. */
+        void hospitalsChanged();
+
         void status(String message);
     }
 
@@ -74,6 +80,19 @@ public final class TraumaPane implements TraumaManager.Listener {
     private TraumaFinder.Result first;
     private TraumaFinder.Result better;
     private TraumaFinder.Result showing;
+    /** The Hospitals page: its rows and the line above them. */
+    private final android.widget.LinearLayout hospitalsList;
+    private final TextView hospitalsNote;
+    /** All | ER | Trauma | Burn, each with its count (operator, 2026-11-09). */
+    private final android.widget.LinearLayout hospitalsFilters;
+    private static final String[] FILTER_NAMES = {"All", "ER", "Trauma", "Burn"};
+    private static final TraumaFinder.Want[] FILTERS = {TraumaFinder.ANY, TraumaFinder.ER,
+            TraumaFinder.ANY_TRAUMA, TraumaFinder.ANY_BURN};
+    private static final String K_FILTER = "iwi.hospitals.filter";
+    /** The details page was opened from the Hospitals page, so Back returns there. */
+    private boolean fromList;
+    /** How many rows the Hospitals page lists. */
+    private static final int LIST_MAX = 12;
 
     public TraumaPane(MapView mapView, View root, View settingsRoot, TraumaManager manager,
             PointSource source, Pages pages) {
@@ -95,13 +114,28 @@ public final class TraumaPane implements TraumaManager.Listener {
         detailsTitle = root.findViewById(R.id.iwi_details_title);
         detailsSubtitle = root.findViewById(R.id.iwi_details_subtitle);
         detailsBody = root.findViewById(R.id.iwi_details_body);
+        hospitalsList = root.findViewById(R.id.iwi_hospitals_list);
+        hospitalsNote = root.findViewById(R.id.iwi_hospitals_note);
+        hospitalsFilters = root.findViewById(R.id.iwi_hospitals_filters);
+        root.findViewById(R.id.iwi_btn_hospitals_back).setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        TraumaPane.this.pages.showMain();
+                    }
+                });
 
         root.findViewById(R.id.iwi_btn_details_back).setOnClickListener(
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
                         showing = null;
-                        TraumaPane.this.pages.showMain();
+                        if (fromList) {
+                            fromList = false;
+                            TraumaPane.this.pages.showHospitals();
+                        } else {
+                            TraumaPane.this.pages.showMain();
+                        }
                     }
                 });
         root.findViewById(R.id.iwi_btn_go_to).setOnClickListener(new View.OnClickListener() {
@@ -227,11 +261,113 @@ public final class TraumaPane implements TraumaManager.Listener {
 
     // ---- the details page ----
 
+    // ---- the Hospitals page ----
+
+    /** Fill the Hospitals page from the reference point and open it. */
+    public void showList() {
+        fromList = false;
+        fill();
+        pages.showHospitals();
+    }
+
+    /** The filter row and the list under it, nearest first. */
+    private void fill() {
+        hospitalsList.removeAllViews();
+        hospitalsFilters.removeAllViews();
+        final List<TraumaCenter> centers = manager.centers();
+        final GeoPoint from = source.point();
+        if (centers == null || centers.isEmpty()) {
+            hospitalsNote.setText("No hospital data on this device. "
+                    + "Settings > Trauma Center Data.");
+            return;
+        }
+        if (from == null) {
+            hospitalsNote.setText("No position yet. Needs a declared IWI or a GPS fix.");
+            return;
+        }
+        final SharedPreferences prefs = manager.prefs();
+        final int filter = Math.max(0, Math.min(FILTERS.length - 1,
+                prefs.getInt(K_FILTER, 0)));
+        final float density = hospitalsList.getResources().getDisplayMetrics().density;
+        for (int i = 0; i < FILTERS.length; i++) {
+            final int which = i;
+            final Button b = new Button(hospitalsFilters.getContext(), null, 0,
+                    R.style.TakwerxButton);
+            b.setText(FILTER_NAMES[i] + " (" + TraumaFinder.count(centers, from, FILTERS[i])
+                    + ")");
+            b.setTextColor(i == filter ? 0xFF4CAF50 : 0xFFFFFFFF);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    prefs.edit().putInt(K_FILTER, which).apply();
+                    fill();
+                }
+            });
+            final android.widget.LinearLayout.LayoutParams lp =
+                    new android.widget.LinearLayout.LayoutParams(0,
+                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            if (i > 0)
+                lp.leftMargin = Math.round(4 * density);
+            hospitalsFilters.addView(b, lp);
+        }
+        final List<TraumaFinder.Result> list =
+                TraumaFinder.nearestList(centers, from, LIST_MAX, FILTERS[filter]);
+        if (list.isEmpty()) {
+            hospitalsNote.setText("None within " + Units.distance(TraumaFinder.CAP_M)
+                    + " " + source.label() + ".");
+            return;
+        }
+        hospitalsNote.setText("Nearest " + list.size() + ", " + source.label()
+                + ". Tap one to mark it on the map. Straight-line estimate at "
+                + manager.cruiseKt() + " kt; where a patient flies is the air crew's call.");
+        for (final TraumaFinder.Result r : list)
+            hospitalsList.addView(row(r), rowParams(density));
+    }
+
+    private Button row(final TraumaFinder.Result r) {
+        final Button b = new Button(hospitalsList.getContext(), null, 0, R.style.TakwerxButton);
+        final TraumaCenter c = r.center;
+        b.setSingleLine(false);
+        b.setMaxLines(4);
+        b.setGravity(android.view.Gravity.START | android.view.Gravity.CENTER_VERTICAL);
+        b.setText(c.name + "\n" + c.kindLabel() + "\n" + Units.distance(r.meters) + " "
+                + cardinal(r.bearing) + ", " + minutesText(r.meters)
+                + (c.padCharted ? ", helipad" : c.padReported ? ", pad not charted"
+                        : ", no helipad"));
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pick(r);
+            }
+        });
+        return b;
+    }
+
+    private static android.widget.LinearLayout.LayoutParams rowParams(float density) {
+        final android.widget.LinearLayout.LayoutParams lp =
+                new android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.bottomMargin = Math.round(4 * density);
+        return lp;
+    }
+
+    /** A row tapped: mark it on the map, center there, and open its details. */
+    private void pick(TraumaFinder.Result r) {
+        if (HospitalMarker.write(r.center)) {
+            mapView.getMapController().panTo(r.center.target(), true);
+            pages.status("Marked " + r.center.name + " on the map.");
+        }
+        showDetails(r);
+        fromList = true;
+    }
+
     private void showDetails(TraumaFinder.Result r) {
         showing = r;
+        fromList = false;
         final TraumaCenter c = r.center;
         detailsTitle.setText(c.name);
-        detailsSubtitle.setText(c.levelLabel() + " trauma center");
+        detailsSubtitle.setText(c.kindLabel());
         detailsBody.setText(detailsText(r));
         pages.showDetails();
     }
@@ -242,8 +378,16 @@ public final class TraumaPane implements TraumaManager.Listener {
         if (!c.city.isEmpty() || !c.state.isEmpty())
             b.append(c.city).append(c.city.isEmpty() ? "" : ", ").append(c.state)
                     .append("\n\n");
-        if (!c.levelText.isEmpty() && c.levelText.contains(","))
-            b.append(c.levelText).append("\n\n");
+        if (c.adult > 0 && c.ped > 0)
+            b.append("Also a pediatric Level ").append(TraumaCenter.roman(c.ped))
+                    .append(" trauma center.\n\n");
+        if (c.burn)
+            b.append(c.burnName.isEmpty() ? "Burn center" : c.burnName)
+                    .append(c.burnVerified ? ", verified by the American Burn Association"
+                            : ", designated by the local EMS agency")
+                    .append(c.burnAdult ? "" : ", children only").append(".\n\n");
+        if (!c.er.isEmpty())
+            b.append("Emergency department: ").append(c.er).append(".\n\n");
         b.append(Units.distance(r.meters)).append(' ').append(cardinal(r.bearing))
                 .append(' ').append(source.label())
                 .append(", bearing ").append(bearingText(r.bearing)).append('\n');
@@ -259,15 +403,23 @@ public final class TraumaPane implements TraumaManager.Listener {
             if (c.padElevFt >= 0)
                 b.append(", ").append(c.padElevFt).append(" ft");
             b.append(".\nThe distance above is to the pad.\n");
-        } else {
+        } else if (c.padReported) {
             b.append("Helipad not charted by the FAA. The hospital reports a pad; ")
                     .append("the distance above is to the hospital.\n");
+        } else {
+            b.append("No helipad on record. The distance above is to the hospital.\n");
         }
         final TraumaPack.Index index = manager.index();
-        b.append("\nTrauma centers from HIFLD hospitals");
-        if (index.hospitalsDate.length() >= 4)
-            b.append(" (").append(index.hospitalsDate.substring(0, 4)).append(')');
-        b.append("; helipads from FAA NASR");
+        final String listed = index.states.get(c.state);
+        if (listed != null) {
+            b.append("\n").append(c.state).append(": ").append(listed).append('.');
+        } else {
+            b.append("\nTrauma level from HIFLD hospitals");
+            if (index.hospitalsDate.length() >= 4)
+                b.append(" (").append(index.hospitalsDate.substring(0, 4)).append(')');
+            b.append("; this state's own list is not in IWI yet.");
+        }
+        b.append(" Helipads from FAA NASR");
         final String cycle = TraumaManager.date(index.cycle);
         if (!cycle.isEmpty())
             b.append(", cycle ").append(cycle);
@@ -352,6 +504,7 @@ public final class TraumaPane implements TraumaManager.Listener {
     public void onPackChanged() {
         refresh();
         refreshSettings();
+        pages.hospitalsChanged();
     }
 
     @Override

@@ -30,9 +30,10 @@ public final class TraumaPack {
 
     private static final String TAG = "IWI-TraumaPack";
 
-    static final String BASE = "https://mapdepot.takwerx.org/iwi/trauma/";
-    static final String MANIFEST = "trauma.json";
-    static final String FILE = "trauma.json.gz";
+    /** v2, 2026-11-09: ERs, trauma and burn centers, state lists first (CA). */
+    static final String BASE = "https://mapdepot.takwerx.org/iwi/hospitals/";
+    static final String MANIFEST = "hospitals.json";
+    static final String FILE = "hospitals.json.gz";
 
     /** The manifest is re-read this often; the FAA cycle behind it is 28 days. */
     private static final long MANIFEST_MAX_AGE_MS = 24L * 60L * 60L * 1000L;
@@ -47,7 +48,7 @@ public final class TraumaPack {
     private final File dir;
 
     public TraumaPack() {
-        this(new File(FileSystemUtils.getItem("tools/iwi"), "trauma"));
+        this(new File(FileSystemUtils.getItem("tools/iwi"), "hospitals"));
     }
 
     TraumaPack(File dir) {
@@ -64,6 +65,8 @@ public final class TraumaPack {
         public String hospitalsDate = "";
         public String hospitalsSource = "";
         public int count;
+        /** Per state with its own lists: "trauma CA EMSA 2025-08-25, burn ..., ER ...". */
+        public final java.util.Map<String, String> states = new java.util.TreeMap<>();
         public String sha = "";
 
         public boolean isEmpty() {
@@ -109,10 +112,22 @@ public final class TraumaPack {
         final Index index = new Index();
         index.cycle = root.optString("cycle", "");
         index.built = root.optString("built", "");
-        final JSONObject hospitals = root.optJSONObject("hospitals");
-        if (hospitals != null) {
-            index.hospitalsDate = hospitals.optString("date", "");
-            index.hospitalsSource = hospitals.optString("source", "");
+        final JSONObject elsewhere = root.optJSONObject("elsewhere");
+        if (elsewhere != null) {
+            index.hospitalsDate = elsewhere.optString("date", "");
+            index.hospitalsSource = elsewhere.optString("source", "");
+        }
+        final JSONObject states = root.optJSONObject("states");
+        if (states != null) {
+            final java.util.Iterator<String> it = states.keys();
+            while (it.hasNext()) {
+                final String st = it.next();
+                final JSONObject o = states.optJSONObject(st);
+                if (o != null)
+                    index.states.put(st, "trauma levels " + o.optString("trauma", "?")
+                            + ", burn centers " + o.optString("burn", "?")
+                            + ", ERs " + o.optString("er", "?"));
+            }
         }
         final JSONObject files = root.optJSONObject("files");
         final JSONObject entry = files == null ? null : files.optJSONObject(FILE);

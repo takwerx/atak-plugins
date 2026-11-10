@@ -26,6 +26,7 @@
     <!-- IWI pane, from LCES 2026-11-07 -->
     <string name="iwi_title">IWI: Incident Within an Incident</string>
     <string name="iwi_go_to">Go To</string>
+    <string name="iwi_hospitals_title">Hospitals: ER, Trauma, Burn</string>
     <string name="iwi_cancel">Cancel</string>
     <string name="iwi_wide_desc">Wide or narrow</string>
     <string name="iwi_download_now">Download Now</string>

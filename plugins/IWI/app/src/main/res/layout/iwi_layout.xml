@@ -558,6 +558,72 @@
         </ScrollView>
     </LinearLayout>
 
+    <!-- Hospitals: the nearest trauma centers with a helipad, one row each, built in
+         code. A tap puts a labeled marker on the map (operator, 2026-11-09). -->
+    <LinearLayout
+        android:id="@+id/iwi_hospitals_page"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="6dp">
+
+            <Button
+                android:id="@+id/iwi_btn_hospitals_back"
+                style="@style/TakwerxButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="90dp"
+                android:text="@string/back" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="12dp"
+                android:textSize="17sp"
+                android:textStyle="bold"
+                android:textColor="@color/white"
+                android:text="@string/iwi_hospitals_title" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/iwi_hospitals_filters"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal" />
+
+        <TextView
+            android:id="@+id/iwi_hospitals_note"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="13sp"
+            android:textColor="@color/guide_grey"
+            android:paddingTop="4dp"
+            android:paddingBottom="6dp" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fadeScrollbars="false">
+
+            <LinearLayout
+                android:id="@+id/iwi_hospitals_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </ScrollView>
+    </LinearLayout>
+
     <!-- Medical Incident Report: the form is built in code into report_container. -->
     <LinearLayout
         android:id="@+id/iwi_report_page"

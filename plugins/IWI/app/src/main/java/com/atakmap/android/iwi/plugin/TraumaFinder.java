@@ -37,9 +37,64 @@ public final class TraumaFinder {
         }
     }
 
-    /** The nearest center of any level within the cap, or null. */
+    /** Which hospitals count for a pick. Anonymous classes, never lambdas (proguard). */
+    public interface Want {
+        boolean ok(TraumaCenter c);
+    }
+
+    public static final Want ER = new Want() {
+        @Override
+        public boolean ok(TraumaCenter c) {
+            return c.hasEr();
+        }
+    };
+    public static final Want ER_PAD = new Want() {
+        @Override
+        public boolean ok(TraumaCenter c) {
+            return c.hasEr() && c.hasPad();
+        }
+    };
+    public static final Want TRAUMA = new Want() {
+        @Override
+        public boolean ok(TraumaCenter c) {
+            return c.adultTrauma();
+        }
+    };
+    public static final Want LEVEL_I = new Want() {
+        @Override
+        public boolean ok(TraumaCenter c) {
+            return c.adult == 1;
+        }
+    };
+    public static final Want BURN = new Want() {
+        @Override
+        public boolean ok(TraumaCenter c) {
+            return c.adultBurn();
+        }
+    };
+
+    /** The nearest hospital the test accepts, within the cap, or null. */
+    public static Result nearest(List<TraumaCenter> centers, GeoPoint from, Want want) {
+        if (centers == null || from == null)
+            return null;
+        TraumaCenter best = null;
+        double bestM = CAP_M;
+        for (TraumaCenter c : centers) {
+            if (!want.ok(c))
+                continue;
+            final double d = GeoCalculations.distanceTo(from, c.target());
+            if (!Double.isNaN(d) && d < bestM) {
+                bestM = d;
+                best = c;
+            }
+        }
+        return best == null ? null
+                : new Result(best, bestM, GeoCalculations.bearingTo(from, best.target()));
+    }
+
+    /** The nearest adult trauma center of any level within the cap, or null. */
     public static Result nearest(List<TraumaCenter> centers, GeoPoint from) {
-        return nearestAtLevel(centers, from, 0);
+        return nearest(centers, from, TRAUMA);
     }
 
     /**
@@ -55,6 +110,68 @@ public final class TraumaFinder {
         return null;
     }
 
+    public static final Want ANY = new Want() {
+        @Override
+        public boolean ok(TraumaCenter c) {
+            return true;
+        }
+    };
+    /** Any trauma center, pediatric ones too, for the Hospitals page's filter. */
+    public static final Want ANY_TRAUMA = new Want() {
+        @Override
+        public boolean ok(TraumaCenter c) {
+            return c.level > 0;
+        }
+    };
+    public static final Want ANY_BURN = new Want() {
+        @Override
+        public boolean ok(TraumaCenter c) {
+            return c.burn;
+        }
+    };
+
+    /** How many the test accepts within the cap: the count on a filter. */
+    public static int count(List<TraumaCenter> centers, GeoPoint from, Want want) {
+        int n = 0;
+        if (centers == null || from == null)
+            return 0;
+        for (TraumaCenter c : centers) {
+            if (!want.ok(c))
+                continue;
+            final double d = GeoCalculations.distanceTo(from, c.target());
+            if (!Double.isNaN(d) && d < CAP_M)
+                n++;
+        }
+        return n;
+    }
+
+    /** Up to {@code max} centers within the cap, nearest first: the Hospitals list. */
+    public static java.util.List<Result> nearestList(List<TraumaCenter> centers,
+            GeoPoint from, int max) {
+        return nearestList(centers, from, max, ANY);
+    }
+
+    public static java.util.List<Result> nearestList(List<TraumaCenter> centers,
+            GeoPoint from, int max, Want want) {
+        final java.util.List<Result> all = new java.util.ArrayList<>();
+        if (centers == null || from == null)
+            return all;
+        for (TraumaCenter c : centers) {
+            if (!want.ok(c))
+                continue;
+            final double d = GeoCalculations.distanceTo(from, c.target());
+            if (!Double.isNaN(d) && d < CAP_M)
+                all.add(new Result(c, d, GeoCalculations.bearingTo(from, c.target())));
+        }
+        java.util.Collections.sort(all, new java.util.Comparator<Result>() {
+            @Override
+            public int compare(Result a, Result b) {
+                return Double.compare(a.meters, b.meters);
+            }
+        });
+        return all.size() > max ? new java.util.ArrayList<>(all.subList(0, max)) : all;
+    }
+
     /** @param level 1 to 5, or 0 for any */
     private static Result nearestAtLevel(List<TraumaCenter> centers, GeoPoint from, int level) {
         if (centers == null || from == null)
@@ -62,7 +179,7 @@ public final class TraumaFinder {
         TraumaCenter best = null;
         double bestM = CAP_M;
         for (TraumaCenter c : centers) {
-            if (level != 0 && c.level != level)
+            if (!c.adultTrauma() || (level != 0 && c.adult != level))
                 continue;
             final double d = GeoCalculations.distanceTo(from, c.target());
             if (!Double.isNaN(d) && d < bestM) {
