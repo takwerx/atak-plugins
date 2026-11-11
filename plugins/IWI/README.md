@@ -1,8 +1,8 @@
 ATAK Plugin — IWI
 
-**Download IWI 0.1** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download IWI 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.8:** https://github.com/takwerx/iwi/releases/download/v0.1/ATAK-Plugin-IWI-0.1--5.8.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/iwi/releases/download/v0.2/ATAK-Plugin-IWI-0.2--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/iwi/releases
 
