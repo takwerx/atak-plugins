@@ -410,7 +410,8 @@ public final class RadioScript {
         for (Patient p : bySeverity(s.patients())) {
             if (!p.hasNotes())
                 continue;
-            line(b, "3. " + p.label() + " " + Patient.name(p.color), said(patient(s, p)));
+            // The sentence already says "Patient 1, Red priority": no label in front.
+            line(b, "3.", said(patient(s, p)));
         }
         line(b, "4. Evacuation location", s.text(IwiState.EVAC_LOCATION));
         line(b, "Patient ETA", s.text(IwiState.ETA));
@@ -429,7 +430,25 @@ public final class RadioScript {
         for (Part p : x.parts)
             if (!p.missing)
                 b.append(p.text);
-        return b.toString().trim();
+        return tidy(b.toString());
+    }
+
+    /**
+     * The separators a dropped field leaves behind: "burns. , , , . Treatment: ."
+     * read on a device with nothing filled in for Patient 2 (S22, 2026-11-11).
+     */
+    static String tidy(String t) {
+        String s = t;
+        String was;
+        do {
+            was = s;
+            s = s.replaceAll(",\\s*,", ",")
+                    .replaceAll(",\\s*\\.", ".")
+                    .replaceAll("\\.\\s*,", ".")
+                    .replaceAll("\\.\\s*\\.", ".")
+                    .replaceAll("(Treatment:|Patient weight)\\s*\\.", "");
+        } while (!s.equals(was));
+        return s.replaceAll("\\s{2,}", " ").trim();
     }
 
     private static void line(StringBuilder b, String label, String value) {
@@ -438,7 +457,7 @@ public final class RadioScript {
         // A line break inside a CoT attribute reaches other devices as a space (XML
         // attribute normalization), so each item also ends with a period: on a device
         // without IWI the remarks read as sentences, not one run-on line.
-        b.append(label).append(": ").append(value);
+        b.append(label).append(label.endsWith(".") ? " " : ": ").append(value);
         final char last = value.charAt(value.length() - 1);
         if (last != '.' && last != '?' && last != '!')
             b.append('.');

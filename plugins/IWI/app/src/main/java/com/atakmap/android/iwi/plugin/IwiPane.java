@@ -124,6 +124,8 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private TextView scriptTitle;
     /** Another device's IWI being read on the script page, or null. */
     private String viewUid;
+    /** That IWI's report, while it is on screen: the count tiles show its counts. */
+    private IwiState viewState;
     /** The Data Sync feed the IWI's markers go to, if one is chosen. */
     private final IwiFeed feed;
     private final Button feedButton;
@@ -540,10 +542,9 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                 : v.callsign()) + ". Read only: only the reporter changes it. It updates "
                 + "here as they do."));
 
-        final int red = v.count(IwiState.RED), yellow = v.count(IwiState.YELLOW);
-        final int green = v.count(IwiState.GREEN), black = v.count(IwiState.BLACK);
-        scriptContainer.addView(line("Red " + red + "   Yellow " + yellow + "   Green " + green
-                + "   Black " + black + "   Total " + v.patientCount(), 18, Color.WHITE));
+        // The counts go in the count tiles at the top, as on the reporter's own pane
+        // (operator, 2026-11-11: "have it look like the regular one").
+        viewState = v;
         final StringBuilder when = new StringBuilder();
         if (v.declaredMs() > 0)
             when.append("Declared ").append(Clock.hhmm(v.declaredMs()));
@@ -560,16 +561,14 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
 
         final GeoPoint p = v.point();
         final String coords = p == null ? null : Coords.ddm(p.getLatitude(), p.getLongitude());
-        scriptContainer.addView(heading("Report"));
-        final String report = RadioScript.remarks(v, coords);
-        if (report.isEmpty())
-            scriptContainer.addView(note("Nothing filled in yet."));
-        for (String row : report.split("\n")) {
-            if (row.trim().isEmpty())
-                continue;
-            final TextView t = line(row, 16, Color.WHITE);
-            t.setPadding(0, dp(6), 0, dp(2));
-            scriptContainer.addView(t);
+        // The report as the reporter's Radio Script shows it, without the radio
+        // instructions: those are for the one on the radio.
+        scriptContainer.addView(heading("Initial report"));
+        render(RadioScript.initial(v, coords), true);
+        final List<RadioScript.Section> more = RadioScript.followUp(v);
+        if (!more.isEmpty()) {
+            scriptContainer.addView(heading("Follow-up"));
+            render(more, true);
         }
         final List<Patient> gone = v.transported();
         if (!gone.isEmpty()) {
@@ -578,6 +577,8 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                 scriptContainer.addView(note(g.label() + " " + Patient.name(g.color) + ", "
                         + Clock.hhmm(g.transportedMs)));
         }
+        refreshTally();
+        refreshSteps();
         return true;
     }
 
@@ -626,11 +627,14 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         // brings them back.
         covered = page == hospitalsPage || page == detailsPage;
         topBar.setVisibility(covered ? View.GONE : View.VISIBLE);
-        tallyRow.setVisibility(state.isLive() && !covered ? View.VISIBLE : View.GONE);
+        // This device's counts, or the counts of the IWI being viewed.
+        refreshTally();
     }
 
     @Override
     public void showMain() {
+        viewUid = null;
+        viewState = null;
         updateMain();
         show(mainPage);
     }
@@ -722,13 +726,14 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         // The count boxes appear at Declare (operator, 2026-11-08); before it, item 2's
         // counters in the report do the counting.
         // The whole row goes, so the initial report gets its height back.
-        tallyRow.setVisibility(state.isLive() && !covered ? View.VISIBLE : View.GONE);
+        final IwiState src = viewUid != null && viewState != null ? viewState : state;
+        tallyRow.setVisibility(src.isLive() && !covered ? View.VISIBLE : View.GONE);
         for (int i = 0; i < tally.length; i++)
-            tally[i].setText(Integer.toString(state.count(Patient.COLORS[i])));
+            tally[i].setText(Integer.toString(src.count(Patient.COLORS[i])));
         final SpannableStringBuilder b = new SpannableStringBuilder("Total ");
         b.setSpan(new android.text.style.RelativeSizeSpan(0.7f), 0, b.length(),
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        b.append(Integer.toString(state.patientCount()));
+        b.append(Integer.toString(src.patientCount()));
         tallyTotal.setText(b);
     }
 
@@ -938,6 +943,14 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private void refreshSteps() {
         if (stepRows[0] == null)
             return;
+        if (viewUid != null) {
+            // Another device's IWI: none of this device's steps or follow-ups apply.
+            stepsBar.setVisibility(View.GONE);
+            nextButton.setVisibility(View.GONE);
+            prevButton.setVisibility(View.GONE);
+            followUpBar.setVisibility(View.GONE);
+            return;
+        }
         final int left = stepsLeft();
         final int first = firstMissing();
         final long reported = state.isLive() ? reportedMs() : 0L;
@@ -1445,6 +1458,11 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
      * @return whether anything in them is not filled in
      */
     private boolean render(List<RadioScript.Section> sections) {
+        return render(sections, false);
+    }
+
+    /** @param readOnly another device's report: its words, not the radio instructions */
+    private boolean render(List<RadioScript.Section> sections, boolean readOnly) {
         boolean anyMissing = false;
         for (RadioScript.Section s : sections) {
             final TextView title = line(s.number + ". " + s.title, 17, color(R.color.amber));
@@ -1452,9 +1470,11 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             title.setPadding(0, dp(14), 0, 0);
             scriptContainer.addView(title);
 
-            for (RadioScript.Lead lead : s.leads) {
-                scriptContainer.addView(quoted(lead.said));
-                scriptContainer.addView(action(lead.then));
+            if (!readOnly) {
+                for (RadioScript.Lead lead : s.leads) {
+                    scriptContainer.addView(quoted(lead.said));
+                    scriptContainer.addView(action(lead.then));
+                }
             }
 
             final SpannableStringBuilder b = new SpannableStringBuilder("\"");
@@ -1470,7 +1490,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             // A section's words never start with a space, but they can end with one.
             while (b.length() > 1 && b.charAt(b.length() - 1) == ' ')
                 b.delete(b.length() - 1, b.length());
-            if (s.saysBreak)
+            if (s.saysBreak && !readOnly)
                 b.append(" Break.");
             b.append("\"");
             final TextView said = line("", 20, Color.WHITE);
@@ -1478,7 +1498,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             said.setPadding(0, dp(4), 0, dp(4));
             scriptContainer.addView(said);
 
-            if (s.after != null)
+            if (s.after != null && !readOnly)
                 scriptContainer.addView(action(s.after));
         }
         return anyMissing;
