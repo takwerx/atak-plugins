@@ -88,6 +88,7 @@
          needs to stay at the top"): how many of the six are in and what is next.
          A tap goes there, page by page; no 1-6 boxes (operator, 2026-11-08). -->
     <LinearLayout
+        android:id="@+id/iwi_top_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
@@ -531,6 +532,17 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/iwi_go_to" />
+            <!-- The wide button on every page (operator, 2026-11-10): this page covers
+                 the bar that holds it. -->
+            <ImageButton
+                android:id="@+id/iwi_btn_details_wide"
+                style="@style/TakwerxIconButton"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_weight="0"
+                android:layout_marginLeft="6dp"
+                android:contentDescription="@string/iwi_wide_desc"
+                android:src="@drawable/ic_wide" />
         </LinearLayout>
 
         <TextView
@@ -592,6 +604,17 @@
                 android:textStyle="bold"
                 android:textColor="@color/white"
                 android:text="@string/iwi_hospitals_title" />
+            <!-- The wide button on every page (operator, 2026-11-10): this page covers
+                 the bar that holds it. -->
+            <ImageButton
+                android:id="@+id/iwi_btn_hospitals_wide"
+                style="@style/TakwerxIconButton"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_weight="0"
+                android:layout_marginLeft="6dp"
+                android:contentDescription="@string/iwi_wide_desc"
+                android:src="@drawable/ic_wide" />
         </LinearLayout>
 
         <LinearLayout

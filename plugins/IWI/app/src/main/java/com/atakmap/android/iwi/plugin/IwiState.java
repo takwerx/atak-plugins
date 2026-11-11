@@ -280,6 +280,11 @@ public final class IwiState implements RadioScript.Source {
         return out;
     }
 
+    /** Every card, on scene and transported, in the order they were added. */
+    public List<Patient> allPatients() {
+        return all();
+    }
+
     /** The patients transported off the scene, in the order they left. */
     public List<Patient> transported() {
         final List<Patient> out = new ArrayList<>();

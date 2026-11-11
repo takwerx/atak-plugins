@@ -50,6 +50,9 @@ public final class TraumaPane implements TraumaManager.Listener {
         void hospitalsChanged();
 
         void status(String message);
+
+        /** Half width, so the map shows (operator, 2026-11-10). */
+        void narrow();
     }
 
     private final MapView mapView;
@@ -141,9 +144,12 @@ public final class TraumaPane implements TraumaManager.Listener {
         root.findViewById(R.id.iwi_btn_go_to).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (showing != null)
+                if (showing != null) {
+                    // Go To in a wide pane moved a map nobody could see: half first.
+                    TraumaPane.this.pages.narrow();
                     TraumaPane.this.mapView.getMapController()
                             .panTo(showing.center.target(), true);
+                }
             }
         });
         line1.setOnClickListener(new View.OnClickListener() {
@@ -355,6 +361,9 @@ public final class TraumaPane implements TraumaManager.Listener {
     /** A row tapped: mark it on the map, center there, and open its details. */
     private void pick(TraumaFinder.Result r) {
         if (HospitalMarker.write(r.center)) {
+            // The tap already centers the map on it, so a wide pane goes to half and the
+            // map shows (operator, 2026-11-10: "it needs to bring the pane back to small").
+            pages.narrow();
             mapView.getMapController().panTo(r.center.target(), true);
             pages.status("Marked " + r.center.name + " on the map.");
         }

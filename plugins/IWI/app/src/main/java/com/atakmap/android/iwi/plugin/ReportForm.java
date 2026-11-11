@@ -464,9 +464,10 @@ final class ReportForm {
             patients.label("3. Patients", "none counted yet");
             patients.complete(false, green());
         } else {
+            // No "2 of 3" and no "4 to fill in": a count of what is left confused
+            // (operator, 2026-11-10). The head turns green when it is all in.
             patients.label("3. Patients", done == list.size()
-                    ? "all " + list.size() + " filled in"
-                    : done + " of " + list.size() + " filled in");
+                    ? "all " + list.size() + " filled in" : null);
             patients.complete(done == list.size(), green());
         }
 
@@ -481,7 +482,7 @@ final class ReportForm {
         if (section.complete())
             f.label(title, done == null || done.isEmpty() ? "filled in" : done);
         else
-            f.label(title, section.missing + " to fill in");
+            f.label(title, null); // no count of what is left (operator, 2026-11-10)
         f.complete(section.complete(), green());
     }
 
@@ -823,6 +824,11 @@ final class ReportForm {
             assess.setVisibility(IwiState.BLACK.equals(p.color) ? View.GONE : View.VISIBLE);
             body.addView(assess, full());
 
+            // What this patient needs from a hospital; the hospital picks follow it
+            // (operator, 2026-11-10). Starts from What Happened until tapped.
+            assess.addView(label("Needs"));
+            tiles(assess, Vocab.NEEDS, 3, true, needsBinding(), groups);
+
             // IRPG p. 108, Patient Assessment, in its order.
             pick(assess, "Consciousness", Patient.LOC, 2);
             pick(assess, "Breathing", Patient.BREATHING, 3);
@@ -916,6 +922,23 @@ final class ReportForm {
             tiles(into, Patient.choices(field), cols, false, cardBinding(field), groups);
         }
 
+        /** The card's Needs, shown as What Happened says until the medic sets them. */
+        private Binding needsBinding() {
+            return new Binding() {
+                @Override
+                String get() {
+                    final Patient p = state.patient(n);
+                    return p == null ? "" : p.needs(state.text(IwiState.NATURE));
+                }
+
+                @Override
+                void set(String v) {
+                    state.updatePatient(n, Patient.NEEDS,
+                            Vocab.parse(v, Vocab.NEEDS).isEmpty() ? "none" : v);
+                }
+            };
+        }
+
         private Binding cardBinding(final String field) {
             return new Binding() {
                 @Override
@@ -985,14 +1008,6 @@ final class ReportForm {
             else
                 b.append(p.updatedMs > 0 && p.hasNotes()
                         ? "updated " + Clock.hhmm(p.updatedMs) : "no notes yet");
-            if (missing > 0) {
-                b.append(", ");
-                final int left = b.length();
-                b.append(missing + " to fill in");
-                b.setSpan(new android.text.style.ForegroundColorSpan(
-                        ReportForm.this.color(R.color.amber)), left, b.length(),
-                        android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            }
             b.setSpan(new android.text.style.RelativeSizeSpan(0.85f), second, b.length(),
                     android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             fold.head.setText(b);

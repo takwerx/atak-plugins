@@ -47,17 +47,30 @@ public final class HospitalSet {
         }
     }
 
-    /** What the report's What Happened says. */
+    /**
+     * What the IWI needs from a hospital (operator, 2026-11-10): each patient card's
+     * Needs, a card not yet set reading What Happened, and What Happened alone before
+     * there are cards. Transported patients count too, so a hospital stays in the feed
+     * until Clear once a patient has needed it ("A"). Black patients do not count.
+     */
+    static Set<String> needs(IwiState state) {
+        final String nature = state.text(IwiState.NATURE);
+        final List<Patient> cards = state.allPatients();
+        if (cards.isEmpty())
+            return Vocab.parse(Vocab.needsFrom(nature), Vocab.NEEDS);
+        final Set<String> out = new java.util.LinkedHashSet<>();
+        for (Patient p : cards)
+            if (!IwiState.BLACK.equals(p.color))
+                out.addAll(Vocab.parse(p.needs(nature), Vocab.NEEDS));
+        return out;
+    }
+
     static boolean trauma(IwiState state) {
-        final Set<String> picked = Vocab.parse(state.text(IwiState.NATURE), Vocab.TRAUMA);
-        for (String code : picked)
-            if (!"burns".equals(code))
-                return true;
-        return false;
+        return needs(state).contains("trauma");
     }
 
     static boolean burns(IwiState state) {
-        return Vocab.parse(state.text(IwiState.NATURE), Vocab.TRAUMA).contains("burns");
+        return needs(state).contains("burns");
     }
 
     /** The picks for a point and an injury, in the order a reader should see them. */
@@ -89,6 +102,17 @@ public final class HospitalSet {
      * nothing until the IWI is declared, or when the pack is not on this device.
      */
     public static void sync(MapView mapView, IwiState state, List<TraumaCenter> centers) {
+        sync(mapView, state, centers, false);
+    }
+
+    /**
+     * @param all send every pick again, not only new ones: the feed was just chosen.
+     *     At Declare the markers go on the map before the question about the feed is
+     *     answered, so without this the hospitals never reached the feed (dev 3,
+     *     2026-11-10).
+     */
+    public static void sync(MapView mapView, IwiState state, List<TraumaCenter> centers,
+            boolean all) {
         if (!state.isLive() || centers == null || centers.isEmpty())
             return;
         final GeoPoint from = state.point();
@@ -100,7 +124,7 @@ public final class HospitalSet {
         for (Pick p : picks) {
             final String uid = state.uid() + "-H-" + p.result.center.id;
             now.add(uid);
-            if (was.contains(uid))
+            if (!all && was.contains(uid))
                 continue;
             final CotEvent e = HospitalMarker.write(p.result.center, uid);
             if (e != null)

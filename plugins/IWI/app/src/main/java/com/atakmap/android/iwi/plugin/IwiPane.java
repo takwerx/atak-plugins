@@ -90,6 +90,9 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private final LinearLayout scriptContainer;
     /** Steps: what the initial call needs, one row each, red until filled in. */
     private Button stepsBar;
+    /** The counts and the button bar: covered while a hospital page is up. */
+    private View topBar;
+    private boolean covered;
     /**
      * NEXT beside the steps box: grey until the step being filled in is done, then
      * green; a tap opens the next step not yet filled in, like turning a page
@@ -205,6 +208,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         scriptTitle = root.findViewById(R.id.iwi_script_title);
         scriptButton = root.findViewById(R.id.iwi_btn_script);
         stepsBar = root.findViewById(R.id.iwi_steps_bar);
+        topBar = root.findViewById(R.id.iwi_top_bar);
         nextButton = root.findViewById(R.id.iwi_btn_next);
         prevButton = root.findViewById(R.id.iwi_btn_prev);
         prevButton.setOnClickListener(new View.OnClickListener() {
@@ -251,12 +255,16 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         tally[3] = root.findViewById(R.id.iwi_tally_black);
         tallyTotal = root.findViewById(R.id.iwi_tally_total);
         tallyRow = root.findViewById(R.id.iwi_tally);
-        root.findViewById(R.id.iwi_btn_wide).setOnClickListener(new View.OnClickListener() {
+        final View.OnClickListener wide = new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 IwiPane.this.exits.toggleWide();
             }
-        });
+        };
+        // The bar's button, and one on each page that covers the bar.
+        root.findViewById(R.id.iwi_btn_wide).setOnClickListener(wide);
+        root.findViewById(R.id.iwi_btn_hospitals_wide).setOnClickListener(wide);
+        root.findViewById(R.id.iwi_btn_details_wide).setOnClickListener(wide);
         styleTally();
         for (int i = 0; i < tally.length; i++) {
             final String c = Patient.COLORS[i];
@@ -359,8 +367,10 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             @Override
             public void onClick(View v) {
                 final GeoPoint p = state.point();
-                if (p != null)
+                if (p != null) {
+                    exits.narrow(); // the map has to show, like the hospital Go To
                     IwiPane.this.mapView.getMapController().panTo(p, true);
+                }
             }
         });
         root.findViewById(R.id.iwi_btn_settings).setOnClickListener(new View.OnClickListener() {
@@ -573,8 +583,9 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     /** A feed picked or dropped: the markers go to it now, not at the next change. */
     private void feedChanged() {
         showFeed();
-        if (state.isLive())
-            writeMarker();
+        // The IWI and every hospital with it, all of them again: the feed is new.
+        if (state.isLive() && IwiMarker.write(state))
+            HospitalSet.sync(mapView, state, hospitals.centers(), true);
         final String evacUid = state.text(IwiState.EVAC_UID);
         final GeoPoint ep = evacPoint();
         if (!evacUid.isEmpty() && ep != null)
@@ -604,6 +615,13 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         reportPage.setVisibility(page == reportPage ? View.VISIBLE : View.GONE);
         scriptPage.setVisibility(page == scriptPage ? View.VISIBLE : View.GONE);
         hospitalsPage.setVisibility(page == hospitalsPage ? View.VISIBLE : View.GONE);
+        // The hospital list and a hospital's details take the whole pane, over the
+        // counts and the buttons: on a phone the list showed one hospital under them
+        // (operator, 2026-11-10: "expand ... and covers everything else"). Back
+        // brings them back.
+        covered = page == hospitalsPage || page == detailsPage;
+        topBar.setVisibility(covered ? View.GONE : View.VISIBLE);
+        tallyRow.setVisibility(state.isLive() && !covered ? View.VISIBLE : View.GONE);
     }
 
     @Override
@@ -615,6 +633,11 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     @Override
     public void showDetails() {
         show(detailsPage);
+    }
+
+    @Override
+    public void narrow() {
+        exits.narrow();
     }
 
     @Override
@@ -694,7 +717,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         // The count boxes appear at Declare (operator, 2026-11-08); before it, item 2's
         // counters in the report do the counting.
         // The whole row goes, so the initial report gets its height back.
-        tallyRow.setVisibility(state.isLive() ? View.VISIBLE : View.GONE);
+        tallyRow.setVisibility(state.isLive() && !covered ? View.VISIBLE : View.GONE);
         for (int i = 0; i < tally.length; i++)
             tally[i].setText(Integer.toString(state.count(Patient.COLORS[i])));
         final SpannableStringBuilder b = new SpannableStringBuilder("Total ");

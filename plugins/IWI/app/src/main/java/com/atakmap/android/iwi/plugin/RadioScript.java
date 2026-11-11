@@ -269,8 +269,10 @@ public final class RadioScript {
             // Dead or dying: no assessment, no treatment, nothing missing.
             return new Section(3, "Initial Patient Assessment")
                     .say(p.label() + ", " + Patient.name(p.color) + ".");
+        final String needs = Vocab.saidAnd(p.needs(s.text(IwiState.NATURE)), Vocab.NEEDS);
         final Section three = new Section(3, "Initial Patient Assessment")
-                .say(p.label() + ", " + Patient.name(p.color) + " priority. ")
+                .say(p.label() + ", " + Patient.name(p.color) + " priority"
+                        + (needs.isEmpty() ? "" : ", " + needs) + ". ")
                 .field(capital(Vocab.LOC.spoken(p.get(Patient.LOC))), "consciousness")
                 .say(", ")
                 .field(Vocab.BREATHING.spoken(p.get(Patient.BREATHING)), "breathing")

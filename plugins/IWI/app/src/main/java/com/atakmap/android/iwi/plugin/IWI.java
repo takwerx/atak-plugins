@@ -29,6 +29,7 @@ import gov.tak.platform.marshal.MarshalManager;
 public class IWI implements IPlugin {
 
     private static final String TAG = "IWI";
+    private HospitalLabels hospitalLabels;
 
     IServiceController serviceController;
     Context pluginContext;
@@ -87,6 +88,8 @@ public class IWI implements IPlugin {
         // Read from disk on a worker, refreshed from the depot in the background.
         trauma = new TraumaManager(mapView);
         trauma.start();
+        hospitalLabels = new HospitalLabels(mapView);
+        hospitalLabels.start();
         registerIwiTap();
     }
 
@@ -160,6 +163,10 @@ public class IWI implements IPlugin {
             dropDown.closeDropDown();
             dropDown.dispose();
             dropDown = null;
+        }
+        if (hospitalLabels != null) {
+            hospitalLabels.stop();
+            hospitalLabels = null;
         }
         if (iwiDetailHandler != null)
             CotDetailManager.getInstance().unregisterHandler(iwiDetailHandler);

@@ -80,12 +80,13 @@ public final class Vocab {
                     "diabetic emergency", "other medical"}, null);
 
     public static final Choices TRAUMA = new Choices(
-            new String[] {"tree_strike", "vehicle", "fall", "rolling_rock", "chainsaw", "burns",
+            // Burns on the top row, where Fall was (operator, 2026-11-10).
+            new String[] {"tree_strike", "vehicle", "burns", "rolling_rock", "chainsaw", "fall",
                     "electrical", "other_trauma"},
-            new String[] {"Tree Strike", "Vehicle Accident", "Fall", "Rolling Rock",
-                    "Chainsaw / Tool", "Burns", "Electrical", "Other Trauma"},
-            new String[] {"struck by a falling tree", "vehicle accident", "fall",
-                    "struck by a rolling rock", "cut by a chainsaw or tool", "burns",
+            new String[] {"Tree Strike", "Vehicle Accident", "Burns", "Rolling Rock",
+                    "Chainsaw / Tool", "Fall", "Electrical", "Other Trauma"},
+            new String[] {"struck by a falling tree", "vehicle accident", "burns",
+                    "struck by a rolling rock", "cut by a chainsaw or tool", "fall",
                     "electrical contact", "other injury"}, null);
 
     /**
@@ -106,16 +107,23 @@ public final class Vocab {
                     "An EMT is providing medical care",
                     "A Paramedic is providing medical care"}, null);
 
-    /** The MIR's own item 5 examples, plus None. */
+    /**
+     * The MIR's own item 5 examples, plus None, and a REMS team (Rapid Extraction
+     * Module Support; operator, 2026-11-10), on the top row in the Wheeled Litter's
+     * place; the litter moved down beside Rope Rescue.
+     */
     public static final Choices RESOURCES = new Choices(
-            new String[] {"paramedic", "crew", "litter", "immobilization", "aed", "oxygen",
-                    "trauma_bag", "iv", "splints", "rope", "extrication", "hazmat", "none"},
-            new String[] {"Paramedic/EMT", "Crew", "Wheeled Litter", "Immobilization", "AED",
+            new String[] {"paramedic", "crew", "rems", "immobilization", "aed", "oxygen",
+                    "trauma_bag", "iv", "splints", "rope", "litter", "extrication", "hazmat",
+                    "none"},
+            new String[] {"Paramedic/EMT", "Crew", "REMS Team", "Immobilization", "AED",
                     "Oxygen", "Trauma Bag", "IV Fluids", "Splints", "Rope Rescue",
-                    "Extrication", "HAZMAT", "None Needed"},
-            new String[] {"a paramedic or EMT", "a crew", "a wheeled litter",
+                    "Wheeled Litter", "Extrication", "HAZMAT", "None Needed"},
+            new String[] {"a paramedic or EMT", "a crew", "a REMS team",
                     "immobilization devices", "an AED", "oxygen", "a trauma bag", "IV fluids",
-                    "splints", "rope rescue", "extrication", "HAZMAT", "none"}, "none");
+                    "splints", "rope rescue", "a wheeled litter", "extrication", "HAZMAT",
+                    "none"},
+            "none");
 
     // ---- a patient: IRPG p. 108, Patient Assessment ----
 
@@ -178,6 +186,32 @@ public final class Vocab {
                     "burns cooled and wrapped", "active cooling", "CPR in progress",
                     "AED applied", "oxygen", "eyes washed and bandaged", "none yet"},
             "none_yet");
+
+    /** A patient's needs, for the hospital picks (operator, 2026-11-10). */
+    public static final Choices NEEDS = new Choices(
+            new String[] {"trauma", "burns", "medical"},
+            new String[] {"Trauma", "Burns", "Medical"},
+            new String[] {"trauma", "burns", "medical"}, null);
+
+    /**
+     * What Happened as needs: Burns is burns, any other trauma kind is trauma, any
+     * medical kind is medical.
+     */
+    public static String needsFrom(String nature) {
+        final Set<String> t = parse(nature, TRAUMA);
+        final StringBuilder b = new StringBuilder();
+        boolean trauma = false;
+        for (String c : t)
+            if (!"burns".equals(c))
+                trauma = true;
+        if (trauma)
+            b.append("trauma");
+        if (t.contains("burns"))
+            b.append(b.length() > 0 ? "," : "").append("burns");
+        if (!parse(nature, MEDICAL).isEmpty())
+            b.append(b.length() > 0 ? "," : "").append("medical");
+        return b.toString();
+    }
 
     // ---- pick-many values ----
 

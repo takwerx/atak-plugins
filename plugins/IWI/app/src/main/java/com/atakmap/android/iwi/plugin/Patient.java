@@ -25,6 +25,12 @@ public final class Patient {
     public static final String REACTION = "reaction";
     public static final String TREATMENT = "treatment";
     public static final String WEIGHT = "weight";
+    /**
+     * What the patient needs from a hospital: trauma, burns, medical, any number
+     * (operator, 2026-11-10). "none" when the medic has taken every pick off, so the
+     * card does not fall back to What Happened.
+     */
+    public static final String NEEDS = "needs";
 
     /** The fields a card shows, in order, and the list each picks from. */
     public static final String[] ONE_OF = {
@@ -59,6 +65,15 @@ public final class Patient {
     public String get(String field) {
         final String s = v.get(field);
         return s == null ? "" : s.trim();
+    }
+
+    /**
+     * The card's needs, or, until the medic sets them, what the report's What Happened
+     * says: a card starts from the first call and is then the patient's own.
+     */
+    public String needs(String nature) {
+        final String own = get(NEEDS);
+        return own.isEmpty() ? Vocab.needsFrom(nature) : own;
     }
 
     public boolean hasNotes() {

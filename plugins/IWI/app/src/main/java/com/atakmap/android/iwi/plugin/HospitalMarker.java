@@ -20,10 +20,21 @@ public final class HospitalMarker {
     private static final String TAG = "IWI-Hospital";
     /** Fixed, so a new pick replaces the last one. */
     public static final String UID = "IWI-hospital";
-    private static final String TYPE = "b-m-p-s-m";
+    /**
+     * ATAK's own Responder Icons hospital (operator, 2026-11-10: "lets use that hospital
+     * icon"). The icon set ships inside every ATAK, so a device without IWI draws it
+     * too. The type is the one the icon set gives that icon, as a marker dropped from
+     * the set would carry.
+     */
+    private static final String TYPE = "a-n-G";
+    private static final String ICON =
+            "de450cbf-2ffc-47fb-bd2b-ba2db89b035e/Infrastructure/Hospitals.png";
     private static final long STALE_MS = 24L * 60L * 60L * 1000L;
-    /** Orange (operator, 2026-11-09): not a triage color, not the cyan evac spot. */
-    private static final int COLOR = 0xFFFF8C00;
+    /**
+     * White, so the icon is drawn in its own colors and not tinted. Red is the label:
+     * white on a red box on a device with IWI, see HospitalLabels.
+     */
+    private static final int COLOR = 0xFFFFFFFF;
 
     private HospitalMarker() {
     }
@@ -58,6 +69,9 @@ public final class HospitalMarker {
         final CotDetail color = new CotDetail("color");
         color.setAttribute("argb", Integer.toString(COLOR));
         detail.addChild(color);
+        final CotDetail icon = new CotDetail("usericon");
+        icon.setAttribute("iconsetpath", ICON);
+        detail.addChild(icon);
         final CotDetail remarks = new CotDetail("remarks");
         remarks.setInnerText(c.kindLabel()
                 + (c.burn && !c.burnName.isEmpty() ? " (" + c.burnName + ")" : "")
