@@ -2,13 +2,17 @@
 package com.atakmap.android.mapdepot.plugin;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.os.Bundle;
-import android.preference.EditTextPreference;
 import android.preference.Preference;
 import android.preference.PreferenceManager;
+import android.text.InputType;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import com.atakmap.android.maps.MapView;
@@ -98,35 +102,60 @@ public class MapDepotPreferenceFragment extends PluginPreferenceFragment {
     }
 
     /**
-     * Ties a non-persistent EditTextPreference to the key store in
-     * {@link BaseMapInstaller}, which keeps keys on the MapView context so
-     * they survive a plugin reload. The summary says whether one is set and
-     * never shows the key itself.
+     * Ties a plain Preference to the key store in {@link BaseMapInstaller},
+     * which keeps keys on the MapView context so they survive a plugin reload.
+     * The summary says whether one is set and never shows the key itself.
+     *
+     * Not an EditTextPreference: it builds its dialog on the context that
+     * inflated the screen, which is the plugin's, and ATAK dies with a
+     * BadTokenException. Settings is an activity of its own, so the dialog is
+     * built on this fragment's host activity: on the MapView context it opens
+     * behind the settings screen and nothing shows.
      */
     private void bindKey(final String provider, String prefName) {
-        final Preference p = findPreference(prefName);
-        if (!(p instanceof EditTextPreference))
+        final Preference pref = findPreference(prefName);
+        if (pref == null)
             return;
-        final EditTextPreference pref = (EditTextPreference) p;
-        pref.setText(BaseMapInstaller.keyFor(provider));
         summarizeKey(pref, provider);
-        pref.setOnPreferenceChangeListener(
-                new Preference.OnPreferenceChangeListener() {
+        pref.setOnPreferenceClickListener(
+                new Preference.OnPreferenceClickListener() {
                     @Override
-                    public boolean onPreferenceChange(Preference preference,
-                            Object value) {
-                        final String k = value == null ? "" : value.toString();
-                        if (!BaseMapInstaller.setKey(provider, k)) {
-                            Toast.makeText(getActivity(),
-                                    pluginContext.getString(R.string.key_bad_shape),
-                                    Toast.LENGTH_SHORT).show();
-                            return false;
-                        }
-                        pref.setText(k.trim());
-                        summarizeKey(pref, provider);
-                        return false;
+                    public boolean onPreferenceClick(Preference preference) {
+                        askForKey(preference, provider);
+                        return true;
                     }
                 });
+    }
+
+    private void askForKey(final Preference pref, final String provider) {
+        final Activity host = getActivity();
+        if (host == null)
+            return;
+        final EditText box = new EditText(host);
+        box.setSingleLine(true);
+        box.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        box.setText(BaseMapInstaller.keyFor(provider));
+        new AlertDialog.Builder(host)
+                .setTitle(pluginContext.getString(R.string.key_carto_title))
+                .setMessage(pluginContext.getString(R.string.key_carto_dialog))
+                .setView(box)
+                .setPositiveButton(pluginContext.getString(R.string.save),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int w) {
+                                final String k = box.getText().toString().trim();
+                                if (!BaseMapInstaller.setKey(provider, k))
+                                    Toast.makeText(host,
+                                            pluginContext.getString(
+                                                    R.string.key_bad_shape),
+                                            Toast.LENGTH_SHORT).show();
+                                summarizeKey(pref, provider);
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.cancel), null)
+                .show();
     }
 
     private void summarizeKey(Preference pref, String provider) {
