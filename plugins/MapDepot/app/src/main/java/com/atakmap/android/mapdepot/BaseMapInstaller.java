@@ -68,6 +68,19 @@ public final class BaseMapInstaller {
 
     private static final String PREF_KEY_PREFIX = "mapdepot.key.";
 
+    /** Whether a trimmed, non-empty string may be stored and written as a key. */
+    static boolean isKeyShape(String key) {
+        return key != null && KEY_SHAPE.matcher(key).matches();
+    }
+
+    /**
+     * The template with the key in its slot, or null when the template has no
+     * slot. Every slot is filled, so a source that names it twice stays whole.
+     */
+    static String fillKey(String xml, String key) {
+        return xml.contains(KEY_SLOT) ? xml.replace(KEY_SLOT, key) : null;
+    }
+
     /** The operator's key for a provider, or empty. Never logged. */
     public static String keyFor(String provider) {
         final SharedPreferences p = prefs();
@@ -87,7 +100,7 @@ public final class BaseMapInstaller {
             p.edit().remove(PREF_KEY_PREFIX + provider).apply();
             return true;
         }
-        if (!KEY_SHAPE.matcher(k).matches())
+        if (!isKeyShape(k))
             return false;
         p.edit().putString(PREF_KEY_PREFIX + provider, k).apply();
         return true;
@@ -363,10 +376,11 @@ public final class BaseMapInstaller {
         final String key = keyFor(map.keyProvider);
         if (key.isEmpty())
             throw new IllegalStateException(NO_KEY);
-        final String xml = new String(template, StandardCharsets.UTF_8);
-        if (!xml.contains(KEY_SLOT))
+        final String filled = fillKey(
+                new String(template, StandardCharsets.UTF_8), key);
+        if (filled == null)
             throw new IllegalStateException("source has no key slot");
-        return xml.replace(KEY_SLOT, key).getBytes(StandardCharsets.UTF_8);
+        return filled.getBytes(StandardCharsets.UTF_8);
     }
 
     /**

@@ -218,10 +218,9 @@ public final class Depot {
         public final long bytes;
         public final String sha256;
         /**
-         * Set when the tile server wants the operator's own API key (CARTO
-         * since 2025). The depot's XML carries a {@code {$key}} slot and the
-         * installer fills it from the key stored under this provider id, so
-         * the catalog never holds anyone's key.
+         * Set when the tile server wants the operator's own API key (CARTO).
+         * The depot's XML carries a {@code {$key}} slot and the installer fills it from the key stored under this
+         * provider id, so the catalog never holds anyone's key.
          */
         public final String keyProvider;
         /** Where to get a key, or empty. Only https survives parsing. */

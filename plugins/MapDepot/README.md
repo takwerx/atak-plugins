@@ -198,7 +198,7 @@ when the operator turns the layer on. Which servers those are is visible in the
 source list before anything is installed.
 
 A few tile servers want the operator's own API key -- CARTO's Voyager, Positron
-and Dark Matter since 2025. The catalog marks those sources and the depot's XML
+and Dark Matter are the ones today. The catalog marks those sources and the depot's XML
 carries a {$key} slot in place of a key. The plugin verifies the digest on that
 template, then fills the slot from a key the operator pasted (asked for on the
 row, editable under Tool Preferences > Map Depot) before writing the file. The
