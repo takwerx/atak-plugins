@@ -2,14 +2,21 @@
 package com.atakmap.android.mapdepot.plugin;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.os.Bundle;
 import android.preference.Preference;
 import android.preference.PreferenceManager;
+import android.text.InputType;
+import android.widget.EditText;
+import android.widget.Toast;
 
 import com.atakmap.android.maps.MapView;
+import com.atakmap.android.mapdepot.BaseMapInstaller;
 import com.atakmap.android.mapdepot.plugin.R;
 import com.atakmap.android.preference.PluginPreferenceFragment;
 import com.atakmap.android.util.PdfHelper;
@@ -27,13 +34,17 @@ import java.io.File;
  * surfaces a plugin's documentation through this screen, so without it the PDF
  * shipped inside the APK and no operator could open it.
  *
- * There is nothing else on this screen on purpose. Map Depot has no settings --
- * the depot address is fixed, and every other choice is made on the page it
- * belongs to.
+ * There is almost nothing else on this screen on purpose. Map Depot has no
+ * settings -- the depot address is fixed, and every other choice is made on
+ * the page it belongs to. The one exception is an API key for a tile server
+ * that wants the operator's own, which belongs nowhere else.
  */
 public class MapDepotPreferenceFragment extends PluginPreferenceFragment {
 
     public static final String TAG = "MapDepotPrefs";
+
+    /** The catalog's {@code keyProvider} for CARTO's basemaps. */
+    private static final String CARTO = "carto";
 
     private static final String USER_GUIDE = "usermanual.pdf";
 
@@ -75,6 +86,8 @@ public class MapDepotPreferenceFragment extends PluginPreferenceFragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        bindKey(CARTO, "key_carto");
+
         final Preference manual = findPreference("manual");
         if (manual == null)
             return;
@@ -86,6 +99,69 @@ public class MapDepotPreferenceFragment extends PluginPreferenceFragment {
                         return true;
                     }
                 });
+    }
+
+    /**
+     * Ties a plain Preference to the key store in {@link BaseMapInstaller},
+     * which keeps keys on the MapView context so they survive a plugin reload.
+     * The summary says whether one is set and never shows the key itself.
+     *
+     * Not an EditTextPreference: it builds its dialog on the context that
+     * inflated the screen, which is the plugin's, and ATAK dies with a
+     * BadTokenException. Settings is an activity of its own, so the dialog is
+     * built on this fragment's host activity: on the MapView context it opens
+     * behind the settings screen and nothing shows.
+     */
+    private void bindKey(final String provider, String prefName) {
+        final Preference pref = findPreference(prefName);
+        if (pref == null)
+            return;
+        summarizeKey(pref, provider);
+        pref.setOnPreferenceClickListener(
+                new Preference.OnPreferenceClickListener() {
+                    @Override
+                    public boolean onPreferenceClick(Preference preference) {
+                        askForKey(preference, provider);
+                        return true;
+                    }
+                });
+    }
+
+    private void askForKey(final Preference pref, final String provider) {
+        final Activity host = getActivity();
+        if (host == null)
+            return;
+        final EditText box = new EditText(host);
+        box.setSingleLine(true);
+        box.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        box.setText(BaseMapInstaller.keyFor(provider));
+        new AlertDialog.Builder(host)
+                .setTitle(pluginContext.getString(R.string.key_carto_title))
+                .setMessage(pluginContext.getString(R.string.key_carto_dialog))
+                .setView(box)
+                .setPositiveButton(pluginContext.getString(R.string.save),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int w) {
+                                final String k = box.getText().toString().trim();
+                                if (!BaseMapInstaller.setKey(provider, k))
+                                    Toast.makeText(host,
+                                            pluginContext.getString(
+                                                    R.string.key_bad_shape),
+                                            Toast.LENGTH_SHORT).show();
+                                summarizeKey(pref, provider);
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.cancel), null)
+                .show();
+    }
+
+    private void summarizeKey(Preference pref, String provider) {
+        pref.setSummary(pluginContext.getString(
+                BaseMapInstaller.keyFor(provider).isEmpty()
+                        ? R.string.key_not_set : R.string.key_set));
     }
 
     /**
