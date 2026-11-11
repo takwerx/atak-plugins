@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Map Depot",
-   plugin-version: "1.14",
+   plugin-version: "1.17",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
