@@ -1,10 +1,10 @@
 ATAK Plugin — Map Depot
 
-**Download Map Depot 1.16** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Map Depot 1.17** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.16/ATAK-Plugin-MapDepot-1.16--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.16/ATAK-Plugin-MapDepot-1.16--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.16/ATAK-Plugin-MapDepot-1.16--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.17/ATAK-Plugin-MapDepot-1.17--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.17/ATAK-Plugin-MapDepot-1.17--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.17/ATAK-Plugin-MapDepot-1.17--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/map-depot/releases
 
@@ -88,6 +88,12 @@ fires.
 
 _________________________________________________________________
 STATUS
+
+Version 1.17: CARTO base maps (Voyager, Positron and Dark Matter, with and
+without labels, plus three label overlays) can now be added with your own free
+CARTO key. Without a key CARTO serves its tiles with a watermark. Add asks for
+the key once and keeps it; Tool Preferences > Map Depot changes it. Tapping that
+row no longer ends ATAK.
 
 Version 1.16: Satellite (Sentinel-2), a new section listing recent satellite
 passes over the map center or your position, in true color or as a fire view
