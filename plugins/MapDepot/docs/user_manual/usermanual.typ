@@ -133,6 +133,34 @@ caches what it has drawn.
 ]
 
 #tak-slide[
+= Maps that need your own key
+
+A few map servers, CARTO's *Voyager*, *Positron* and *Dark Matter*, serve clean
+tiles only to requests that carry an API key of your own. Their rows say
+*needs your API key*. Tap *Add* and the plugin asks for the key. *Get a key*
+opens the provider's page; CARTO's is free for ordinary use.
+
+#v(6pt)
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("66.png", width: 100%)
+][
+  The key stays on the device and is written into the map source file ATAK
+  reads. The row then says *key set*.
+]
+]
+
+#tak-slide[
+= Changing the key
+
+To change or clear the key, open *Settings*, *Tool Preferences*, *Map Depot*.
+Maps you already added go back to *Add* so you can add them again with the new
+key.
+
+#v(6pt)
+#image("67.png", width: 100%)
+]
+
+#tak-slide[
 #toolbox.side-by-side(columns: (7fr, 5fr))[
   #image("18.png", width: 100%)
 ][
