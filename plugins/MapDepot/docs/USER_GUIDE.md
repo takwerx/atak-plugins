@@ -155,6 +155,10 @@ clear it later, go to **Settings › Tool Preferences › Map Depot**. After a
 change, the affected rows go back to **Add** so you can re-add them with the
 new key.
 
+![CARTO key prompt](screenshots/66_carto_key_prompt.png)
+
+![CARTO key in Tool Preferences](screenshots/67_carto_key_preference.png)
+
 ### Overlays
 
 Some sources are *overlays* rather than base maps: roads, labels, contour lines,
