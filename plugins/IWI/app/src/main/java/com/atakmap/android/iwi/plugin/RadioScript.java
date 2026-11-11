@@ -435,7 +435,14 @@ public final class RadioScript {
     private static void line(StringBuilder b, String label, String value) {
         if (value == null || value.isEmpty())
             return;
-        b.append(label).append(": ").append(value).append('\n');
+        // A line break inside a CoT attribute reaches other devices as a space (XML
+        // attribute normalization), so each item also ends with a period: on a device
+        // without IWI the remarks read as sentences, not one run-on line.
+        b.append(label).append(": ").append(value);
+        final char last = value.charAt(value.length() - 1);
+        if (last != '.' && last != '?' && last != '!')
+            b.append('.');
+        b.append('\n');
     }
 
     private static String join(String a, String b) {

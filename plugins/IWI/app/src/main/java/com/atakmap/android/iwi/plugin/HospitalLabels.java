@@ -48,7 +48,7 @@ final class HospitalLabels {
     private static final String GROUP = "IWI Hospital Labels";
     private static final String SUFFIX = ".iwi-label";
     /** Bump when the drawing changes, or a stale file is served under the same name. */
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
     /** A red that white text reads on; the dot is ATAK red, see HospitalMarker. */
     private static final int FILL = 0xFFD00000;
     private static final int EDGE = 0x99FFFFFF;
@@ -143,6 +143,22 @@ final class HospitalLabels {
         }
     };
 
+    /**
+     * ATAK turns a marker's own label back on with every update that reaches it from a
+     * server: its LabelDetailHandler calls setShowLabel(true) when the event has no
+     * hideLabel. A hospital in the feed is updated all the time on a receiving device,
+     * so its plain label came back under the red box (S22, 2026-11-11). Turn it off
+     * again whenever it comes back.
+     */
+    private final Marker.OnStateChangedListener states = new Marker.OnStateChangedListener() {
+        @Override
+        public void onStateChanged(Marker m) {
+            if (labels.containsKey(m.getUID())
+                    && m.getTextRenderFlag() != Marker.TEXT_STATE_NEVER_SHOW)
+                m.setTextRenderFlag(Marker.TEXT_STATE_NEVER_SHOW);
+        }
+    };
+
     private final PointMapItem.OnPointChangedListener points =
             new PointMapItem.OnPointChangedListener() {
                 @Override
@@ -187,6 +203,7 @@ final class HospitalLabels {
             group().addItem(l);
             labels.put(m.getUID(), l);
             m.addOnTitleChangedListener(titles);
+            m.addOnStateChangedListener(states);
             m.addOnPointChangedListener(points);
             m.addOnVisibleChangedListener(visibility);
         } else {
@@ -207,6 +224,7 @@ final class HospitalLabels {
         if (m instanceof Marker) {
             final Marker hm = (Marker) m;
             hm.removeOnTitleChangedListener(titles);
+            hm.removeOnStateChangedListener(states);
             hm.removeOnPointChangedListener(points);
             hm.removeOnVisibleChangedListener(visibility);
             if (restore)
@@ -247,7 +265,7 @@ final class HospitalLabels {
         if (hit != null)
             return hit;
 
-        final String[] lines = text.trim().split("\n");
+        final String[] lines = lines(text);
         final Paint tp = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
         final Typeface face = tf == null ? null : tf.getTypeface();
         tp.setTypeface(face);
@@ -275,6 +293,34 @@ final class HospitalLabels {
                 .build();
         icons.put(key, icon);
         return icon;
+    }
+
+    /** What {@link TraumaCenter#kindLabel()} starts with, the start of the second line. */
+    private static final String[] KINDS = {
+            " TRAUMA Level ", " BURN CENTER", " Standby ER, ", " ER, "
+    };
+
+    /**
+     * The label's two lines: the name, then what it is. The marker's title carries a
+     * line break, but only on the device that made it: a line break inside a CoT
+     * attribute reaches every other device as a space (XML attribute normalization),
+     * and the box there was one long line (S22, 2026-11-11). So split a one-line title
+     * where the kind begins.
+     */
+    static String[] lines(String text) {
+        final String t = text.trim();
+        if (t.indexOf('\n') >= 0)
+            return t.split("\n");
+        for (String k : KINDS) {
+            final int i = t.lastIndexOf(k);
+            if (i > 0)
+                return new String[] {
+                        t.substring(0, i).trim(), t.substring(i).trim()
+                };
+        }
+        return new String[] {
+                t
+        };
     }
 
     private static boolean compose(File out, String[] lines, Paint tp, Paint.FontMetrics fm,
