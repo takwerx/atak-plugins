@@ -504,7 +504,12 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
 
     /** Whether a map item is an IWI from a device with IWI: it carries the report. */
     public static boolean carriesReport(MapItem item) {
-        return item != null && item.getMetaString("iwi.report", null) != null;
+        if (item == null)
+            return false;
+        if (item.getMetaString("iwi.report", null) != null)
+            return true;
+        return IwiDetailHandler.adoptOpaque(item)
+                && item.getMetaString("iwi.report", null) != null;
     }
 
     /**
