@@ -3,6 +3,9 @@
     <string name="app_name">IWI</string>
     <string name="app_desc">IWI</string>
     <string name="settings">Settings</string>
+    <string name="manual_title">Plugin Documentation</string>
+    <string name="manual_summary">Open the IWI user guide: declaring an IWI, the Medical Incident Report, the radio script and hospitals</string>
+    <string name="prefs_summary">Report a medical incident on the fireline: the IRPG Medical Incident Report, a radio script and the nearest hospitals</string>
     <string name="back">Back</string>
     <string name="show_settings">Open or close</string>
     <string name="mir_header">FOR A NON-EMERGENCY INCIDENT, WORK THROUGH CHAIN OF COMMAND TO REPORT AND TRANSPORT INJURED PERSONNEL AS NECESSARY.\n\nFOR A MEDICAL EMERGENCY: IDENTIFY ON-SCENE INCIDENT COMMANDER BY NAME AND POSITION AND ANNOUNCE \"MEDICAL EMERGENCY\" TO INITIATE RESPONSE FROM IMT COMMUNICATIONS/DISPATCH.\n\nUse the following items to communicate situation to communications/dispatch.</string>

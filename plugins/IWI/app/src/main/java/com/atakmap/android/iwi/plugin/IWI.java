@@ -29,6 +29,8 @@ import gov.tak.platform.marshal.MarshalManager;
 public class IWI implements IPlugin {
 
     private static final String TAG = "IWI";
+    /** The Tool Preferences entry, the only way to reach the manual. */
+    private static final String PREFS_KEY = "iwiPreference";
     private HospitalLabels hospitalLabels;
 
     IServiceController serviceController;
@@ -91,6 +93,29 @@ public class IWI implements IPlugin {
         hospitalLabels = new HospitalLabels(mapView);
         hospitalLabels.start();
         registerIwiTap();
+        registerPreferences();
+    }
+
+    private void registerPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.register(
+                    new com.atakmap.app.preferences.ToolsPreferenceFragment.ToolPreference(
+                            pluginContext.getString(R.string.app_name),
+                            pluginContext.getString(R.string.prefs_summary),
+                            PREFS_KEY,
+                            pluginContext.getResources().getDrawable(R.drawable.ic_toolbar),
+                            new IwiPreferenceFragment(pluginContext)));
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not register preferences: " + notThisBuild);
+        }
+    }
+
+    private void unregisterPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.unregister(PREFS_KEY);
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not unregister preferences: " + notThisBuild);
+        }
     }
 
     /**
@@ -151,6 +176,7 @@ public class IWI implements IPlugin {
 
     @Override
     public void onStop() {
+        unregisterPreferences();
         if (iwiTap != null) {
             final MapMenuReceiver menus = MapMenuReceiver.getInstance();
             if (menus != null)
