@@ -157,9 +157,11 @@ hospitals sent with it carry ATAK's hospital icon with their name and kind.
 
 ![The IWI and a hospital on a device without IWI](screenshots/25_without_iwi_map.png)
 
-Left: the same IWI in ATAK's own CASEVAC view, on a device without IWI. Right:
-the IWI on the reporting device. On a device with IWI, a tap on another
-device's IWI opens its whole report, read only.
+Left: the same IWI in ATAK's own CASEVAC view, on a device without IWI. The
+9-line holds the location, the count and the request; its remarks hold the
+report. Right: the IWI on the reporting device. On a device with IWI, a tap on
+another device's IWI opens its whole report, read only, with the counts in
+color.
 
 ![ATAK's CASEVAC view beside IWI](screenshots/26_casevac_vs_iwi.png)
 

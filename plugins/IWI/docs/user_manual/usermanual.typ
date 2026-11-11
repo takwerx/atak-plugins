@@ -260,22 +260,13 @@ ATAK's hospital icon and their name and kind.
 #tak-slide[
 = ATAK's CASEVAC view and IWI
 
-#toolbox.side-by-side(columns: (6fr, 5fr))[
-  #image("26.png", height: 290pt)
-][
-  Left: the same IWI on a device without IWI, in ATAK's own CASEVAC view. The
-  9-line holds the location, the count and the request, and the remarks hold
-  the report.
+#align(center, image("26.png", height: 230pt))
 
-  #v(6pt)
-
-  Right: the IWI on the reporting device.
-
-  #v(6pt)
-
-  On a device with IWI, a tap on another device's IWI opens its whole report,
-  read only.
-]
+Left: the IWI on a device without IWI, in ATAK's own CASEVAC view. The 9-line
+holds the location, the count and the request; its remarks hold the report.
+Right: the same IWI on the reporting device. On a device with IWI, a tap on
+another device's IWI opens its whole report, read only, with the counts in
+color.
 ]
 
 #tak-slide[
