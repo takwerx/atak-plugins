@@ -142,8 +142,9 @@ empty ground, that a hot pixel is a wildfire rather than a flare or a solar farm
 _________________________________________________________________
 STATUS
 
-0.5, the first public release, built and signed by tak.gov for ATAK-CIV 5.6, 5.7
-and 5.8. Heat detections, a fire spread model that runs on the device, and other
+0.6, built and signed by tak.gov for ATAK-CIV 5.6, 5.7 and 5.8. 0.6 names the
+weather the model uses on the Conditions choices (your own observation, a
+Kestrel, or a station). Heat detections, a fire spread model that runs on the device, and other
 agencies' published forecasts, all on the ATAK map. The model gives a direction
 and an order of magnitude, not a perimeter to plan on; the user guide says what
 it leaves out.
