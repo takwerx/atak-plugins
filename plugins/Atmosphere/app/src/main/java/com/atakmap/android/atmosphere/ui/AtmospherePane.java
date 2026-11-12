@@ -453,6 +453,7 @@ public final class AtmospherePane {
     private boolean sstOpen = true;
     private static final String PREF_TEMPERATURE_OPEN = "weather.temperature.open";
     private final LinearLayout temperatureSettings, temperatureLegend;
+    private final WindScaleView temperatureScale;
     private final ImageButton temperatureExpand;
     private final Button temperatureToggle;
     private final TextView temperatureStatus;
@@ -1090,6 +1091,8 @@ public final class AtmospherePane {
         temperatureToggle = find(R.id.temperature_toggle);
         temperatureStatus = find(R.id.temperature_status);
         temperatureLegend = find(R.id.temperature_legend);
+        temperatureScale = new WindScaleView(pluginContext);
+        temperatureLegend.addView(temperatureScale);
         snotelSettings = find(R.id.snotel_settings);
         snotelExpand = find(R.id.snotel_expand);
         snotelToggle = find(R.id.snotel_toggle);
@@ -2427,14 +2430,8 @@ public final class AtmospherePane {
         temperature = overlay;
         if (temperature == null)
             return;
-        temperatureLegend.removeAllViews();
-        final int[] stops = { -40, -20, 0, 10, 20, 30, 40, 50 };
-        for (int celsius : stops) {
-            final String label = String.format(Locale.US, "%d °C / %d °F", celsius,
-                    Math.round(celsius * 1.8f + 32));
-            temperatureLegend.addView(legendLine(label,
-                    com.atakmap.android.atmosphere.rain.NomadsTemperature.color(celsius) | 0xff000000));
-        }
+        temperature.setFahrenheit(units != UnitSystem.METRIC);
+        updateTemperatureScale();
         temperature.setListener(new RainOverlay.Listener() {
             @Override
             public void onFrames(List<String> labels, int shown) {
@@ -2442,6 +2439,7 @@ public final class AtmospherePane {
 
             @Override
             public void onFrameShown(int index, long validTime) {
+                updateTemperatureScale();
                 if (validTime == 0)
                     return;
                 final String time = new SimpleDateFormat("MMM d, h:mm a z", Locale.getDefault())
@@ -2457,6 +2455,33 @@ public final class AtmospherePane {
             }
         });
         updateLayerControls();
+    }
+
+    /**
+     * The legend for the temperature on the map: only the five-degree bands the
+     * picture holds, coldest to warmest, the edge under each join in the operator's
+     * unit. Rebuilt with every frame, because a pan to the mountains or the desert
+     * changes which bands are there.
+     */
+    private void updateTemperatureScale() {
+        final boolean fahrenheit = units != UnitSystem.METRIC;
+        final com.atakmap.android.atmosphere.rain.RainGrid grid =
+                temperature == null ? null : temperature.shownGrid();
+        final float[] edges = grid == null ? null
+                : com.atakmap.android.atmosphere.rain.NomadsTemperature.bandEdges(grid, fahrenheit);
+        if (edges == null) {
+            temperatureLegend.setVisibility(View.GONE);
+            return;
+        }
+        temperatureLegend.setVisibility(View.VISIBLE);
+        // Joins sit between bands: the edges after the first, the last one with the unit.
+        final float[] joins = new float[edges.length - 1];
+        for (int i = 0; i < joins.length; i++)
+            joins[i] = edges[i + 1];
+        temperatureScale.setBands(
+                com.atakmap.android.atmosphere.rain.NomadsTemperature.bandColors(edges, fahrenheit),
+                joins, fahrenheit ? "°F" : "°C");
+        temperatureScale.setEnds(null, null);
     }
 
     private boolean sstLegendAsked;
@@ -7335,6 +7360,10 @@ public final class AtmospherePane {
         updateWindUnitRow();
         relabelWindLevelRows();
         updateWindLevel();
+        // The temperature bands step in the unit shown, so the picture is recolored.
+        if (temperature != null)
+            temperature.setFahrenheit(units != UnitSystem.METRIC);
+        updateTemperatureScale();
         // A unit change is a display change: re-render, never re-fetch.
         render();
         // The Here lines too: the wind said km/h beside a mph legend after the

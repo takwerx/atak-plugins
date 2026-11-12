@@ -1,22 +1,27 @@
 package com.atakmap.android.atmosphere.overlay;
 
+import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 
 import com.atakmap.android.atmosphere.compat.MapCompat;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.net.Http;
+import com.atakmap.android.atmosphere.rain.BandLabels;
 import com.atakmap.android.atmosphere.rain.NomadsRain;
 import com.atakmap.android.atmosphere.rain.NomadsTemperature;
 import com.atakmap.android.atmosphere.rain.RainGrid;
+import com.atakmap.android.atmosphere.units.UnitSystem;
 import com.atakmap.android.atmosphere.wind.NomadsWind;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoBounds;
 import com.atakmap.map.AtakMapView;
+import com.atakmap.map.layer.feature.AttributeSet;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -44,14 +49,21 @@ public final class RainOverlay {
     public static final String LAYER_ID = "rain";
     public static final String TEMPERATURE_LAYER_ID = "temperature";
     public static final String HOST = NomadsRain.HOST;
+    private static final String PREF_UNITS = "weather.units";
 
     /** Eight pixels a quarter-degree cell: a 30-degree box is 960 across. */
     private static final int MAX_PX = 1024;
+    /** The temperature's box is wider, so its picture is too, or a continent goes blocky. */
+    private static final int MAX_PX_TEMPERATURE = 2048;
     private static final int PX_PER_CELL = 8;
     private static final long MOVE_SETTLE_MS = 600L;
     private static final long SCRUB_SETTLE_MS = 180L;
     private static final int CACHE_FRAMES = 12;
     private static final int RUN_STEPS_BACK = 4;
+    /** A label cell on the lattice {@link BandLabels} works on, about a pill wide. */
+    private static final float LABEL_CELL_DP = 80f;
+    /** The band labels' layer in Overlay Manager, a row beside the picture's. */
+    private static final String LABELS_NAME = "Air Temperature Labels";
 
     public interface Listener {
         void onFrames(List<String> labels, int shown);
@@ -76,6 +88,10 @@ public final class RainOverlay {
     private final RasterLayer layer;
     private final boolean temperature;
     private final String layerId;
+    /** Temperature only: the band written on each patch of the picture; null for rain. */
+    private final AtmosphereFeatures labels;
+    private final ZonePills pills;
+    private final float density;
     private final Map<String, Frame> cache = new LinkedHashMap<String, Frame>(16, 0.75f, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<String, Frame> eldest) {
@@ -85,6 +101,8 @@ public final class RainOverlay {
     private ExecutorService worker;
 
     private boolean started, on;
+    /** Temperature only: band the picture in °F rather than °C. */
+    private boolean fahrenheit;
     private long run;
     private int hours = NomadsRain.HOURS;
     private int hour;
@@ -122,15 +140,25 @@ public final class RainOverlay {
     };
 
     public RainOverlay(MapView mapView, EgressPolicy egress) {
-        this(mapView, egress, false);
+        this(mapView, null, egress, false);
     }
 
-    public RainOverlay(MapView mapView, EgressPolicy egress, boolean temperature) {
+    /** The temperature, which labels its bands on the map and so needs the plugin's context. */
+    public RainOverlay(MapView mapView, Context pluginContext, EgressPolicy egress, boolean temperature) {
         this.mapView = mapView;
         this.egress = egress;
         this.temperature = temperature;
         this.layerId = temperature ? TEMPERATURE_LAYER_ID : LAYER_ID;
         this.layer = new RasterLayer(temperature ? "Atmosphere air temperature" : "Atmosphere rain");
+        this.density = mapView.getContext().getResources().getDisplayMetrics().density;
+        if (temperature && pluginContext != null) {
+            labels = new AtmosphereFeatures(mapView, pluginContext, TAG, LABELS_NAME,
+                    "temperature_labels.sqlite", "temperature", false);
+            pills = new ZonePills();
+        } else {
+            labels = null;
+            pills = null;
+        }
     }
 
     public void setListener(Listener l) {
@@ -156,8 +184,14 @@ public final class RainOverlay {
         GLRasterLayer.register();
         mapView.addLayer(MapView.RenderStack.MAP_SURFACE_OVERLAYS, layer);
         layer.setVisible(false);
+        if (labels != null)
+            labels.attach();
         mapView.addOnMapMovedListener(moved);
         final SharedPreferences p = MapCompat.prefs();
+        // The pane may not exist yet when a layer left on comes back; the unit the
+        // bands step in is the operator's, read here, and the pane keeps it current.
+        fahrenheit = UnitSystem.fromName(p == null ? null : p.getString(PREF_UNITS, null),
+                UnitSystem.IMPERIAL) != UnitSystem.METRIC;
         if (p != null && p.getBoolean("weather.layer." + layerId + ".on", false)
             && egress.isLayerEnabled(layerId))
             setOn(true);
@@ -180,12 +214,70 @@ public final class RainOverlay {
             worker.shutdownNow();
             worker = null;
         }
+        if (labels != null)
+            labels.detach();
         cache.clear();
         shown = null;
     }
 
     public boolean isOn() {
         return on;
+    }
+
+    /** The grid behind the picture on the map, or null; for a legend of what is drawn. */
+    public RainGrid shownGrid() {
+        return shown == null ? null : shown.grid;
+    }
+
+    /**
+     * Which unit the temperature bands step in. A display change, not a forecast
+     * change: the frame on the map is redrawn from its grid and the rest of the
+     * cache dropped, nothing is fetched.
+     */
+    public void setFahrenheit(boolean value) {
+        if (!temperature || fahrenheit == value)
+            return;
+        fahrenheit = value;
+        final Frame current = shown;
+        cache.clear();
+        pendingKey = null;
+        if (!on || current == null)
+            return;
+        final ExecutorService w = worker;
+        if (w == null)
+            return;
+        final int mine = ++generation;
+        final String k = region == null ? null : key(run, hour, region);
+        w.execute(new Runnable() {
+            @Override
+            public void run() {
+                final Frame redrawn = redraw(current.grid);
+                mapView.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mine != generation || !on)
+                            return;
+                        if (k != null)
+                            cache.put(k, redrawn);
+                        show(redrawn);
+                    }
+                });
+            }
+        });
+    }
+
+    /** Color a grid into a frame; worker thread. */
+    private Frame redraw(RainGrid g) {
+        final int maxPx = temperature ? MAX_PX_TEMPERATURE : MAX_PX;
+        final int pw = Math.max(64, Math.min(maxPx, g.nx * PX_PER_CELL));
+        final int ph = Math.max(64, Math.min(maxPx, g.ny * PX_PER_CELL));
+        final int[] px = temperature ? NomadsTemperature.render(g, pw, ph, fahrenheit)
+                : NomadsRain.render(g, pw, ph);
+        Log.d(TAG, String.format(Locale.US, "drawn %dx%d over %.2f,%.2f..%.2f,%.2f, %s",
+                pw, ph, g.west, g.south, g.east, g.north,
+                temperature ? (fahrenheit ? "temperature °F" : "temperature °C")
+                        : String.format(Locale.US, "rain on %.1f%%", NomadsRain.rainPercent(px))));
+        return new Frame(g, Bitmap.createBitmap(px, pw, ph, Bitmap.Config.ARGB_8888));
     }
 
     /** How often a layer left on looks for a newer model run. */
@@ -245,6 +337,7 @@ public final class RainOverlay {
             layer.setVisible(false);
             layer.clear();
             shown = null;
+            clearLabels();
             status("");
         }
     }
@@ -310,6 +403,37 @@ public final class RainOverlay {
                 r.getWest(), r.getSouth(), r.getEast(), r.getNorth());
     }
 
+    /**
+     * What the screen shows, as a box. The map's own bounds, unless a corner of the
+     * screen is off the globe: zoomed out to a continent the top corners see past
+     * the horizon, the bounds come back NaN, and the layer said "zoom in" at exactly
+     * the zoom a temperature map is for. Then the box is worked from the center and
+     * the resolution, which is what the middle of the screen covers.
+     */
+    private GeoBounds viewBounds() {
+        final GeoBounds b = mapView.getBounds();
+        if (b != null && !Double.isNaN(b.getNorth()) && !Double.isNaN(b.getSouth())
+                && !Double.isNaN(b.getEast()) && !Double.isNaN(b.getWest()))
+            return b;
+        final com.atakmap.coremap.maps.coords.GeoPoint c = mapView.getCenterPoint().get();
+        final double metersPerPx = mapView.getMapResolution();
+        if (c == null || !c.isValid() || metersPerPx <= 0 || mapView.getWidth() <= 0)
+            return b;
+        final double degPerM = 1 / 111_320d;
+        final double halfLat = mapView.getHeight() * metersPerPx * degPerM / 2;
+        final double north = Math.min(90, c.getLatitude() + halfLat);
+        final double south = Math.max(-90, c.getLatitude() - halfLat);
+        // Reaching a pole, the view holds every longitude: the cap, as a ring.
+        if (north >= 85 || south <= -85)
+            return new GeoBounds(north >= 85 ? 90 : north, -180, south <= -85 ? -90 : south, 180);
+        final double cos = Math.max(0.2, Math.cos(Math.toRadians(c.getLatitude())));
+        final double halfLon = mapView.getWidth() * metersPerPx * degPerM / cos / 2;
+        if (halfLon >= 180)
+            return b;
+        return new GeoBounds(north, Math.max(-180, c.getLongitude() - halfLon),
+                south, Math.min(180, c.getLongitude() + halfLon));
+    }
+
     private static boolean contains(GeoBounds outer, GeoBounds inner) {
         return inner.getWest() >= outer.getWest() && inner.getEast() <= outer.getEast()
                 && inner.getSouth() >= outer.getSouth() && inner.getNorth() <= outer.getNorth();
@@ -323,27 +447,45 @@ public final class RainOverlay {
         layer.clear();
         shown = null;
         region = null;
+        clearLabels();
         status(why);
     }
 
     private void ensureRegion() {
         if (!on)
             return;
-        final GeoBounds bounds = mapView.getBounds();
+        GeoBounds bounds = viewBounds();
         if (bounds == null)
             return;
+        // A view across the antimeridian (the Aleutians) has east under west. The
+        // model's filter and this reader both take one box that does not cross it,
+        // so the side the map's center is on is drawn and the other side is not.
+        if (temperature && !Double.isNaN(bounds.getEast()) && !Double.isNaN(bounds.getWest())
+                && bounds.getEast() < bounds.getWest()) {
+            final com.atakmap.coremap.maps.coords.GeoPoint c = mapView.getCenterPoint().get();
+            final boolean eastSide = c != null && c.getLongitude() < 0;
+            bounds = new GeoBounds(bounds.getNorth(), eastSide ? -180 : bounds.getWest(),
+                    bounds.getSouth(), eastSide ? bounds.getEast() : 180);
+        }
+        // Looking down on a pole, every longitude is in view: ask for the whole ring
+        // of the cap rather than the half a box can name, or the cap draws half bare.
+        final boolean polar = temperature && !Double.isNaN(bounds.getNorth())
+                && !Double.isNaN(bounds.getSouth())
+                && (bounds.getNorth() >= 85 || bounds.getSouth() <= -85);
+        if (polar)
+            bounds = new GeoBounds(bounds.getNorth(), -180, bounds.getSouth(), 180);
         final boolean wholeWorld = Double.isNaN(bounds.getNorth()) || Double.isNaN(bounds.getSouth())
                 || Double.isNaN(bounds.getEast()) || Double.isNaN(bounds.getWest())
                 || bounds.getEast() <= bounds.getWest()
-                || bounds.getEast() - bounds.getWest() >= 355;
+                || (!polar && bounds.getEast() - bounds.getWest() >= 355);
         if (wholeWorld) {
             clearMap(temperature ? "Zoom in to see air temperature" : "Zoom in to see the rain");
             return;
         }
         final GeoBounds clamped = new GeoBounds(Math.min(90, bounds.getNorth()), bounds.getWest(),
                 Math.max(-90, bounds.getSouth()), bounds.getEast());
-        final double maxLon = NomadsRain.MAX_SPAN_LON;
-        final double maxLat = NomadsRain.MAX_SPAN_LAT;
+        final double maxLon = temperature ? NomadsTemperature.MAX_SPAN_LON : NomadsRain.MAX_SPAN_LON;
+        final double maxLat = temperature ? NomadsTemperature.MAX_SPAN_LAT : NomadsRain.MAX_SPAN_LAT;
 
         boolean refetch = region == null || !contains(region, clamped);
         if (refetch && region != null && clamped.getEast() - clamped.getWest() > maxLon) {
@@ -414,11 +556,14 @@ public final class RainOverlay {
     private void fetch(final long tryRun, final int stepsBack, final int h, final GeoBounds r,
             final String k, final int mine) {
         status(temperature ? "Getting air temperature…" : "Getting the rain…");
+        // Padded a cell's worth, but never past the antimeridian: -180.1 reads as
+        // 179.9 to the filter, which then hands back a grid across the dateline
+        // that the reader refuses (Alaska, 2026-11-12).
+        final double west = Math.max(-180, r.getWest() - 0.1), east = Math.min(180, r.getEast() + 0.1);
+        final double south = r.getSouth() - 0.1, north = r.getNorth() + 0.1;
         final String url = temperature
-            ? NomadsTemperature.url(tryRun, h, r.getWest() - 0.1, r.getSouth() - 0.1,
-                r.getEast() + 0.1, r.getNorth() + 0.1)
-            : NomadsRain.url(tryRun, h, r.getWest() - 0.1, r.getSouth() - 0.1,
-                r.getEast() + 0.1, r.getNorth() + 0.1);
+            ? NomadsTemperature.url(tryRun, h, west, south, east, north)
+            : NomadsRain.url(tryRun, h, west, south, east, north);
         Http.getBytes(url,
                 egress.userAgent(), new Http.BytesCallback() {
                     @Override
@@ -463,16 +608,8 @@ public final class RainOverlay {
                 String error = null;
                 try {
                     final RainGrid g = temperature ? NomadsTemperature.read(body) : NomadsRain.read(body);
-                    final int pw = Math.max(64, Math.min(MAX_PX, g.nx * PX_PER_CELL));
-                    final int ph = Math.max(64, Math.min(MAX_PX, g.ny * PX_PER_CELL));
-                    final int[] px = temperature ? NomadsTemperature.render(g, pw, ph)
-                            : NomadsRain.render(g, pw, ph);
-                    frame = new Frame(g, Bitmap.createBitmap(px, pw, ph,
-                            Bitmap.Config.ARGB_8888));
-                    Log.d(TAG, String.format(Locale.US,
-                            "+%d h run %d drawn %dx%d over %.2f,%.2f..%.2f,%.2f, %s on %.1f%%",
-                            h, answeredRun, pw, ph, g.west, g.south, g.east, g.north,
-                            temperature ? "temperature" : "rain", NomadsRain.rainPercent(px)));
+                    frame = redraw(g);
+                    Log.d(TAG, String.format(Locale.US, "+%d h run %d", h, answeredRun));
                 } catch (IOException e) {
                     Log.w(TAG, temperature ? "temperature grid unreadable" : "rain grid unreadable", e);
                     error = e.getMessage();
@@ -515,6 +652,91 @@ public final class RainOverlay {
         status("");
         if (listener != null)
             listener.onFrameShown(hourIndex(), f.grid.validTime);
+        relabel(f);
+    }
+
+    // ---- the bands, written on the map ----------------------------------------------
+
+    /**
+     * Write each band in view on its own patch of the picture, as a pill in the band's
+     * color (see {@link BandLabels}). Main thread reads the view; the worker places
+     * and writes. Called with every frame shown, which includes every settled pan or
+     * zoom, so the labels follow the view.
+     */
+    private void relabel(final Frame f) {
+        final ExecutorService w = worker;
+        if (labels == null || w == null)
+            return;
+        final GeoBounds view = viewBounds();
+        final int width = mapView.getWidth(), height = mapView.getHeight();
+        if (view == null || width <= 0 || height <= 0)
+            return;
+        // Only the part of the view the picture covers.
+        final double west = Math.max(view.getWest(), f.grid.west);
+        final double east = Math.min(view.getEast(), f.grid.east);
+        final double south = Math.max(view.getSouth(), f.grid.south);
+        final double north = Math.min(view.getNorth(), f.grid.north);
+        if (east <= west || north <= south) {
+            clearLabels();
+            return;
+        }
+        final float cellPx = LABEL_CELL_DP * density;
+        final int cols = Math.max(1, Math.round(width * (float) ((east - west)
+                / (view.getEast() - view.getWest())) / cellPx));
+        final int rows = Math.max(1, Math.round(height * (float) ((north - south)
+                / (view.getNorth() - view.getSouth())) / cellPx));
+        final boolean fahrenheit = this.fahrenheit;
+        final long validTime = f.grid.validTime;
+        final int mine = generation;
+        w.execute(new Runnable() {
+            @Override
+            public void run() {
+                if (mine != generation || !on)
+                    return;
+                final List<BandLabels.Label> placed = BandLabels.place(f.grid, west, south,
+                        east, north, cols, rows, fahrenheit);
+                final List<AtmosphereFeatures.Drawn> drawn = new ArrayList<>();
+                for (BandLabels.Label l : placed) {
+                    final String text = BandLabels.text(l.floor, fahrenheit);
+                    final int fill = NomadsTemperature.bandColor(
+                            NomadsTemperature.toCelsius(l.floor + 1f, fahrenheit), fahrenheit);
+                    final ZonePills.Pill pill = pills.pill(text, textOn(fill), fill);
+                    if (pill == null)
+                        continue;
+                    final AttributeSet attrs = new AttributeSet();
+                    attrs.setAttribute("Air temperature", text);
+                    attrs.setAttribute("_details", "Air temperature " + text
+                            + "\nNOAA GFS estimate for the model hour shown; not a station reading.");
+                    drawn.add(new AtmosphereFeatures.Drawn(LABELS_NAME, text,
+                            AtmosphereFeatures.point(l.lat, l.lon),
+                            AtmosphereFeatures.icon(pill.uri, pill.width, pill.height), attrs));
+                }
+                if (mine != generation || !on)
+                    return;
+                labels.rewrite(drawn);
+                Log.d(TAG, "labelled " + drawn.size() + " band patch(es) on a " + cols + "x" + rows
+                        + " lattice, valid " + validTime);
+            }
+        });
+    }
+
+    /** Dark text on the light bands, white on the rest, so the number reads on its pill. */
+    private static int textOn(int fill) {
+        final double luminance = (0.299 * ((fill >> 16) & 255) + 0.587 * ((fill >> 8) & 255)
+                + 0.114 * (fill & 255)) / 255.0;
+        return luminance > 0.6 ? 0xFF1A1A1A : 0xFFFFFFFF;
+    }
+
+    private void clearLabels() {
+        final ExecutorService w = worker;
+        if (labels == null || w == null)
+            return;
+        w.execute(new Runnable() {
+            @Override
+            public void run() {
+                labels.rewrite(Collections.<AtmosphereFeatures.Drawn>emptyList());
+            }
+        });
     }
 
     /** True when the view is wider than the model is asked for and only its middle is drawn. */

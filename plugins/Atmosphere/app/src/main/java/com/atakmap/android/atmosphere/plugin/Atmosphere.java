@@ -322,7 +322,7 @@ public class Atmosphere implements IPlugin {
         waves.start();
         rain = new RainOverlay(mapView, egress);
         rain.start();
-        temperature = new RainOverlay(mapView, egress, true);
+        temperature = new RainOverlay(mapView, pluginContext, egress, true);
         temperature.start();
         air = new AirQualityOverlay(mapView, pluginContext, egress);
         air.start();
