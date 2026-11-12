@@ -348,6 +348,23 @@ SDK artifacts, publish scrub; the `static` job runs it on every PR, forks includ
 Their offline tests are `scripts/test-ci-*.sh`. `/ship` runs the first two in pre-flight
 (the patch is in ops #692).
 
+**CloudTAK web plugins (ops #692).** No APK, so the emulator is not the gate. The gate is a
+real Marketplace install on a box with TAK Portal and CloudTAK, then a look at what CloudTAK
+serves: `scripts/ci-cloudtak-plugin-check.py --via '<cmd that runs a shell line on the box>'
+--plugin <marketplace id> --map-url https://map.<domain> [--reinstall] [--label '<menu text>']
+[--screenshot FILE]`. It stages the install and presses Deploy (the Marketplace page's own two
+calls to TAK Portal on the box), waits for the job (it must end `complete`), checks the plugin's
+folder and the Portal's installed flag, then fetches the map page's scripts and requires
+`plugins/<id>/index` for the plugin AND for every other plugin the Portal lists installed. A
+folder on disk is not proof: on Nov 12, 2026 installs ended `complete` with the files in place
+while CloudTAK's app loaded no plugin (ops #687). With `--screenshot` a headless browser signs
+in (token signed inside the api container) and screenshots the plugin's menu entry. Examples of
+`--via`: `ssh test12`, or `fresh-install/box <run id>` from the ops checkout for a kept
+fresh-install VM. Exit 0 is the only pass (3 = could not run). Offline test:
+`scripts/test-ci-cloudtak-plugin-check.sh` (real broken and good served apps). Use a fresh
+box (`fresh-install/run --full --keep`) or a fleet box nobody else is using
+(`testing-activity.py` first); never test8. A rebuild takes 15 to 40 minutes.
+
 ## Toolchain (already installed on the dev Mac)
 
 - JDK 17 — `/opt/homebrew/opt/openjdk@17` (`JAVA_HOME`)
