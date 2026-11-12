@@ -248,8 +248,18 @@ public final class GLRasterLayer extends GLAbstractLayer
             texture.load(null, 0, 0, width, height);
             final float u = (float) width / (float) texture.getTexWidth();
             final float v = (float) height / (float) texture.getTexHeight();
-            final double west = ul.getLongitude(), east = ur.getLongitude();
+            double west = ul.getLongitude(), east = ur.getLongitude();
             final double north = ul.getLatitude(), south = ll.getLatitude();
+            // A picture that is the whole ring meets itself at the antimeridian. The
+            // map draws the two edges as two meridians a hair apart, a dark seam down
+            // the Pacific (2026-11-12). The ring is stretched a cell's worth past each
+            // edge, so the two sides overlap and the seam closes; the texel at the
+            // edge is the model's value at 180, which both sides share.
+            final boolean ring = east - west >= 359;
+            if (ring) {
+                west -= CELL_DEGREES / 2;
+                east += CELL_DEGREES / 2;
+            }
             final int cols = Math.max(1, Math.min(MAX_CELLS, (int) Math.ceil((east - west) / CELL_DEGREES)));
             final int rows = Math.max(1, Math.min(MAX_CELLS, (int) Math.ceil((north - south) / CELL_DEGREES)));
             vertices = cols * rows * 6;

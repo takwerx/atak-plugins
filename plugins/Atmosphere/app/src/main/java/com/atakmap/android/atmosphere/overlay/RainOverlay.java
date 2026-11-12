@@ -430,8 +430,8 @@ public final class RainOverlay {
         final double halfLon = mapView.getWidth() * metersPerPx * degPerM / cos / 2;
         if (halfLon >= 180)
             return b;
-        return new GeoBounds(north, Math.max(-180, c.getLongitude() - halfLon),
-                south, Math.min(180, c.getLongitude() + halfLon));
+        // Not clamped: a side past 180 is how the caller learns the view wraps.
+        return new GeoBounds(north, c.getLongitude() - halfLon, south, c.getLongitude() + halfLon);
     }
 
     private static boolean contains(GeoBounds outer, GeoBounds inner) {
@@ -457,27 +457,24 @@ public final class RainOverlay {
         GeoBounds bounds = viewBounds();
         if (bounds == null)
             return;
-        // A view across the antimeridian (the Aleutians) has east under west. The
-        // model's filter and this reader both take one box that does not cross it,
-        // so the side the map's center is on is drawn and the other side is not.
-        if (temperature && !Double.isNaN(bounds.getEast()) && !Double.isNaN(bounds.getWest())
-                && bounds.getEast() < bounds.getWest()) {
-            final com.atakmap.coremap.maps.coords.GeoPoint c = mapView.getCenterPoint().get();
-            final boolean eastSide = c != null && c.getLongitude() < 0;
-            bounds = new GeoBounds(bounds.getNorth(), eastSide ? -180 : bounds.getWest(),
-                    bounds.getSouth(), eastSide ? bounds.getEast() : 180);
-        }
-        // Looking down on a pole, every longitude is in view: ask for the whole ring
-        // of the cap rather than the half a box can name, or the cap draws half bare.
-        final boolean polar = temperature && !Double.isNaN(bounds.getNorth())
-                && !Double.isNaN(bounds.getSouth())
-                && (bounds.getNorth() >= 85 || bounds.getSouth() <= -85);
-        if (polar)
+        // Every longitude at once: looking down on a pole, or across the
+        // antimeridian (the view east of the view's west, the Aleutians and the
+        // mid-Pacific). One box cannot name a span across 180, so the whole ring of
+        // the latitude band is asked for; the model is a quarter degree and a ring
+        // 60 degrees tall is under two megabytes. Drawn only one side at first, the
+        // other side of the Pacific was bare to a hard edge (2026-11-12).
+        final boolean ring = temperature && !Double.isNaN(bounds.getNorth())
+                && !Double.isNaN(bounds.getSouth()) && !Double.isNaN(bounds.getEast())
+                && !Double.isNaN(bounds.getWest())
+                && (bounds.getNorth() >= 85 || bounds.getSouth() <= -85
+                        || bounds.getEast() < bounds.getWest()
+                        || bounds.getWest() < -180 || bounds.getEast() > 180);
+        if (ring)
             bounds = new GeoBounds(bounds.getNorth(), -180, bounds.getSouth(), 180);
         final boolean wholeWorld = Double.isNaN(bounds.getNorth()) || Double.isNaN(bounds.getSouth())
                 || Double.isNaN(bounds.getEast()) || Double.isNaN(bounds.getWest())
                 || bounds.getEast() <= bounds.getWest()
-                || (!polar && bounds.getEast() - bounds.getWest() >= 355);
+                || (!ring && bounds.getEast() - bounds.getWest() >= 355);
         if (wholeWorld) {
             clearMap(temperature ? "Zoom in to see air temperature" : "Zoom in to see the rain");
             return;
@@ -667,10 +664,14 @@ public final class RainOverlay {
         final ExecutorService w = worker;
         if (labels == null || w == null)
             return;
-        final GeoBounds view = viewBounds();
+        GeoBounds view = viewBounds();
         final int width = mapView.getWidth(), height = mapView.getHeight();
         if (view == null || width <= 0 || height <= 0)
             return;
+        // Across the antimeridian the view's east is under its west, or a side is
+        // past 180; the picture is the whole ring then, so label the ring.
+        if (view.getEast() < view.getWest() || view.getWest() < -180 || view.getEast() > 180)
+            view = new GeoBounds(view.getNorth(), -180, view.getSouth(), 180);
         // Only the part of the view the picture covers.
         final double west = Math.max(view.getWest(), f.grid.west);
         final double east = Math.min(view.getEast(), f.grid.east);
