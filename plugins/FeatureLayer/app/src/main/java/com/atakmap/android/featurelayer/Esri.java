@@ -76,7 +76,11 @@ public final class Esri {
          * full detail and 1.3 MB at 0.001 degrees (about 100 m), 2026-10-06.
          */
         public Scope simplified(double degrees) {
-            return new Scope(geometry, type, extra + String.format(java.util.Locale.US, "&maxAllowableOffset=%.6f", degrees));
+            // geometryPrecision: five decimals, about a meter, instead of the
+            // fifteen the server writes by default; the coordinates are most of
+            // the bytes and a land layer's fetch was 6 to 8 s on the phone (2026-10-16).
+            return new Scope(geometry, type, extra + String.format(java.util.Locale.US,
+                    "&maxAllowableOffset=%.6f&geometryPrecision=5", degrees));
         }
 
         String params() throws Exception {
@@ -142,7 +146,7 @@ public final class Esri {
         final String params = "where=" + enc(where) + "&outStatistics=" + enc(stats)
                 + "&returnGeometry=false&f=json" + (scope == null ? "" : scope.params());
         final String url = base + "/" + layerId + "/query";
-        final JSONObject d = new JSONObject(scope == null ? get(url + "?" + params, token) : post(url, params, token));
+        final JSONObject d = new JSONObject(scope == null ? get(url + "?" + params + uncached(), token) : post(url, params, token));
         if (d.has("error"))
             throw new IllegalStateException(d.getJSONObject("error").optString("message"));
         final JSONArray feats = d.optJSONArray("features");
@@ -247,6 +251,25 @@ public final class Esri {
      */
     public static int query(String base, int layerId, String where, Scope scope, String token, boolean geojson,
             int pageSize, int maxFeatures, FeatureSink sink) throws Exception {
+        return query(base, layerId, where, scope, token, geojson, pageSize, maxFeatures, null, sink);
+    }
+
+    /** The same, asking for only {@code outFields} (comma separated); null is every field. */
+    public static int query(String base, int layerId, String where, Scope scope, String token, boolean geojson,
+            int pageSize, int maxFeatures, String outFields, FeatureSink sink) throws Exception {
+        return query(base, layerId, where, scope, token, geojson, pageSize, maxFeatures, outFields, false, sink);
+    }
+
+    /**
+     * The same, and with {@code pbf} each page is asked for as Esri's FeatureCollection
+     * protobuf instead of JSON: four to nine times fewer bytes for a land layer, which
+     * was most of its redraw time on the phone (2026-10-16). A page the server will not
+     * answer that way, or one that does not decode, is fetched again as JSON and the
+     * rest of the query stays on JSON, so a service that drops PBF costs time, not a
+     * layer. Every service a land layer reads lists PBF among its query formats.
+     */
+    public static int query(String base, int layerId, String where, Scope scope, String token, boolean geojson,
+            int pageSize, int maxFeatures, String outFields, boolean pbf, FeatureSink sink) throws Exception {
         int count = 0, offset = 0;
         // The cap is a cap: a 1,000-row page for a 300-feature layer delivered 1,000
         // (a national view of DART on 2026-09-18). Ask for no more than the cap, and
@@ -257,12 +280,27 @@ public final class Esri {
             if (maxFeatures > 0 && count >= maxFeatures)
                 break;
             final String params = "where=" + enc(where)
-                    + "&outFields=*&outSR=4326&f=" + (geojson ? "geojson" : "json")
+                    + "&outFields=" + (outFields == null || outFields.isEmpty() ? "*" : enc(outFields))
+                    + "&outSR=4326&f=" + (geojson ? "geojson" : "json")
                     + "&resultRecordCount=" + pageSize + "&resultOffset=" + offset
                     + (scope == null ? "" : scope.params());
             final String url = base + "/" + layerId + "/query";
-            final JSONObject page = new JSONObject(
-                    scope == null ? get(url + "?" + params, token) : post(url, params, token));
+            if (pbf) {
+                final int[] got = pbfPage(url, params, token, layerId, offset, maxFeatures - count, sink);
+                if (got != null) {
+                    count += got[2];
+                    if (got[0] == 0 || (got[1] == 0 && got[0] < pageSize))
+                        break;
+                    offset += got[0];
+                    continue;
+                }
+                pbf = false; // this page and the rest as JSON
+            }
+            final long t0 = System.currentTimeMillis();
+            final String body = scope == null ? get(url + "?" + params + uncached(), token) : post(url, params, token);
+            final long t1 = System.currentTimeMillis();
+            final JSONObject page = new JSONObject(body);
+            final long t2 = System.currentTimeMillis();
             if (page.has("error")) {
                 final JSONObject err = page.getJSONObject("error");
                 throw new IllegalStateException(err.optString("message") + " " + err.optJSONArray("details"));
@@ -270,6 +308,11 @@ public final class Esri {
             final JSONArray feats = page.optJSONArray("features");
             if (feats == null || feats.length() == 0)
                 break;
+            // Where a slow fetch spends its time (2026-10-16): the wire, the parse, or the sink.
+            final long[] sinkMs = { 0 };
+            final long t3 = System.currentTimeMillis();
+            com.atakmap.coremap.log.Log.d("FeatureLayer", "page " + layerId + " offset " + offset + ": " + body.length()
+                    + " chars, wire " + (t1 - t0) + " ms, parse " + (t2 - t1) + " ms, " + feats.length() + " rows");
             for (int i = 0; i < feats.length(); i++) {
                 final JSONObject f = feats.getJSONObject(i);
                 final JSONObject props = f.optJSONObject(geojson ? "properties" : "attributes");
@@ -284,6 +327,8 @@ public final class Esri {
                 if (maxFeatures > 0 && count >= maxFeatures)
                     break;
             }
+            com.atakmap.coremap.log.Log.d("FeatureLayer", "page " + layerId + " offset " + offset + ": sink "
+                    + (System.currentTimeMillis() - t3) + " ms");
             final boolean more = page.optBoolean("exceededTransferLimit", false)
                     || (page.optJSONObject("properties") != null
                             && page.getJSONObject("properties").optBoolean("exceededTransferLimit", false));
@@ -292,6 +337,82 @@ public final class Esri {
             offset += feats.length();
         }
         return count;
+    }
+
+    /**
+     * One page as PBF: {rows in the page, 1 when the server says more follow, rows handed
+     * to the sink}, or null when the page could not be had that way (the JSON path takes
+     * over).
+     * {@code params} is the JSON query's form body; only its format changes.
+     */
+    private static int[] pbfPage(String url, String params, String token, int layerId, int offset, int room,
+            final FeatureSink sink) throws Exception {
+        final String body = params.replace("&f=json", "&f=pbf").replace("&f=geojson", "&f=pbf");
+        final long t0 = System.currentTimeMillis();
+        final byte[] data;
+        try {
+            data = postBytes(url, body, token);
+        } catch (Exception e) {
+            com.atakmap.coremap.log.Log.w("FeatureLayer", "pbf page " + layerId + " offset " + offset
+                    + " not served: " + e.getMessage() + "; asking for JSON");
+            return null;
+        }
+        final long t1 = System.currentTimeMillis();
+        // A service that cannot answer in PBF answers the error in JSON, with 200.
+        if (data.length > 0 && data[0] == '{') {
+            String why = "not protobuf";
+            try {
+                final JSONObject err = new JSONObject(new String(data, "UTF-8")).optJSONObject("error");
+                if (err != null)
+                    why = err.optString("message");
+            } catch (org.json.JSONException ignored) {
+            }
+            com.atakmap.coremap.log.Log.w("FeatureLayer", "pbf page " + layerId + ": " + why + "; asking for JSON");
+            return null;
+        }
+        // Decoded whole before any row reaches the sink: a page that fails halfway is
+        // fetched again as JSON, and its first half must not arrive twice.
+        final java.util.List<JSONObject> propsList = new java.util.ArrayList<>();
+        final java.util.List<Geometry> geoms = new java.util.ArrayList<>();
+        final int cap = room > 0 ? room : Integer.MAX_VALUE;
+        final EsriPbf.Page p;
+        try {
+            p = EsriPbf.read(data, new EsriPbf.Sink() {
+                @Override
+                public void feature(java.util.Map<String, Object> attrs, int type, java.util.List<double[]> parts)
+                        throws Exception {
+                    if (geoms.size() >= cap)
+                        return;
+                    final Geometry g = fromParts(type, parts);
+                    if (g == null)
+                        return;
+                    final JSONObject props = new JSONObject();
+                    for (java.util.Map.Entry<String, Object> e : attrs.entrySet()) {
+                        final Object v = e.getValue();
+                        // org.json refuses NaN and infinity; a server's odd number is
+                        // one empty field, never a failed layer.
+                        if (v instanceof Double && (((Double) v).isNaN() || ((Double) v).isInfinite()))
+                            continue;
+                        props.put(e.getKey(), v);
+                    }
+                    propsList.add(props);
+                    geoms.add(g);
+                }
+            });
+        } catch (IllegalStateException | IndexOutOfBoundsException e) {
+            // A page that is not the protobuf we expect: the format, not the server.
+            com.atakmap.coremap.log.Log.w("FeatureLayer", "pbf page " + layerId + " offset " + offset
+                    + " did not decode: " + e.getMessage() + "; asking for JSON");
+            return null;
+        }
+        final long t2 = System.currentTimeMillis();
+        for (int i = 0; i < geoms.size(); i++)
+            sink.feature(propsList.get(i), geoms.get(i));
+        com.atakmap.coremap.log.Log.d("FeatureLayer", "pbf page " + layerId + " offset " + offset + ": " + data.length
+                + " bytes, wire " + (t1 - t0) + " ms, decode " + (t2 - t1) + " ms, sink "
+                + (System.currentTimeMillis() - t2) + " ms, " + p.count + " rows");
+        // The page's own row count drives the offset: it is what the server counts.
+        return new int[] { p.count, p.exceededTransferLimit ? 1 : 0, geoms.size() };
     }
 
     // ---- geometry -----------------------------------------------------------------
@@ -381,13 +502,73 @@ public final class Esri {
      * holes: the fill tessellated to nothing and the shape dropped out on zoom-in.
      */
     private static Geometry esriRings(JSONArray rings) throws Exception {
-        final java.util.List<Polygon> parts = new java.util.ArrayList<>();
+        final java.util.List<double[]> flat = new java.util.ArrayList<>(rings.length());
         for (int i = 0; i < rings.length(); i++) {
             final JSONArray r = rings.getJSONArray(i);
-            if (parts.isEmpty() || ringArea(r) < 0)
-                parts.add(new Polygon(2));
-            parts.get(parts.size() - 1).addRing(line(r));
+            final double[] d = new double[r.length() * 2];
+            for (int j = 0; j < r.length(); j++) {
+                final JSONArray p = r.getJSONArray(j);
+                d[j * 2] = p.getDouble(0);
+                d[j * 2 + 1] = p.getDouble(1);
+            }
+            flat.add(d);
         }
+        return esriRings(flat);
+    }
+
+    /** A decoded PBF feature as geometry, by the same rules as the JSON. */
+    static Geometry fromParts(int type, java.util.List<double[]> parts) throws Exception {
+        switch (type) {
+            case EsriPbf.TYPE_POINT: {
+                final double[] p = parts.get(0);
+                return p.length < 2 ? null : new Point(p[0], p[1]);
+            }
+            case EsriPbf.TYPE_POLYLINE: {
+                if (parts.size() == 1)
+                    return line(parts.get(0));
+                final GeometryCollection gc = new GeometryCollection(2);
+                for (double[] p : parts)
+                    gc.addGeometry(line(p));
+                return gc;
+            }
+            case EsriPbf.TYPE_POLYGON:
+                return esriRings(parts);
+            default:
+                return null;
+        }
+    }
+
+    private static LineString line(double[] xy) {
+        final LineString ls = new LineString(2);
+        for (int i = 0; i + 1 < xy.length; i += 2)
+            ls.addPoint(xy[i], xy[i + 1]);
+        return ls;
+    }
+
+    /** {@link #esriRings(JSONArray)} over rings of x,y pairs. */
+    private static Geometry esriRings(java.util.List<double[]> rings) throws Exception {
+        final java.util.List<Polygon> parts = new java.util.ArrayList<>();
+        for (int i = 0; i < rings.size(); i++) {
+            final double[] r = rings.get(i);
+            final double a = ringArea(r);
+            // A ring the server's simplification collapsed to a line or a point: CAL
+            // FIRE's State Responsibility Area is one polygon of 927 rings, and at a
+            // 50 m offset hundreds of its inholdings come back as three or four points
+            // of no area. The tessellator refused the whole polygon and nothing of the
+            // state's responsibility drew (2026-10-14). Dropped; a polygon whose outer
+            // ring is one of them is dropped with it.
+            if (r.length < 8 || Math.abs(a) < 1e-12) {
+                if (a < 0 || parts.isEmpty())
+                    parts.add(null); // an outer ring with nothing in it: its holes go nowhere
+                continue;
+            }
+            if (parts.isEmpty() || a < 0)
+                parts.add(new Polygon(2));
+            final Polygon p = parts.get(parts.size() - 1);
+            if (p != null)
+                p.addRing(line(r));
+        }
+        parts.removeAll(java.util.Collections.singleton(null));
         if (parts.isEmpty())
             return null;
         if (parts.size() == 1)
@@ -398,14 +579,13 @@ public final class Esri {
         return gc;
     }
 
-    /** Shoelace area of a ring in lon/lat, y up: negative is clockwise, an outer ring. */
-    private static double ringArea(JSONArray ring) throws Exception {
-        final int n = ring.length();
+    /** Shoelace area of a ring of x,y pairs in lon/lat, y up: negative is clockwise, an outer ring. */
+    private static double ringArea(double[] xy) {
+        final int n = xy.length / 2;
         double a = 0d;
         for (int i = 0; i < n; i++) {
-            final JSONArray p0 = ring.getJSONArray(i);
-            final JSONArray p1 = ring.getJSONArray((i + 1) % n);
-            a += p0.getDouble(0) * p1.getDouble(1) - p1.getDouble(0) * p0.getDouble(1);
+            final int j = (i + 1) % n;
+            a += xy[i * 2] * xy[j * 2 + 1] - xy[j * 2] * xy[i * 2 + 1];
         }
         return a / 2d;
     }
@@ -517,6 +697,17 @@ public final class Esri {
         }
     }
 
+    /**
+     * A parameter the server ignores and the CDN does not: ArcGIS Online answers a plain
+     * GET query with "cache-control: public, max-age=3600", so the same URL asked every
+     * minute got the same answer for up to an hour. CA Air Intel on "All time" has no
+     * time in its where, and said "no change" for 40 minutes while a new FIRIS perimeter
+     * sat in the service (2026-11-08). Tile queries do not use this: they want the CDN.
+     */
+    static String uncached() {
+        return "&_ts=" + System.currentTimeMillis();
+    }
+
     public static String get(String url) throws Exception {
         return get(url, null);
     }
@@ -584,6 +775,41 @@ public final class Esri {
                     sb.append(buf, 0, n);
             }
             return sb.toString();
+        } finally {
+            c.disconnect();
+        }
+    }
+
+    /** {@link #post} returning the body's bytes: a PBF answer is not text. */
+    public static byte[] postBytes(String url, String body, String token) throws Exception {
+        if (!url.startsWith("https://"))
+            throw new IllegalStateException("not https: " + hostOf(url));
+        final HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        c.setConnectTimeout(20000);
+        c.setReadTimeout(60000);
+        c.setRequestMethod("POST");
+        c.setDoOutput(true);
+        c.setRequestProperty("User-Agent", "FeatureLayer/0.1 (ATAK plugin)");
+        c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+        if (token != null)
+            c.setRequestProperty("X-Esri-Authorization", "Bearer " + token);
+        try {
+            final byte[] out = body.getBytes("UTF-8");
+            c.setFixedLengthStreamingMode(out.length);
+            try (java.io.OutputStream os = c.getOutputStream()) {
+                os.write(out);
+            }
+            final int code = c.getResponseCode();
+            if (code != 200)
+                throw new IllegalStateException("HTTP " + code + " for POST " + url);
+            final java.io.ByteArrayOutputStream sb = new java.io.ByteArrayOutputStream(65536);
+            try (java.io.InputStream in = c.getInputStream()) {
+                final byte[] buf = new byte[16384];
+                int n;
+                while ((n = in.read(buf)) > 0)
+                    sb.write(buf, 0, n);
+            }
+            return sb.toByteArray();
         } finally {
             c.disconnect();
         }

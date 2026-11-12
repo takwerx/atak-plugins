@@ -1,10 +1,10 @@
 ATAK Plugin — Feature Layer
 
-**Download Feature Layer 0.14** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Feature Layer 0.17** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.14/ATAK-Plugin-FeatureLayer-0.14--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.14/ATAK-Plugin-FeatureLayer-0.14--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.14/ATAK-Plugin-FeatureLayer-0.14--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.17/ATAK-Plugin-FeatureLayer-0.17--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.17/ATAK-Plugin-FeatureLayer-0.17--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.17/ATAK-Plugin-FeatureLayer-0.17--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/feature-layer/releases
 
@@ -61,6 +61,26 @@ its attributes, a bloodhound, a range and bearing line, or a marker.
 
 _________________________________________________________________
 STATUS
+
+0.17, live layers see new data within a minute. A layer set to "All time"
+could show a new perimeter up to an hour late: CA Air Intel missed a FIRIS
+mission that was already in the service. Every check for new data now gets a
+fresh answer from the server. Built for ATAK 5.6, 5.7 and 5.8.
+
+0.16, boundaries on every target, and the land layers. Built for ATAK 5.6,
+5.7 and 5.8. California adds CAL FIRE Responsibility Areas, Protection Areas,
+CAL FIRE Units and Land Ownership; every state adds USGS Public Land and Public
+Access. Counties, tribal lands and CAL FIRE Units are named from about the
+125-mile scale. A tap on a boundary opens its details. CA Air Intel has an
+Active only switch, and Find lists only the types switched on. The guide and
+manual show the new layers on the map.
+
+0.15, boundaries. A built-in Boundaries source, public, no sign-in: county,
+city and tribal land boundaries from the Census Bureau, one or more states at
+a time, every boundary in a state or only the ones picked by name. Each area
+carries its name on the map, and the layer's status line says which county or
+city the phone is in. Reference data: fetched once, kept on the phone, back
+after a restart with no network.
 
 0.14, the guide's pictures for 0.13, and two fixes. Every picture of a
 changed screen retaken on official ATAK. Find puts names that start with the

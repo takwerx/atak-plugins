@@ -129,6 +129,7 @@ CANDIDATES=(
     "app/src/main/assets"
     "app/src/main/res"
     "app/src/main/java"
+    "app/src/main/cpp"
     "app/src/gov"
     "template.local.properties"
     "README.md"

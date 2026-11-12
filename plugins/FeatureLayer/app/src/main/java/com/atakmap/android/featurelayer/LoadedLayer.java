@@ -49,9 +49,11 @@ public class LoadedLayer {
      * Fire Starts as flame and RX markers. 55: fire labels carry % contained. 56: unnamed fires leave after four hours. 57: after an hour, so the
      * stored expiry times are written again. 58: CAL FIRE's record on its fires. 59: Fire History's
      * 2010s, 2000s and 1990s in color. 60: every decade in a color of its own.
-     * 61: 1979 and earlier grey again.
+     * 61: 1979 and earlier grey again. 62: tribal lands gated at 20 mi (Boundaries.TRIBAL_GATE_SINCE).
+     * 64: county, tribal and CAL FIRE Unit names from 125 mi. 65: the same, measured on
+     * ATAK's real bar (Boundaries.LABEL_125MI_SINCE).
      */
-    private static final int STYLE_VERSION = 61;
+    private static final int STYLE_VERSION = 65;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
@@ -76,6 +78,9 @@ public class LoadedLayer {
     private final String lineGlyph, polygonGlyph;
     private final ChooserGlyphs glyphs;
     private final PointIcons pointIcons;
+
+    /** This plugin's live (non-boundary) layers on the map, so a boundaries layer can slot in under them. */
+    private static final Set<com.atakmap.map.layer.Layer> LIVE = java.util.Collections.synchronizedSet(new HashSet<com.atakmap.map.layer.Layer>());
 
     private FeatureSetDatabase2 store;
     private FeatureLayer3 layer;
@@ -133,6 +138,8 @@ public class LoadedLayer {
     }
 
     public String displayName() {
+        if (spec.subtitle == null || spec.subtitle.isEmpty())
+            return spec.title;
         return spec.title + " (" + spec.subtitle + ")";
     }
 
@@ -229,7 +236,11 @@ public class LoadedLayer {
                     final boolean poly = isArea(g);
                     final com.atakmap.android.maps.Shape shape = item instanceof com.atakmap.android.maps.Shape
                             ? (com.atakmap.android.maps.Shape) item : null;
-                    final int color = ChooserGlyphs.visible(shape == null ? 0xFFFFFFFF : shape.getStrokeColor());
+                    // A filled area is known by its fill: the land layers share one grey edge,
+                    // and SRA and FRA both read grey in the chooser (operator, 2026-11-02).
+                    final int fill = shape == null ? 0 : shape.getFillColor();
+                    final int color = ChooserGlyphs.visible(shape == null ? 0xFFFFFFFF
+                            : poly && (fill >>> 24) != 0 ? fill : shape.getStrokeColor());
                     String uri = poly ? polygonGlyph : lineGlyph;
                     int tint = color;
                     String cat = null;
@@ -320,7 +331,29 @@ public class LoadedLayer {
         // and counts.
         if (dartLabels == null) {
             mapView.getMapOverlayManager().addFilesOverlay(overlay);
-            mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
+            // Boundaries go under every live layer, so a perimeter is never hidden under
+            // a county fill: the bottom of the stack, whenever they are added or restored.
+            // Boundaries go under every live layer of this plugin, so a perimeter is
+            // never hidden under a county fill: just below the lowest live layer in the
+            // stack, or on top when there is none. Not at index 0: the bottom of ATAK's
+            // overlay stack sits under one of its own layers, and the fifth boundaries
+            // layer pushed down there never drew (2026-10-14).
+            if (Boundaries.handles(spec)) {
+                int at = -1;
+                final java.util.List<com.atakmap.map.layer.Layer> stack = mapView.getLayers(MapView.RenderStack.VECTOR_OVERLAYS);
+                for (int i = 0; stack != null && i < stack.size(); i++)
+                    if (LIVE.contains(stack.get(i))) {
+                        at = i;
+                        break;
+                    }
+                if (at >= 0)
+                    mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, at, layer);
+                else
+                    mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
+            } else {
+                mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
+                LIVE.add(layer);
+            }
         }
         count = countFeatures();
         status = storedFeatures() > 0 ? "cached" : "empty";
@@ -371,6 +404,8 @@ public class LoadedLayer {
                 dartLabels.dispose();
             if (layer != null && !drawnByMarkers)
                 mapView.removeLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
+            if (layer != null)
+                LIVE.remove(layer);
             if (overlay != null && !drawnByMarkers)
                 mapView.getMapOverlayManager().removeOverlay(overlay);
             if (store != null)
@@ -407,7 +442,8 @@ public class LoadedLayer {
      */
     public boolean isWideFeed() {
         return DartStyles.handles(spec) || FireGuardStyles.handles(spec) || NewStartsStyles.handles(spec)
-                || FireHistoryStyles.handles(spec) || "ca-air-intel".equals(spec.id);
+                || FireHistoryStyles.handles(spec) || "ca-air-intel".equals(spec.id)
+                || (Boundaries.handles(spec) && Boundaries.mosaic(spec.kind));
     }
 
     /** Removes unnamed fires whose hour is up from the memory copy and the store. Worker thread. */
@@ -445,6 +481,18 @@ public class LoadedLayer {
         return NewStartsStyles.handles(spec) ? NewStartsStyles.marker(kind, iconDir) : null;
     }
 
+    /**
+     * A switched-off boundary or land layer that needs nothing at start: it holds
+     * features written with this build's styles. Worker thread (reads the store).
+     */
+    boolean restsHidden() {
+        if (layerOn || !Boundaries.handles(spec) || !drawnByThisBuild())
+            return false;
+        synchronized (lock) {
+            return store != null && !closed && storedFeatures() > 0;
+        }
+    }
+
     /** Whether the store was last written with this build's styles, so nothing in it points at older files. */
     boolean drawnByThisBuild() {
         return spec.styleVersion == STYLE_VERSION;
@@ -468,6 +516,19 @@ public class LoadedLayer {
                 rewriteStore();
             else
                 applyVisibility();
+        }
+        // A boundary layer skipped at start (restsHidden) catches up a style change now.
+        if (v && Boundaries.handles(spec) && !drawnByThisBuild())
+            return true;
+        // A land layer switched on where its square no longer reaches: it shows what it
+        // holds at once and fetches the square here (scope() re-boxes it).
+        if (v && "box".equals(spec.scopeKind) && Boundaries.handles(spec) && Boundaries.mosaic(spec.kind)) {
+            try {
+                final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
+                return b != null && (spec.scopeBox == null || !Boundaries.coversWithRoom(spec.scopeBox, b));
+            } catch (RuntimeException e) {
+                return false;
+            }
         }
         return false;
     }
@@ -953,6 +1014,83 @@ public class LoadedLayer {
         return true;
     }
 
+    /**
+     * "Elko County, NV": the boundary under a point, from the memory copy, for the row's
+     * status line (operator: "an answer the crew asks for"). Null when none holds it or
+     * the layer is not a Boundaries layer. Worker thread: Texas cities is 1,864 shapes.
+     */
+    public String nameAt(double lat, double lon) {
+        if (!Boundaries.handles(spec))
+            return null;
+        synchronized (lock) {
+            loadCacheLocked();
+        }
+        final List<Pending> snapshot = cache;
+        for (Pending pf : snapshot) {
+            if (pf.geometry == null || pf.name == null || pf.name.isEmpty() || !spec.isOn(pf.setName))
+                continue;
+            final com.atakmap.map.layer.feature.geometry.Envelope e = pf.geometry.getEnvelope();
+            if (e == null || lon < e.minX || lon > e.maxX || lat < e.minY || lat > e.maxY)
+                continue;
+            if (!insideArea(pf.geometry, lon, lat))
+                continue;
+            final String fips = attr(pf.attrs, Boundaries.ATTR_STATE);
+            final Boundaries.State st = Boundaries.state(fips);
+            return pf.name + (st == null ? "" : ", " + st.abbr);
+        }
+        return null;
+    }
+
+    /** Inside a polygon's outer ring and in none of its holes; any polygon of a collection. */
+    private static boolean insideArea(Geometry g, double lon, double lat) {
+        if (g instanceof com.atakmap.map.layer.feature.geometry.Polygon) {
+            final com.atakmap.map.layer.feature.geometry.Polygon poly = (com.atakmap.map.layer.feature.geometry.Polygon) g;
+            final LineString outer = poly.getExteriorRing();
+            if (outer == null || outer.getNumPoints() < 3 || !inRing(flat(outer), lon, lat))
+                return false;
+            for (LineString hole : poly.getInteriorRings())
+                if (hole != null && hole.getNumPoints() > 2 && inRing(flat(hole), lon, lat))
+                    return false;
+            return true;
+        }
+        if (g instanceof GeometryCollection)
+            for (Geometry c : ((GeometryCollection) g).getGeometries())
+                if (insideArea(c, lon, lat))
+                    return true;
+        return false;
+    }
+
+    /**
+     * Each class of a land mosaic with the color it is drawn in, from the memory copy
+     * (the hue rides in every feature's {@code _fill}), in the Features list's order:
+     * the map key. Empty until the first fetch.
+     */
+    public java.util.LinkedHashMap<String, Integer> classHues() {
+        final java.util.LinkedHashMap<String, Integer> out = new java.util.LinkedHashMap<>();
+        synchronized (lock) {
+            loadCacheLocked();
+        }
+        final Map<String, Integer> seen = new HashMap<>();
+        for (Pending pf : cache) {
+            if (seen.containsKey(pf.setName))
+                continue;
+            final String raw = attr(pf.attrs, "_fill");
+            if (raw == null)
+                continue;
+            try {
+                seen.put(pf.setName, (int) Long.parseLong(raw) & 0x00FFFFFF);
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        for (SetInfo si : types())
+            if (seen.containsKey(si.name))
+                out.put(si.name, seen.get(si.name));
+        return out;
+    }
+
+    /** The row's "You are in Elko County, NV" line (or "Map center is in", with no fix), or null; set by the manager as the operator moves. */
+    public volatile String whereLine;
+
     /** A search hit: what it is, where it is. */
     public static class Hit {
         public final String title, layer, layerId, type;
@@ -997,6 +1135,10 @@ public class LoadedLayer {
         final List<Pending> snapshot = cache;
         for (Pending pf : snapshot) {
             if (pf.setName.endsWith(" marks"))
+                continue;
+            // A type switched off is off the map, so it is out of the list too: FIRIS alone
+            // on CA Air Intel listed every source (operator, 2026-11-02).
+            if (!myFiresShown() && !spec.isOn(pf.setName))
                 continue;
             String title = pf.name, type = pf.setName;
             String inKey = null, inValue = null;
@@ -1229,6 +1371,8 @@ public class LoadedLayer {
     public String scopeLabel() {
         if (spec.scopeKind == null)
             return "Everything";
+        if ("box".equals(spec.scopeKind) && Boundaries.handles(spec) && Boundaries.mosaic(spec.kind))
+            return "what is on screen and around it, following the map";
         if ("all".equals(spec.scopeKind))
             return "Everywhere";
         if ("view".equals(spec.scopeKind))
@@ -1267,8 +1411,39 @@ public class LoadedLayer {
      * what is drawn no longer answers the scope. Judged on the main thread by
      * {@link LayerManager} after a debounced map move.
      */
+    /**
+     * A land layer that is shown and whose square no longer reaches the view, whether or
+     * not a fetch is running: what the move tick waits on before it lets go.
+     */
+    boolean landSquareStale() {
+        if (!layerOn || !"box".equals(spec.scopeKind) || !Boundaries.handles(spec) || !Boundaries.mosaic(spec.kind))
+            return false;
+        try {
+            final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
+            return b != null && spec.scopeBox != null && !Boundaries.coversWithRoom(spec.scopeBox, b);
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
     boolean movedOutOfScope() {
-        if (!hasScopeControl() || refreshing || busy || "all".equals(spec.scopeKind))
+        if (refreshing || busy)
+            return false;
+        // A land layer's square follows the map center: a new one once the center has
+        // left the middle of the loaded one.
+        if ("box".equals(spec.scopeKind) && Boundaries.handles(spec) && Boundaries.mosaic(spec.kind)) {
+            // A land layer that is switched off follows nothing: four hidden layers were
+            // fetched again on every pan (2026-10-16). It catches up when switched on.
+            if (!layerOn)
+                return false;
+            try {
+                final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
+                return b != null && spec.scopeBox != null && !Boundaries.coversWithRoom(spec.scopeBox, b);
+            } catch (RuntimeException e) {
+                return false;
+            }
+        }
+        if (!hasScopeControl() || "all".equals(spec.scopeKind))
             return false;
         if (myFiresShown())
             return false; // My Fires are fetched by their own extents: the map moving changes nothing
@@ -1326,6 +1501,9 @@ public class LoadedLayer {
         if (NewStartsStyles.handles(spec))
             return Double.MAX_VALUE;
         // Fire History: a century of perimeters; 250 km keeps a view to a few thousand.
+        // A land mosaic (responsibility areas, ownership) is the same shape of data.
+        if (Boundaries.handles(spec) && Boundaries.mosaic(spec.kind))
+            return 160_000; // about 100 miles: ownership is 2,200 polygons in such a box
         return FireHistoryStyles.handles(spec) ? 250_000 : MAX_VIEW_M;
     }
 
@@ -1400,9 +1578,21 @@ public class LoadedLayer {
             return Esri.Scope.circle(c.getLatitude(), c.getLongitude(), spec.scopeRadiusM);
         }
         if ("box".equals(spec.scopeKind)) {
+            final boolean land = Boundaries.handles(spec) && Boundaries.mosaic(spec.kind);
+            if (land) {
+                // The square follows the view: loaded again, sized to what is on screen
+                // plus a margin, once the view reaches the edge of the loaded one
+                // (movedOutOfScope), or when a saved layer has none yet.
+                final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
+                if (b == null)
+                    throw new IllegalStateException("the map has no extent yet");
+                if (spec.scopeBox == null || !Boundaries.coversWithRoom(spec.scopeBox, b))
+                    spec.scopeBox = Boundaries.boxFor(b);
+            }
             if (spec.scopeBox == null)
                 throw new IllegalStateException("no area set for " + spec.title);
-            return Esri.Scope.box(spec.scopeBox[0], spec.scopeBox[1], spec.scopeBox[2], spec.scopeBox[3]);
+            final Esri.Scope b = Esri.Scope.box(spec.scopeBox[0], spec.scopeBox[1], spec.scopeBox[2], spec.scopeBox[3]);
+            return land ? b.simplified(Boundaries.AREA_OFFSET_DEG) : b;
         }
         if ("shape".equals(spec.scopeKind)) {
             if (spec.scopeRings == null || spec.scopeRings.isEmpty())
@@ -1432,6 +1622,7 @@ public class LoadedLayer {
     public void refresh(String token, Runnable progress) {
         if (store == null || closed || refreshing)
             return;
+        final long startedAt = System.currentTimeMillis();
         refreshing = true;
         this.progress = 0;
         status = "refreshing";
@@ -1477,15 +1668,23 @@ public class LoadedLayer {
             perimeterRings.clear();
             perimeterHoles.clear();
             // Only My Fires: each fire fetched by its own extent and year, wherever it is.
-            final List<LayerSpec.MyFire> fires = new ArrayList<>();
-            if (myFiresShown())
-                fires.addAll(spec.myFires);
-            else
-                fires.add(null);
+            // Each pass is one spatial filter: a fire's extent for My Fires, a state's
+            // outline for tribal lands (Boundaries.passes), else one unfiltered pass.
+            final List<Object[]> passes = new ArrayList<>(); // { MyFire or null, Esri.Scope or null }
+            if (myFiresShown()) {
+                for (LayerSpec.MyFire f : spec.myFires)
+                    passes.add(new Object[] { f, boxScope(f.box) });
+            } else if (Boundaries.handles(spec)) {
+                for (Esri.Scope sc : Boundaries.passes(spec))
+                    passes.add(new Object[] { null, sc });
+            } else {
+                passes.add(new Object[] { null, null });
+            }
             int tries = 0;
             try {
-                for (LayerSpec.MyFire f : fires) {
-                    scopeOverride = f == null ? null : boxScope(f.box);
+                for (Object[] pass : passes) {
+                    final LayerSpec.MyFire f = (LayerSpec.MyFire) pass[0];
+                    scopeOverride = (Esri.Scope) pass[1];
                     yearOverride = f == null ? 0 : yearOf(f.key);
                     for (int li = 0; li < spec.layerIds.length; li++) {
                         final int layerId = spec.layerIds[li];
@@ -1514,6 +1713,7 @@ public class LoadedLayer {
             }
             if (tries > 0 && problems.size() == tries)
                 throw new IllegalStateException(problems.get(0));
+            final long fetchedAt = System.currentTimeMillis();
             synchronized (lock) {
                 if (store == null || closed)
                     throw new IllegalStateException("layer closed");
@@ -1521,7 +1721,10 @@ public class LoadedLayer {
                 spec.bounds = extentOf(pending);
                 rewriteStore(true);
                 spec.styleVersion = STYLE_VERSION;
-                Log.d(TAG, spec.id + ": refresh done, " + pending.size() + " fetched, store holds " + count);
+                // Where the time goes, so a slow layer can be blamed on the network or
+                // the store rather than guessed at (2026-10-16, ten-second redraws).
+                Log.d(TAG, spec.id + ": refresh done, " + pending.size() + " fetched, store holds " + count
+                        + " (fetch " + (fetchedAt - startedAt) + " ms, store " + (System.currentTimeMillis() - fetchedAt) + " ms)");
             }
             lastRefresh = System.currentTimeMillis();
             stale = false;
@@ -1717,19 +1920,22 @@ public class LoadedLayer {
         // decade, with its age color) wins; within a source the larger copy does.
         final boolean firstSource = base.equals(spec.baseFor(0));
         final boolean nwcg = spec.profile == LayerSpec.Profile.NWCG;
+        final boolean bounds = Boundaries.handles(spec);
         final boolean isPointLayer = info.geometryType.contains("Point");
         final boolean isLineLayer = info.geometryType.contains("Polyline");
+        // The type a source layer's features are listed under: its own name, or the word
+        // Boundaries uses for it ("Incorporated Places" is "Incorporated").
+        final String setName = bounds ? Boundaries.setName(spec.kind, layerId) : info.name;
         // Only when the source layer is itself the type. A layer that splits by a field
         // (CA Air Intel by source) names its types from the data, and the layer's own name
         // listed a seventh type nothing was ever in.
         if (spec.setField == null && !history)
-            spec.setKind.put(info.name, isPointLayer ? "point" : isLineLayer ? "line" : "polygon");
+            spec.setKind.put(setName, isPointLayer ? "point" : isLineLayer ? "line" : "polygon");
         else
             spec.setKind.remove(info.name);
-        final int fill = spec.fillFor(info.name);
+        final int fill = spec.fillFor(setName);
         final EsriRenderer generic = nwcg ? null : new EsriRenderer(info.drawingInfo, info.geometryType, iconDir, fill);
         final double gsd = isPointLayer ? pointGsd() : isLineLayer ? GSD_LINES : GSD_ALWAYS;
-        final String setName = info.name;
         final String repairName = (nwcg && isPointLayer) ? info.name + " (repair)" : null;
         final Set<String> dates = info.dateFields;
         lastDateFields = dates == null ? new java.util.HashSet<String>() : dates;
@@ -1765,10 +1971,22 @@ public class LoadedLayer {
         final String where = year > 0
                 ? "(" + spec.whereNow() + ") AND " + FireHistoryStyles.yearWhere(base.equals(spec.baseFor(0)), year)
                 : spec.whereNow();
+        // A land layer takes the service's biggest page: round trips were the time.
+        final int page = bounds && Boundaries.mosaic(spec.kind) ? Math.min(2000, info.maxRecordCount)
+                : Math.min(spec.geojson ? 2000 : 1000, info.maxRecordCount);
+        // And it comes as protobuf: the wire was most of a redraw (2026-10-16).
+        final boolean pbf = bounds && Boundaries.mosaic(spec.kind);
         Esri.query(base, layerId, where, sc, token, spec.geojson,
-                Math.min(spec.geojson ? 2000 : 1000, info.maxRecordCount), spec.maxFeatures, new Esri.FeatureSink() {
+                page, spec.maxFeatures, spec.outFields, pbf, new Esri.FeatureSink() {
                     @Override
                     public void feature(JSONObject props, Geometry g) throws Exception {
+                        if (bounds && Boundaries.mosaic(spec.kind)) {
+                            // Parts and holes too small to see at the square's scale go, or
+                            // the renderer tessellates thousands of parcel-sized dots.
+                            g = Boundaries.prune(g, Boundaries.MIN_RING_AREA_DEG2);
+                            if (g == null)
+                                return;
+                        }
                         // A fire with no name, past its hour: a dispatch call nobody came
                         // back to. Left out, and counted on the row's status line.
                         long dropAt = 0;
@@ -1793,6 +2011,13 @@ public class LoadedLayer {
                             // no size reported is a type of its own (NewStartsStyles).
                             if (NewStartsStyles.handles(spec))
                                 target = NewStartsStyles.type(props);
+                            // A land mosaic is typed by the publisher's own class label
+                            // ("State Responsibility Area (SRA)"), not the code behind it.
+                            if (bounds && generic != null) {
+                                final String lbl = generic.labelFor(props);
+                                target = lbl != null && !lbl.isEmpty() ? lbl
+                                        : Boundaries.mosaic(spec.kind) ? Boundaries.fallbackClass(spec.kind, v) : target;
+                            }
                             spec.setKind.put(target, isPointLayer ? "point" : isLineLayer ? "line" : "polygon");
                         }
                         int dupAt = -1;
@@ -1919,6 +2144,21 @@ public class LoadedLayer {
                                 title = name + " (" + layerName + ")";
                             }
                             style = history ? FireHistoryStyles.style(target, spec.fillFor(target)) : generic.styleFor(props);
+                            if (bounds && Boundaries.mosaic(spec.kind)) {
+                                // The publisher's class, in the publisher's color (the service's
+                                // own renderer): what the ground is, named once.
+                                name = target;
+                                title = target;
+                            } else if (bounds) {
+                                // "Elko County", "Reno": the Census name, in the kind's color,
+                                // outline only unless the fill control says otherwise.
+                                final String bn = Boundaries.label(spec.kind, props);
+                                if (bn != null)
+                                    name = bn;
+                                title = Boundaries.KIND_COUNTIES.equals(spec.kind) || Boundaries.KIND_UNITS.equals(spec.kind)
+                                        ? name : name + " (" + target + ")";
+                                style = Boundaries.style(spec, spec.fillFor(target));
+                            }
                             if (NewStartsStyles.handles(spec) && isPointLayer) {
                                 // NIFC's colors and size rule on a composed circle, so the
                                 // name pill is drawn whole (a renderer dot has no icon to
@@ -1955,8 +2195,13 @@ public class LoadedLayer {
                         // Perimeter", so they get no name; lines never do (ATAK repeats a line's
                         // label along its length).
                         String bare = null, bareAlt = null;
-                        final com.atakmap.map.layer.feature.geometry.Point at = !nwcg && !isPointLayer && !isLineLayer
-                                && name != null && !name.isEmpty() ? labelPoint(g) : null;
+                        // A Census area's name sits on its own interior point, which the
+                        // Bureau places inside the shape; the centroid of a crescent-shaped
+                        // county lands outside it.
+                        final boolean mosaic = bounds && !Boundaries.labelled(spec.kind);
+                        final com.atakmap.map.layer.feature.geometry.Point census = bounds && !mosaic ? Boundaries.interiorPoint(props) : null;
+                        final com.atakmap.map.layer.feature.geometry.Point at = !nwcg && !isPointLayer && !isLineLayer && !mosaic
+                                && name != null && !name.isEmpty() ? (census != null ? census : labelPoint(g)) : null;
                         if (at != null) {
                             style = NwcgStyles.withNameLabel(style);
                             if (alt != null)
@@ -1999,7 +2244,9 @@ public class LoadedLayer {
                                 }
                             }
                         }
-                        final AttributeSet attrs = Esri.toAttributes(props, dates);
+                        // A boundary's details are five lines, not the Census row's thirty codes.
+                        final AttributeSet attrs = bounds ? Boundaries.attributes(spec.kind, target, props)
+                                : Esri.toAttributes(props, dates);
                         if (history && copy != null) {
                             // Which fire this is, so My Fires can pick it out later.
                             final double[] bx = (double[]) copy[1];
@@ -2026,8 +2273,9 @@ public class LoadedLayer {
                         // "Pickup", "IHC"), so the picker lists kinds and a row says what it
                         // is; the layer's name was standing in (operator, 2026-09-18: "when i
                         // click on vehicle how come i dont get a sub type?").
-                        final String dartType = history ? target : NewStartsStyles.handles(spec) ? NewStartsStyles.type(props)
-                                : (DartStyles.handles(spec) || FireGuardStyles.handles(spec)) && spec.setField != null
+                        final String dartType = history || bounds ? target : NewStartsStyles.handles(spec) ? NewStartsStyles.type(props)
+                                : (DartStyles.handles(spec) || FireGuardStyles.handles(spec) || "ca-air-intel".equals(spec.id))
+                                        && spec.setField != null
                                 ? props.optString(spec.setField, "").trim() : "";
                         attrs.setAttribute("_type", !dartType.isEmpty() && !"null".equalsIgnoreCase(dartType) ? dartType
                                 : nwcg ? (cat != null ? cat : layerName)
@@ -2040,6 +2288,13 @@ public class LoadedLayer {
                         // the button changed nothing (regressed unnoticed in the marks rewrite).
                         if (!isPointLayer && !isLineLayer) {
                             int hue = nwcg ? NwcgStyles.polygonFill(cat) : generic.rawFillFor(props);
+                            if (bounds && !Boundaries.mosaic(spec.kind))
+                                hue = 0xFF000000 | Boundaries.hue(spec);
+                            final boolean strongMosaic = bounds && Boundaries.mosaic(spec.kind) && hue != 0;
+                            if (strongMosaic) {
+                                final int chosen = Boundaries.classHue(spec.kind, target);
+                                hue = 0xFF000000 | (chosen != 0 ? chosen : Boundaries.strongFill(hue & 0x00FFFFFF));
+                            }
                             if (!nwcg && "sarcop".equals(spec.iconSet)) {
                                 final int h = SarcopStyles.fillHue(layerName, props);
                                 if (h != 0)
@@ -2063,7 +2318,8 @@ public class LoadedLayer {
                                 style = refilled(style, hue & 0x00FFFFFF, want);
                                 if (alt != null)
                                     alt = refilled(alt, hue & 0x00FFFFFF, want);
-                            } else if (want != fill && hue != 0) {
+                            } else if ((want != fill || strongMosaic) && hue != 0) {
+                                // A land mosaic is refilled in its strengthened color.
                                 style = refilled(style, hue & 0x00FFFFFF, want);
                                 if (alt != null)
                                     alt = refilled(alt, hue & 0x00FFFFFF, want);
@@ -2714,6 +2970,47 @@ public class LoadedLayer {
             } catch (Exception e) {
                 Log.w(TAG, "restyle failed", e);
             }
+        }
+    }
+
+    /**
+     * A Boundaries layer in another color, from what the phone holds: no fetch, so it
+     * works offline. The bare form in each feature's attributes and its fill hue take the
+     * color too, or the labels toggle and the fill control would bring the old one back.
+     * Worker thread.
+     */
+    public void recolor(int rgb) {
+        spec.outlineRgb = rgb & 0x00FFFFFF;
+        synchronized (lock) {
+            if (store == null || closed)
+                return;
+            loadCacheLocked();
+            final List<Pending> out = new ArrayList<>(cache.size());
+            for (Pending pf : cache) {
+                if (pf.attrs != null) {
+                    try {
+                        if (pf.attrs.containsAttribute(ATTR_BARE)) {
+                            final Style b = com.atakmap.map.layer.feature.ogr.style.FeatureStyleParser
+                                    .parse2(pf.attrs.getStringAttribute(ATTR_BARE));
+                            final String nb = packStyle(Boundaries.recolored(b, rgb));
+                            if (nb != null)
+                                pf.attrs.setAttribute(ATTR_BARE, nb);
+                        }
+                        if (pf.attrs.containsAttribute("_fill"))
+                            pf.attrs.setAttribute("_fill", String.valueOf(0xFF000000 | (rgb & 0x00FFFFFF)));
+                    } catch (Exception e) {
+                        Log.w(TAG, spec.id + ": recolor of a bare style failed", e);
+                    }
+                }
+                final Pending np = new Pending(pf.setName, pf.minGsd, pf.name, pf.geometry,
+                        Boundaries.recolored(pf.style, rgb), pf.attrs);
+                np.maxGsd = pf.maxGsd;
+                np.alt = pf.alt == null ? null : Boundaries.recolored(pf.alt, rgb);
+                out.add(np);
+            }
+            cache = out;
+            rewriteStore();
+            Log.d(TAG, spec.id + ": recolored " + out.size() + " to " + Boundaries.colorName(rgb));
         }
     }
 

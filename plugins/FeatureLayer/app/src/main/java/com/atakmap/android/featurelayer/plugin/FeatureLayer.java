@@ -112,6 +112,46 @@ public class FeatureLayer implements IPlugin {
             manager.start();
         }
         followMap(true);
+        registerShow();
+    }
+
+    /**
+     * Opens the pane: a system broadcast, so a test over adb can open it without driving
+     * the Tools list. Debug builds only: a system receiver is exported to every app on
+     * the phone, and a release build has no use for one.
+     */
+    public static final String SHOW_ACTION = "com.atakmap.android.featurelayer.SHOW";
+    private android.content.BroadcastReceiver showReceiver;
+
+    private void registerShow() {
+        if (showReceiver != null || !BuildConfig.DEBUG)
+            return;
+        showReceiver = new android.content.BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, android.content.Intent intent) {
+                if (SHOW_ACTION.equals(intent.getAction()))
+                    showPane();
+            }
+        };
+        try {
+            final com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter f =
+                    new com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter();
+            f.addAction(SHOW_ACTION);
+            com.atakmap.android.ipc.AtakBroadcast.getInstance().registerSystemReceiver(showReceiver, f);
+        } catch (Exception e) {
+            Log.w(TAG, "show receiver", e);
+            showReceiver = null;
+        }
+    }
+
+    private void unregisterShow() {
+        if (showReceiver == null)
+            return;
+        try {
+            com.atakmap.android.ipc.AtakBroadcast.getInstance().unregisterSystemReceiver(showReceiver);
+        } catch (Exception ignored) {
+        }
+        showReceiver = null;
     }
 
     @Override
@@ -135,6 +175,7 @@ public class FeatureLayer implements IPlugin {
         if (uiService != null)
             uiService.removeToolbarItem(toolbarItem);
         unregisterPreferences();
+        unregisterShow();
     }
 
     private void toast(String s) {
@@ -173,6 +214,8 @@ public class FeatureLayer implements IPlugin {
                     "Fires found more than a day ago and not yet contained, public"),
             new Org("fire-history", "Fire History", null, "Add fire history",
                     "Where fires have burned since 1900, by years since and by decade, public"),
+            new Org("boundaries", "Boundaries", null, "Add",
+                    "County, city and tribal land boundaries by state, public"),
             new Org("sarcop-live", "SARCOP Live", Sources.NAPSG_PORTAL, "Find incident", "Search"),
             new Org("sarcop-training", "SARCOP Training", null, "Find incident", "Search"),
             new Org("ca-air-intel", "CA Air Intel", null, "Add perimeters", "Statewide fire perimeters, public"),
@@ -1247,6 +1290,8 @@ public class FeatureLayer implements IPlugin {
         final View dartRow = paneView.findViewById(R.id.dart_row);
         final Button dart = paneView.findViewById(R.id.btn_dart);
         dartRow.setVisibility(View.GONE);
+        final View boundariesPanel = paneView.findViewById(R.id.boundaries_panel);
+        boundariesPanel.setVisibility(View.GONE);
         dart.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -1270,6 +1315,14 @@ public class FeatureLayer implements IPlugin {
         if ("nifc".equals(org.id) && manager != null && manager.auth(Sources.NIFC_PORTAL).isSignedIn())
             dartRow.setVisibility(View.VISIBLE);
         orgButton.setText(org.title);
+        if ("boundaries".equals(org.id)) {
+            // Its own page of rows under the source button; nothing to search or sign into.
+            searchRow.setVisibility(View.GONE);
+            signin.setVisibility(View.GONE);
+            boundariesPanel.setVisibility(View.VISIBLE);
+            bindBoundaries();
+            return;
+        }
         searchRow.setVisibility(View.VISIBLE);
         find.setText(org.findLabel);
         search.setHint(org.hint);
@@ -1396,6 +1449,408 @@ public class FeatureLayer implements IPlugin {
         }
     }
 
+    // ---- Boundaries: kind, states, which, add -------------------------------------------
+
+    /** The kinds to add, in Boundaries.KINDS order; every kind until the operator unticks one. */
+    private final java.util.LinkedHashSet<String> bKinds = new java.util.LinkedHashSet<>(java.util.Arrays.asList(com.atakmap.android.featurelayer.Boundaries.KINDS));
+    private final List<String> bStates = new java.util.ArrayList<>();          // FIPS codes, in the order picked
+    private List<com.atakmap.android.featurelayer.Boundaries.Named> bPicks;     // null = every boundary in the states
+    /** The state under the map center, asked of the Census once per page opening; null until it answers. */
+    private com.atakmap.android.featurelayer.Boundaries.State bCenterState;
+    private boolean bCenterAsked;
+
+    private static String joinStates(List<String> fips, boolean abbr) {
+        final StringBuilder sb = new StringBuilder();
+        for (String f : fips) {
+            final com.atakmap.android.featurelayer.Boundaries.State st = com.atakmap.android.featurelayer.Boundaries.state(f);
+            sb.append(sb.length() > 0 ? ", " : "").append(st == null ? f : abbr ? st.abbr : st.name);
+        }
+        return sb.toString();
+    }
+
+    /** The three rows and the Add button say what is picked; the state under the map is the default. */
+    private void bindBoundaries() {
+        if (paneView == null)
+            return;
+        final Button kind = paneView.findViewById(R.id.btn_bnd_kind);
+        final Button state = paneView.findViewById(R.id.btn_bnd_state);
+        final Button which = paneView.findViewById(R.id.btn_bnd_which);
+        final Button add = paneView.findViewById(R.id.btn_bnd_add);
+        if (!bCenterAsked && manager != null) {
+            // Which state the map is over, from the Census (the nearest state center is a
+            // guess that fails on a border); the list puts it first and the row starts on it.
+            bCenterAsked = true;
+            final com.atakmap.coremap.maps.coords.GeoPoint c = mapCenter();
+            if (c != null) {
+                manager.search(new Callable<com.atakmap.android.featurelayer.Boundaries.State>() {
+                    @Override
+                    public com.atakmap.android.featurelayer.Boundaries.State call() {
+                        return com.atakmap.android.featurelayer.Boundaries.stateAt(c.getLatitude(), c.getLongitude());
+                    }
+                }, new LayerManager.SearchCallback<com.atakmap.android.featurelayer.Boundaries.State>() {
+                    @Override
+                    public void onResult(com.atakmap.android.featurelayer.Boundaries.State st, String error) {
+                        if (st == null) {
+                            bCenterAsked = false; // offline, or at sea: asked again next time the page is shown
+                            return;
+                        }
+                        bCenterState = st;
+                        if (bStates.isEmpty()) {
+                            bStates.add(st.fips);
+                            bindBoundaries();
+                        }
+                    }
+                });
+            }
+        }
+        if (bStates.isEmpty() && bCenterState != null)
+            bStates.add(bCenterState.fips);
+        kind.setText(bKinds.isEmpty() ? "Kinds: pick one" : "Kinds: " + kindsTitle());
+        state.setText(bStates.isEmpty() ? "State: pick one" : "State: " + joinStates(bStates, bStates.size() > 2));
+        which.setText(bPicks == null ? "Which: All"
+                : "Which: " + bPicks.size() + (bPicks.size() == 1 ? " picked" : " picked"));
+        final String[] names = pickNames();
+        add.setText(bStates.isEmpty() || bKinds.isEmpty() ? "Add"
+                : names != null ? "Add " + joinNames(names) + " (" + joinStates(bStates, true) + ")"
+                : "Add " + com.atakmap.android.featurelayer.Boundaries.groupTitle(bStates.toArray(new String[0])) + ": " + kindsTitle());
+        add.setEnabled(!bStates.isEmpty() && !bKinds.isEmpty() && (bPicks == null || !bPicks.isEmpty()));
+        kind.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pickBoundaryKind();
+            }
+        });
+        state.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pickBoundaryStates();
+            }
+        });
+        which.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pickBoundaryWhich();
+            }
+        });
+        add.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                addBoundaries();
+            }
+        });
+    }
+
+    /** "Counties, Cities, Tribal Lands", in the standard order, for the row and the Add button. */
+    /** The kinds on offer for the picked states, in the standard order. */
+    private String[] kindsOffered() {
+        return com.atakmap.android.featurelayer.Boundaries.kindsFor(bStates.toArray(new String[0]));
+    }
+
+    private String kindsTitle() {
+        final StringBuilder sb = new StringBuilder();
+        for (String k : kindsOffered())
+            if (bKinds.contains(k))
+                sb.append(sb.length() > 0 ? ", " : "").append(com.atakmap.android.featurelayer.Boundaries.kindTitle(k));
+        return sb.toString();
+    }
+
+    private static String joinNames(String[] names) {
+        final StringBuilder sb = new StringBuilder();
+        final int shown = Math.min(3, names.length);
+        for (int i = 0; i < shown; i++)
+            sb.append(i > 0 ? ", " : "").append(names[i]);
+        if (names.length > shown)
+            sb.append(" +").append(names.length - shown);
+        return sb.toString();
+    }
+
+    private String[] pickNames() {
+        if (bPicks == null || bPicks.isEmpty())
+            return null;
+        final String[] out = new String[bPicks.size()];
+        for (int i = 0; i < out.length; i++)
+            out[i] = bPicks.get(i).shortName; // "Elko, Humboldt Counties (NV)", not "Elko County, Humboldt County Counties"
+        return out;
+    }
+
+    private void pickBoundaryKind() {
+        final String[] kinds = kindsOffered();
+        final CharSequence[] labels = new CharSequence[kinds.length];
+        final boolean[] on = new boolean[kinds.length];
+        for (int i = 0; i < kinds.length; i++) {
+            final String t = com.atakmap.android.featurelayer.Boundaries.kindTitle(kinds[i]);
+            final String n = com.atakmap.android.featurelayer.Boundaries.kindNote(kinds[i]);
+            final android.text.SpannableString two = new android.text.SpannableString(t + "\n" + n);
+            two.setSpan(new android.text.style.RelativeSizeSpan(0.78f), t.length() + 1, two.length(), 0);
+            two.setSpan(new android.text.style.ForegroundColorSpan(0xFFBBBBBB), t.length() + 1, two.length(), 0);
+            labels[i] = two;
+            on[i] = bKinds.contains(kinds[i]);
+        }
+        final java.util.LinkedHashSet<String> picked = new java.util.LinkedHashSet<>(bKinds);
+        new AlertDialog.Builder(mapView.getContext()).setTitle("Kinds")
+                .setMultiChoiceItems(labels, on, new DialogInterface.OnMultiChoiceClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which, boolean isChecked) {
+                        if (isChecked)
+                            picked.add(kinds[which]);
+                        else
+                            picked.remove(kinds[which]);
+                    }
+                })
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        if (!picked.equals(bKinds))
+                            bPicks = null; // names belong to the kinds they were picked in
+                        bKinds.clear();
+                        bKinds.addAll(picked);
+                        bindBoundaries();
+                    }
+                })
+                .setNegativeButton("Cancel", null).show();
+    }
+
+    /** Up to five states, the one under the map first; a sixth tap says so and stays off. */
+    private void pickBoundaryStates() {
+        final com.atakmap.coremap.maps.coords.GeoPoint c = mapCenter();
+        final List<com.atakmap.android.featurelayer.Boundaries.State> all = com.atakmap.android.featurelayer.Boundaries
+                .statesNear(c == null ? Double.NaN : c.getLatitude(), c == null ? Double.NaN : c.getLongitude());
+        if (bCenterState != null) {
+            all.remove(bCenterState);
+            all.add(0, bCenterState);
+        }
+        final String[] labels = new String[all.size()];
+        final boolean[] on = new boolean[all.size()];
+        for (int i = 0; i < all.size(); i++) {
+            labels[i] = all.get(i).name;
+            on[i] = bStates.contains(all.get(i).fips);
+        }
+        final List<String> picked = new java.util.ArrayList<>(bStates);
+        new AlertDialog.Builder(mapView.getContext()).setTitle("States, up to " + com.atakmap.android.featurelayer.Boundaries.MAX_STATES)
+                .setMultiChoiceItems(labels, on, new DialogInterface.OnMultiChoiceClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which, boolean isChecked) {
+                        final String fips = all.get(which).fips;
+                        if (isChecked) {
+                            if (picked.size() >= com.atakmap.android.featurelayer.Boundaries.MAX_STATES) {
+                                ((AlertDialog) d).getListView().setItemChecked(which, false);
+                                toast("Up to " + com.atakmap.android.featurelayer.Boundaries.MAX_STATES
+                                        + " states in one layer; add another layer for more");
+                                return;
+                            }
+                            if (!picked.contains(fips))
+                                picked.add(fips);
+                        } else {
+                            picked.remove(fips);
+                        }
+                    }
+                })
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        if (!picked.equals(bStates))
+                            bPicks = null; // names belong to the states they were picked in
+                        bStates.clear();
+                        bStates.addAll(picked);
+                        bindBoundaries();
+                    }
+                })
+                .setNegativeButton("Cancel", null).show();
+    }
+
+    private void pickBoundaryWhich() {
+        if (bStates.isEmpty()) {
+            toast("Pick a state first");
+            return;
+        }
+        if (bKinds.isEmpty()) {
+            toast("Pick a kind first");
+            return;
+        }
+        final String[] labels = { "All", "Pick names\u2026" };
+        new AlertDialog.Builder(mapView.getContext()).setTitle("Which boundaries")
+                .setSingleChoiceItems(labels, bPicks == null ? 0 : 1, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        d.dismiss();
+                        if (which == 0) {
+                            bPicks = null;
+                            bindBoundaries();
+                        } else {
+                            fetchBoundaryNames();
+                        }
+                    }
+                }).setNegativeButton("Cancel", null).show();
+    }
+
+    /** The names list, no shapes, nearest the map center first; then the checklist. */
+    private void fetchBoundaryNames() {
+        if (manager == null)
+            return;
+        final List<String> kl = new java.util.ArrayList<>();
+        for (String k : kindsOffered())
+            if (bKinds.contains(k) && com.atakmap.android.featurelayer.Boundaries.pickable(k))
+                kl.add(k);
+        if (kl.isEmpty()) {
+            toast("Names are picked for counties, cities, communities and tribal lands; the land layers show what is in view");
+            return;
+        }
+        final String[] kinds = kl.toArray(new String[0]);
+        final String[] states = bStates.toArray(new String[0]);
+        final com.atakmap.coremap.maps.coords.GeoPoint c = mapCenter();
+        final Button which = paneView.findViewById(R.id.btn_bnd_which);
+        which.setText("Which: loading names\u2026");
+        which.setEnabled(false);
+        manager.search(new Callable<List<com.atakmap.android.featurelayer.Boundaries.Named>>() {
+            @Override
+            public List<com.atakmap.android.featurelayer.Boundaries.Named> call() throws Exception {
+                return com.atakmap.android.featurelayer.Boundaries.names(kinds, states,
+                        c == null ? Double.NaN : c.getLatitude(), c == null ? Double.NaN : c.getLongitude());
+            }
+        }, new LayerManager.SearchCallback<List<com.atakmap.android.featurelayer.Boundaries.Named>>() {
+            @Override
+            public void onResult(List<com.atakmap.android.featurelayer.Boundaries.Named> names, String error) {
+                which.setEnabled(true);
+                bindBoundaries();
+                if (error != null)
+                    toast("Could not load the names: no network?");
+                else if (names == null || names.isEmpty())
+                    toast("No boundaries listed there");
+                else
+                    pickBoundaryNames(names);
+            }
+        });
+    }
+
+    /** A checklist with a filter box on top; a tick keeps a name, OK keeps the ticks. */
+    private void pickBoundaryNames(final List<com.atakmap.android.featurelayer.Boundaries.Named> names) {
+        final Context ctx = mapView.getContext();
+        final java.util.Set<String> picked = new java.util.LinkedHashSet<>();
+        if (bPicks != null)
+            for (com.atakmap.android.featurelayer.Boundaries.Named n : bPicks)
+                picked.add(n.geoid);
+        final boolean oneState = bStates.size() == 1;
+        boolean oneTypeTmp = true;
+        for (com.atakmap.android.featurelayer.Boundaries.Named n : names)
+            if (!n.type.equals(names.get(0).type))
+                oneTypeTmp = false;
+        final boolean oneType = oneTypeTmp;
+        final LinearLayout box = new LinearLayout(ctx);
+        box.setOrientation(LinearLayout.VERTICAL);
+        final int pad = (int) (8 * ctx.getResources().getDisplayMetrics().density);
+        box.setPadding(pad, pad, pad, 0);
+        final EditText filter = new EditText(ctx);
+        filter.setHint("Type to narrow the list");
+        filter.setSingleLine(true);
+        filter.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+        filter.setImeOptions(android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI
+                | android.view.inputmethod.EditorInfo.IME_FLAG_NO_FULLSCREEN);
+        box.addView(filter, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        final android.widget.ListView list = new android.widget.ListView(ctx);
+        list.setChoiceMode(android.widget.ListView.CHOICE_MODE_MULTIPLE);
+        box.addView(list, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                (int) (mapView.getHeight() * 0.55)));
+        final List<com.atakmap.android.featurelayer.Boundaries.Named> shown = new java.util.ArrayList<>();
+        final Runnable fill = new Runnable() {
+            @Override
+            public void run() {
+                final String needle = filter.getText().toString().trim().toLowerCase(java.util.Locale.US);
+                shown.clear();
+                final List<String> labels = new java.util.ArrayList<>();
+                for (com.atakmap.android.featurelayer.Boundaries.Named n : names) {
+                    if (!needle.isEmpty() && !n.name.toLowerCase(java.util.Locale.US).contains(needle))
+                        continue;
+                    shown.add(n);
+                    labels.add(n.label(oneState, oneType)
+                            + (n.distanceM == Double.MAX_VALUE ? "" : "  \u00b7  " + Units.formatBig(n.distanceM)));
+                }
+                list.setAdapter(new android.widget.ArrayAdapter<String>(ctx,
+                        android.R.layout.simple_list_item_multiple_choice, labels));
+                for (int i = 0; i < shown.size(); i++)
+                    list.setItemChecked(i, picked.contains(shown.get(i).geoid));
+            }
+        };
+        fill.run();
+        filter.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int a, int b, int c) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int a, int b, int c) {
+            }
+
+            @Override
+            public void afterTextChanged(android.text.Editable e) {
+                fill.run();
+            }
+        });
+        list.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(android.widget.AdapterView<?> parent, View v, int pos, long id) {
+                if (pos < 0 || pos >= shown.size())
+                    return;
+                final String g = shown.get(pos).geoid;
+                if (list.isItemChecked(pos))
+                    picked.add(g);
+                else
+                    picked.remove(g);
+            }
+        });
+        final String what = bKinds.size() == 1 ? kindsTitle().toLowerCase(java.util.Locale.US) : "boundaries";
+        new AlertDialog.Builder(ctx).setTitle("Pick " + what + " (" + names.size() + ")")
+                .setView(box)
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        final List<com.atakmap.android.featurelayer.Boundaries.Named> out = new java.util.ArrayList<>();
+                        for (com.atakmap.android.featurelayer.Boundaries.Named n : names)
+                            if (picked.contains(n.geoid))
+                                out.add(n);
+                        bPicks = out.isEmpty() ? null : out;
+                        bindBoundaries();
+                    }
+                })
+                .setNegativeButton("Cancel", null).show();
+    }
+
+    /** One layer per kind: every boundary of it in the states, or the names picked in it. */
+    private void addBoundaries() {
+        if (manager == null || bStates.isEmpty() || bKinds.isEmpty())
+            return;
+        final String[] states = bStates.toArray(new String[0]);
+        LayerSpec last = null;
+        for (String kind : kindsOffered()) {
+            if (!bKinds.contains(kind))
+                continue;
+            String[] geoids = null, names = null;
+            if (bPicks != null && !bPicks.isEmpty() && com.atakmap.android.featurelayer.Boundaries.pickable(kind)) {
+                final List<String> g = new java.util.ArrayList<>(), n = new java.util.ArrayList<>();
+                for (com.atakmap.android.featurelayer.Boundaries.Named p : bPicks)
+                    if (kind.equals(p.kind)) {
+                        g.add(p.geoid);
+                        n.add(p.shortName);
+                    }
+                if (g.isEmpty())
+                    continue; // nothing of this kind was picked
+                geoids = g.toArray(new String[0]);
+                names = n.toArray(new String[0]);
+            }
+            last = com.atakmap.android.featurelayer.Boundaries.layer(kind, states, geoids, names);
+            if (com.atakmap.android.featurelayer.Boundaries.mosaic(kind)) {
+                // The square it loads first: what is on screen and around it.
+                final com.atakmap.coremap.maps.coords.GeoBounds vb = mapView.getBounds();
+                if (vb != null)
+                    last.scopeBox = com.atakmap.android.featurelayer.Boundaries.boxFor(vb);
+            }
+            manager.add(last);
+        }
+        bPicks = null;
+        if (last != null)
+            backToMain();
+    }
+
     private void renderRows() {
         if (paneView == null || manager == null)
             return;
@@ -1424,102 +1879,305 @@ public class FeatureLayer implements IPlugin {
                         manager.setVisible(l, turnOn);
             }
         });
+        // Boundaries fold under their state: one row per state, the kinds inside it
+        // (operator, 2026-10-12: "keeping the side pane menus compact then expandable").
+        final java.util.Map<String, List<LoadedLayer>> groups = new java.util.LinkedHashMap<>();
+        final List<Object> order = new java.util.ArrayList<>(); // a LoadedLayer, or a group key
         for (final LoadedLayer l : layers) {
-            final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.layer_row, null);
-            final TextView status = row.findViewById(R.id.row_status);
-            status.setText(statusLine(l));
-            final Button toggle = row.findViewById(R.id.row_toggle);
-            if (l.refreshing || l.busy) {
-                toggle.setText(l.displayName() + " Loading\u2026");
-                toggle.setTextColor(Color.parseColor("#FFC107"));
-                toggle.setEnabled(false);
+            if (com.atakmap.android.featurelayer.Boundaries.handles(l.spec)) {
+                final String key = com.atakmap.android.featurelayer.Boundaries.groupKey(l.spec);
+                List<LoadedLayer> g = groups.get(key);
+                if (g == null) {
+                    g = new java.util.ArrayList<>();
+                    groups.put(key, g);
+                    order.add(key);
+                }
+                g.add(l);
             } else {
-                toggle.setText(l.myFiresShown() && l.isVisible()
-                        ? l.spec.title + ": My Fires (" + l.myFiresCount() + ")"
-                        : l.displayName() + (l.isVisible() ? " ON" : " OFF"));
-                toggle.setTextColor(l.isVisible() ? Color.parseColor("#4CAF50") : Color.parseColor("#F44336"));
-                toggle.setEnabled(true);
+                order.add(l);
             }
-            // One line per layer, its controls under the arrow (Atmosphere's layers page,
-            // operator 2026-10-05). Closed until opened, and remembered per layer: the
-            // list is rebuilt on every refresh, so the state cannot live in the views.
-            final ImageButton expand = row.findViewById(R.id.row_expand);
-            final View body = row.findViewById(R.id.row_body);
-            final String foldKey = foldPref(l);
-            final boolean open = uiPrefs().getBoolean(foldKey, false);
-            expand.setRotation(open ? 180f : 0f);
-            body.setVisibility(open ? View.VISIBLE : View.GONE);
-            status.setVisibility(open ? View.VISIBLE : View.GONE);
-            expand.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    final boolean nowOpen = body.getVisibility() != View.VISIBLE;
-                    uiPrefs().edit().putBoolean(foldKey, nowOpen).apply();
-                    expand.setRotation(nowOpen ? 180f : 0f);
-                    body.setVisibility(nowOpen ? View.VISIBLE : View.GONE);
-                    status.setVisibility(nowOpen ? View.VISIBLE : View.GONE);
-                }
-            });
-            toggle.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    manager.setVisible(l, !l.isVisible());
-                }
-            });
-            row.findViewById(R.id.row_sets).setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    pickSets(l);
-                }
-            });
-            // Go to frames one incident; a feed spread over a state or the country has no
-            // one place to go, and Features takes the row.
-            row.findViewById(R.id.row_goto).setVisibility(l.isWideFeed() ? View.GONE : View.VISIBLE);
-            row.findViewById(R.id.row_goto).setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    l.panTo();
-                }
-            });
-            final Button auto = row.findViewById(R.id.row_auto);
-            auto.setText(autoLabel(l.spec.refreshMinutes));
-            auto.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    final int[] steps = { 0, 1, 5, 15, 30 };
-                    int i = 0;
-                    for (int k = 0; k < steps.length; k++)
-                        if (steps[k] == l.spec.refreshMinutes)
-                            i = k;
-                    final int next = steps[(i + 1) % steps.length];
-                    auto.setText(autoLabel(next));
-                    manager.setRefreshMinutes(l, next);
-                }
-            });
-            row.findViewById(R.id.row_refresh).setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    manager.refresh(l);
-                }
-            });
-            row.findViewById(R.id.row_remove).setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    uiPrefs().edit().remove(foldKey).apply();
-                    manager.remove(l);
-                }
-            });
-            bindKey((LinearLayout) row.findViewById(R.id.row_key), l);
-            bindMyFires(row, l);
-            final View scopeBlock = row.findViewById(R.id.row_scope);
-            if (l.hasScopeControl()) {
-                scopeBlock.setVisibility(View.VISIBLE);
-                bindScope(row, l);
-            } else {
-                scopeBlock.setVisibility(View.GONE);
-            }
-            container.addView(row);
         }
+        for (Object o : order) {
+            if (o instanceof LoadedLayer)
+                container.addView(buildRow((LoadedLayer) o, ((LoadedLayer) o).displayName()));
+            else
+                container.addView(groupRow((String) o, groups.get((String) o)));
+        }
+    }
+
+    /**
+     * "Color: Purple" on a Boundaries layer's row, with a swatch; a tap opens the colors
+     * as a grid of dark tiles. Gone on every other layer.
+     */
+    private void bindColor(View row, final LoadedLayer l) {
+        final Button b = row.findViewById(R.id.row_color);
+        if (b == null)
+            return;
+        // A land mosaic draws in its publisher's colors, one per class: no color to pick.
+        if (!com.atakmap.android.featurelayer.Boundaries.handles(l.spec)
+                || com.atakmap.android.featurelayer.Boundaries.mosaic(l.spec.kind)) {
+            b.setVisibility(View.GONE);
+            return;
+        }
+        final int rgb = com.atakmap.android.featurelayer.Boundaries.hue(l.spec);
+        b.setVisibility(View.VISIBLE);
+        b.setText("Color: " + com.atakmap.android.featurelayer.Boundaries.colorName(rgb));
+        b.setCompoundDrawablesWithIntrinsicBounds(swatch(rgb), null, null, null);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pickColor(l);
+            }
+        });
+    }
+
+    /** A rounded color square for a button, edged in grey so black and white show. */
+    private android.graphics.drawable.Drawable swatch(int rgb) {
+        final float dp = paneView.getResources().getDisplayMetrics().density;
+        final android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
+        d.setColor(0xFF000000 | rgb);
+        d.setStroke(Math.max(1, Math.round(dp)), 0xFF999999);
+        d.setCornerRadius(3 * dp);
+        final int side = Math.round(22 * dp);
+        d.setBounds(0, 0, side, side);
+        d.setSize(side, side);
+        return d;
+    }
+
+    /** The colors as two columns of dark tiles, each with its swatch; the layer's own marked. */
+    private void pickColor(final LoadedLayer l) {
+        final android.content.Context ctx = mapView.getContext();
+        final float dp = paneView.getResources().getDisplayMetrics().density;
+        final int now = com.atakmap.android.featurelayer.Boundaries.hue(l.spec);
+        final LinearLayout grid = new LinearLayout(ctx);
+        grid.setOrientation(LinearLayout.VERTICAL);
+        final int pad = Math.round(8 * dp);
+        grid.setPadding(pad, pad, pad, pad);
+        final AlertDialog[] dialog = new AlertDialog[1];
+        final Object[][] colors = com.atakmap.android.featurelayer.Boundaries.COLORS;
+        LinearLayout line = null;
+        for (int i = 0; i < colors.length; i++) {
+            if (i % 2 == 0) {
+                line = new LinearLayout(ctx);
+                line.setOrientation(LinearLayout.HORIZONTAL);
+                grid.addView(line);
+            }
+            final String name = (String) colors[i][0];
+            final int rgb = (Integer) colors[i][1];
+            final Button t = (Button) PluginLayoutInflater.inflate(pluginContext, R.layout.color_tile, null);
+            t.setText(((rgb & 0x00FFFFFF) == (now & 0x00FFFFFF) ? "\u2713 " : "") + name);
+            t.setCompoundDrawablesWithIntrinsicBounds(swatch(rgb), null, null, null);
+            t.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (dialog[0] != null)
+                        dialog[0].dismiss();
+                    if ((rgb & 0x00FFFFFF) != (now & 0x00FFFFFF))
+                        manager.setColor(l, rgb);
+                }
+            });
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.setMargins(Math.round(3 * dp), Math.round(3 * dp), Math.round(3 * dp), Math.round(3 * dp));
+            line.addView(t, lp);
+        }
+        dialog[0] = new AlertDialog.Builder(ctx).setTitle(l.displayName() + ": color").setView(grid)
+                .setNegativeButton("Cancel", null).show();
+    }
+
+    /** The prefix a where line starts with, so several can share one. */
+    private static String wherePrefix(String w) {
+        return w.startsWith("Map center is in ") ? "Map center is in " : w.startsWith("You are in ") ? "You are in " : "";
+    }
+
+    /** One state's row: the head switches every kind in it, the arrow opens the kind rows. */
+    private View groupRow(final String key, final List<LoadedLayer> kinds) {
+        final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.boundary_group_row, null);
+        final Button toggle = row.findViewById(R.id.group_toggle);
+        final ImageButton expand = row.findViewById(R.id.group_expand);
+        final LinearLayout body = row.findViewById(R.id.group_body);
+        final TextView where = row.findViewById(R.id.group_where);
+        final String title = com.atakmap.android.featurelayer.Boundaries.groupTitle(kinds.get(0).spec.states) + " Boundaries";
+        boolean anyOn = false, loading = false;
+        final StringBuilder wl = new StringBuilder();
+        for (LoadedLayer l : kinds) {
+            anyOn |= l.isVisible();
+            loading |= l.refreshing || l.busy;
+            final String w = l.whereLine;
+            if (w != null && l.isVisible() && !l.refreshing && !l.busy) {
+                if (wl.length() == 0)
+                    wl.append(w);
+                else
+                    wl.append(" \u00b7 ").append(w.substring(wherePrefix(w).length()));
+            }
+        }
+        if (loading) {
+            toggle.setText(title + " Loading\u2026");
+            toggle.setTextColor(Color.parseColor("#FFC107"));
+            toggle.setEnabled(false);
+        } else {
+            toggle.setText(title + (anyOn ? " ON" : " OFF"));
+            toggle.setTextColor(anyOn ? Color.parseColor("#4CAF50") : Color.parseColor("#F44336"));
+            toggle.setEnabled(true);
+        }
+        final boolean turnOn = !anyOn;
+        // Off remembers which kinds were on, and on brings back those, not every kind
+        // (operator, 2026-10-13: "if i have ... county and community on, then i hit calif
+        // boundary off and back on it should be last state not everything back on").
+        final String onKey = "group.on." + key;
+        toggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (!turnOn) {
+                    final StringBuilder was = new StringBuilder();
+                    for (LoadedLayer l : kinds)
+                        if (l.isVisible())
+                            was.append(was.length() > 0 ? "\n" : "").append(l.spec.id);
+                    uiPrefs().edit().putString(onKey, was.toString()).apply();
+                    for (LoadedLayer l : kinds)
+                        if (l.isVisible())
+                            manager.setVisible(l, false);
+                    return;
+                }
+                final java.util.Set<String> was = new java.util.HashSet<>(
+                        java.util.Arrays.asList(uiPrefs().getString(onKey, "").split("\n")));
+                boolean any = false;
+                for (LoadedLayer l : kinds)
+                    any |= was.contains(l.spec.id);
+                for (LoadedLayer l : kinds)
+                    if (!any || was.contains(l.spec.id))
+                        manager.setVisible(l, true);
+            }
+        });
+        if (wl.length() > 0) {
+            where.setText(wl);
+            where.setVisibility(View.VISIBLE);
+        } else {
+            where.setVisibility(View.GONE);
+        }
+        final String foldKey = "fold.group." + key;
+        final boolean open = uiPrefs().getBoolean(foldKey, false);
+        expand.setRotation(open ? 180f : 0f);
+        body.setVisibility(open ? View.VISIBLE : View.GONE);
+        expand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final boolean nowOpen = body.getVisibility() != View.VISIBLE;
+                uiPrefs().edit().putBoolean(foldKey, nowOpen).apply();
+                expand.setRotation(nowOpen ? 180f : 0f);
+                body.setVisibility(nowOpen ? View.VISIBLE : View.GONE);
+            }
+        });
+        for (LoadedLayer l : kinds)
+            body.addView(buildRow(l, com.atakmap.android.featurelayer.Boundaries.shortTitle(l.spec)));
+        return row;
+    }
+
+    /** One layer's row: its switch, its status line and, under the arrow, its controls. */
+    private View buildRow(final LoadedLayer l, final String name) {
+        final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.layer_row, null);
+        final TextView status = row.findViewById(R.id.row_status);
+        status.setText(statusLine(l));
+        // "You are in Elko County, NV", from the layer itself, while it is on.
+        final TextView where = row.findViewById(R.id.row_where);
+        final String whereLine = l.whereLine;
+        if (whereLine != null && l.isVisible() && !l.refreshing && !l.busy) {
+            where.setText(whereLine);
+            where.setVisibility(View.VISIBLE);
+        } else {
+            where.setVisibility(View.GONE);
+        }
+        final Button toggle = row.findViewById(R.id.row_toggle);
+        if (l.refreshing || l.busy) {
+            toggle.setText(name + " Loading\u2026");
+            toggle.setTextColor(Color.parseColor("#FFC107"));
+            toggle.setEnabled(false);
+        } else {
+            toggle.setText(l.myFiresShown() && l.isVisible()
+                    ? l.spec.title + ": My Fires (" + l.myFiresCount() + ")"
+                    : name + (l.isVisible() ? " ON" : " OFF"));
+            toggle.setTextColor(l.isVisible() ? Color.parseColor("#4CAF50") : Color.parseColor("#F44336"));
+            toggle.setEnabled(true);
+        }
+        // One line per layer, its controls under the arrow (Atmosphere's layers page,
+        // operator 2026-10-05). Closed until opened, and remembered per layer: the
+        // list is rebuilt on every refresh, so the state cannot live in the views.
+        final ImageButton expand = row.findViewById(R.id.row_expand);
+        final View body = row.findViewById(R.id.row_body);
+        final String foldKey = foldPref(l);
+        final boolean open = uiPrefs().getBoolean(foldKey, false);
+        expand.setRotation(open ? 180f : 0f);
+        body.setVisibility(open ? View.VISIBLE : View.GONE);
+        status.setVisibility(open ? View.VISIBLE : View.GONE);
+        expand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final boolean nowOpen = body.getVisibility() != View.VISIBLE;
+                uiPrefs().edit().putBoolean(foldKey, nowOpen).apply();
+                expand.setRotation(nowOpen ? 180f : 0f);
+                body.setVisibility(nowOpen ? View.VISIBLE : View.GONE);
+                status.setVisibility(nowOpen ? View.VISIBLE : View.GONE);
+            }
+        });
+        toggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                manager.setVisible(l, !l.isVisible());
+            }
+        });
+        row.findViewById(R.id.row_sets).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pickSets(l);
+            }
+        });
+        // Go to frames one incident; a feed spread over a state or the country has no
+        // one place to go, and Features takes the row.
+        bindColor(row, l);
+        row.findViewById(R.id.row_goto).setVisibility(l.isWideFeed() ? View.GONE : View.VISIBLE);
+        row.findViewById(R.id.row_goto).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                l.panTo();
+            }
+        });
+        final Button auto = row.findViewById(R.id.row_auto);
+        auto.setText(autoLabel(l.spec.refreshMinutes));
+        auto.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final int[] steps = { 0, 1, 5, 15, 30 };
+                int i = 0;
+                for (int k = 0; k < steps.length; k++)
+                    if (steps[k] == l.spec.refreshMinutes)
+                        i = k;
+                final int next = steps[(i + 1) % steps.length];
+                auto.setText(autoLabel(next));
+                manager.setRefreshMinutes(l, next);
+            }
+        });
+        row.findViewById(R.id.row_refresh).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                manager.refreshHere(l);
+            }
+        });
+        row.findViewById(R.id.row_remove).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                uiPrefs().edit().remove(foldKey).apply();
+                manager.remove(l);
+            }
+        });
+        bindKey((LinearLayout) row.findViewById(R.id.row_key), l);
+        bindMyFires(row, l);
+        final View scopeBlock = row.findViewById(R.id.row_scope);
+        if (l.hasScopeControl()) {
+            scopeBlock.setVisibility(View.VISIBLE);
+            bindScope(row, l);
+        } else {
+            scopeBlock.setVisibility(View.GONE);
+        }
+        return row;
     }
 
     /** After a panel swap; posted so it runs once the new panel has been laid out. */
@@ -1781,6 +2439,27 @@ public class FeatureLayer implements IPlugin {
                                     manager.setSinceHours(l, hours[which]);
                                 }
                             }).setNegativeButton("Cancel", null).show();
+                }
+            });
+            container.addView(row);
+        }
+        if (l.spec.activeWhere != null) {
+            // Active only: OFF brings back perimeters the service has marked inactive,
+            // for a fire that is out but still worth a look (or a model run from it).
+            final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.feature_row, null);
+            ((TextView) row.findViewById(R.id.feature_name)).setText("Perimeters");
+            final Button only = row.findViewById(R.id.feature_toggle);
+            final boolean on = l.spec.activeOnly;
+            only.setText("Active only " + (on ? "ON" : "OFF"));
+            only.setTextColor(on ? Color.parseColor("#4CAF50") : Color.parseColor("#F44336"));
+            row.findViewById(R.id.feature_fill).setVisibility(View.GONE);
+            only.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    final boolean next = !l.spec.activeOnly;
+                    only.setText("Active only " + (next ? "ON" : "OFF"));
+                    only.setTextColor(next ? Color.parseColor("#4CAF50") : Color.parseColor("#F44336"));
+                    manager.setActiveOnly(l, next);
                 }
             });
             container.addView(row);
@@ -2131,6 +2810,11 @@ public class FeatureLayer implements IPlugin {
             bindHistoryKey(key, l);
             return;
         }
+        if (com.atakmap.android.featurelayer.Boundaries.handles(l.spec)
+                && com.atakmap.android.featurelayer.Boundaries.mosaic(l.spec.kind)) {
+            bindMosaicKey(key, l);
+            return;
+        }
         if (!com.atakmap.android.featurelayer.NewStartsStyles.handles(l.spec)) {
             key.setVisibility(View.GONE);
             return;
@@ -2154,6 +2838,44 @@ public class FeatureLayer implements IPlugin {
             final TextView name = new TextView(key.getContext());
             name.setText(k[1]);
             name.setTextColor(Color.WHITE);
+            name.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
+            name.setPadding(Math.round(10 * dp), 0, 0, 0);
+            line.addView(name);
+            key.addView(line);
+        }
+        key.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * A land layer's key: each class the view holds as a swatch in the color it is drawn
+     * in, read from the features themselves, so the key and the map cannot disagree
+     * (operator, 2026-10-14: the Features list named the classes without colors).
+     */
+    private void bindMosaicKey(LinearLayout key, LoadedLayer l) {
+        while (key.getChildCount() > 1)
+            key.removeViewAt(1);
+        final java.util.LinkedHashMap<String, Integer> hues = l.classHues();
+        if (hues.isEmpty()) {
+            key.setVisibility(View.GONE);
+            return;
+        }
+        final float dp = paneView.getResources().getDisplayMetrics().density;
+        for (java.util.Map.Entry<String, Integer> k : hues.entrySet()) {
+            final LinearLayout line = new LinearLayout(key.getContext());
+            line.setOrientation(LinearLayout.HORIZONTAL);
+            line.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            line.setPadding(0, Math.round(2 * dp), 0, Math.round(2 * dp));
+            final View swatch = new View(key.getContext());
+            final android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
+            d.setColor(0xFF000000 | k.getValue());
+            d.setStroke(Math.max(1, Math.round(dp)), 0xFF999999);
+            d.setCornerRadius(3 * dp);
+            swatch.setBackground(d);
+            final int side = Math.round(22 * dp);
+            line.addView(swatch, new LinearLayout.LayoutParams(side, side));
+            final TextView name = new TextView(key.getContext());
+            name.setText(k.getKey() + (l.spec.isOn(k.getKey()) ? "" : "  (off)"));
+            name.setTextColor(l.spec.isOn(k.getKey()) ? Color.WHITE : 0xFF999999);
             name.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
             name.setPadding(Math.round(10 * dp), 0, 0, 0);
             line.addView(name);
