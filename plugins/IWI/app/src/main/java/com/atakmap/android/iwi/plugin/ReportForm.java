@@ -62,6 +62,12 @@ final class ReportForm {
 
         /** The same button again while waiting for the tap. */
         void cancelEvacPick();
+
+        /**
+         * A patient left the scene, came back, or was removed: the shared IWI follows at
+         * once, not when the report page closes (operator, 2026-11-11).
+         */
+        void patientsSent();
     }
 
     /** Where a tile group reads and writes its value. */
@@ -1073,6 +1079,7 @@ final class ReportForm {
                     public void onClick(DialogInterface dialog, int which) {
                         state.setTransported(n, System.currentTimeMillis());
                         patientsChanged();
+                        host.patientsSent();
                     }
                 })
                 .setNegativeButton("Cancel", null)
@@ -1088,6 +1095,7 @@ final class ReportForm {
                     public void onClick(DialogInterface dialog, int which) {
                         state.setTransported(n, 0L);
                         patientsChanged();
+                        host.patientsSent();
                     }
                 })
                 .setNegativeButton("Cancel", null)
@@ -1114,6 +1122,7 @@ final class ReportForm {
                     public void onClick(DialogInterface dialog, int which) {
                         state.removePatient(n);
                         patientsChanged();
+                        host.patientsSent();
                     }
                 })
                 .setNegativeButton("Cancel", null)

@@ -659,6 +659,12 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         HospitalSet.sync(mapView, state, hospitals.centers());
     }
 
+    @Override
+    public void patientsSent() {
+        if (state.isLive())
+            writeMarker();
+    }
+
     /** The IWI marker, then the hospitals that go with it: both follow the report. */
     private boolean writeMarker() {
         final boolean ok = IwiMarker.write(state);
