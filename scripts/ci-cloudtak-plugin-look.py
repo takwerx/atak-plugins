@@ -27,17 +27,33 @@ def main():
         page.evaluate("t => localStorage.setItem('CapacitorStorage.token', t)", token)
         page.goto(a.map_url, wait_until="load", timeout=90000)
         page.wait_for_timeout(8000)
+        # A profile's first sign-in shows "Welcome to CloudTAK" (callsign) over the map; it covers the menu button.
+        if page.get_by_text("Welcome to CloudTAK").count() > 0:
+            page.get_by_placeholder("Enter your callsign").fill("PLUGINCHK")
+            page.get_by_role("button", name="Get Started").click()
+            page.wait_for_timeout(3000)
+        # ... then a "Permissions" dialog (location, notifications): skip it.
+        if page.get_by_text("Skip for now").count() > 0:
+            page.get_by_text("Skip for now").click()
+            page.wait_for_timeout(1500)
         try:
             page.click("[title='Open Menu']", timeout=30000)
         except Exception as e:
             page.screenshot(path=a.screenshot)
             print("no menu button (signed in? map loaded?): %s" % str(e)[:160], file=sys.stderr); b.close(); return 1
         page.wait_for_timeout(1500)
-        found = page.get_by_text(a.label, exact=False).count() > 0
+        # The menu is longer than the window: the Search box filters it (lesson ops #461), so the row is on screen.
+        try:
+            page.get_by_placeholder("Search...").fill(a.label)
+        except Exception:
+            pass
+        page.wait_for_timeout(1500)
+        row = page.get_by_text(a.label, exact=False)
+        found = row.count() > 0 and row.first.is_visible()
         page.screenshot(path=a.screenshot)
         b.close()
     if not found:
-        print("menu is open but has no row with text %r" % a.label, file=sys.stderr)
+        print("menu is open but shows no row with text %r" % a.label, file=sys.stderr)
         return 1
     print("menu row %r found" % a.label)
     return 0

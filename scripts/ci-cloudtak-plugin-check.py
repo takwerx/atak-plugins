@@ -15,7 +15,7 @@ This does what a customer does and judges the outcome:
   5. Optional, on the Studio: a headless browser opens CloudTAK signed in and screenshots the plugin's menu entry
      (ci-cloudtak-plugin-look.py), so a person can see it loaded.
 
-  scripts/ci-cloudtak-plugin-check.py --via 'ssh test12' --plugin tak-dispatcher --map-url https://map.example.org
+  scripts/ci-cloudtak-plugin-check.py --via 'ssh test12' --plugin dispatcher --map-url https://map.example.org
         [--reinstall] [--label 'TAK Dispatcher'] [--screenshot FILE] [--max-min 45] [--cloudtak-dir DIR]
   scripts/ci-cloudtak-plugin-check.py --judge-job STATUS.json KIND ID        # verdict on a saved job list, no box
   scripts/ci-cloudtak-plugin-check.py --judge-bundle APP.js ID [ID ...]      # verdict on a saved served app, no box
@@ -24,7 +24,7 @@ This does what a customer does and judges the outcome:
             console user's home (root, or the console user): `ssh test12`, `fresh-install/box fi-2026...`,
             `ssh -i KEY ubuntu@IP sudo bash -c`. The box must run TAK Portal and CloudTAK.
 --plugin    the Marketplace plugin id (GET /api/cloudtak-marketplace/plugins lists them; e.g. print,
-            search-containment, tak-dispatcher).
+            search-containment, dispatcher).
 --map-url   CloudTAK's public address, fetched FROM THE BOX (`curl -k`), so a box behind NAT works.
 --reinstall Uninstall first, then install (another CloudTAK rebuild, about 20 to 40 min). Without it, a plugin that is
             already installed is not installed again: only the app check runs, and the report says so.

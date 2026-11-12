@@ -92,6 +92,7 @@ jobs:
           persist-credentials: false
       - run: bash scripts/test-ci-load-smoke.sh
       - run: bash scripts/test-ci-static-check.sh
+      - run: bash scripts/test-ci-cloudtak-plugin-check.sh
 
   # One build per touched plugin, one at a time, on the Studio.
   build:
