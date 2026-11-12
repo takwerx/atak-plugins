@@ -2,6 +2,8 @@ ATAK Plugin — IWI
 
 **Download IWI 0.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
+- **ATAK-CIV 5.6:** https://github.com/takwerx/iwi/releases/download/v0.3/ATAK-Plugin-IWI-0.3--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/iwi/releases/download/v0.3/ATAK-Plugin-IWI-0.3--5.7.0-civ-release.apk
 - **ATAK-CIV 5.8:** https://github.com/takwerx/iwi/releases/download/v0.3/ATAK-Plugin-IWI-0.3--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/iwi/releases
@@ -42,9 +44,9 @@ Capabilities:
 _________________________________________________________________
 STATUS
 
-Version 0.1, first submission, ATAK-CIV 5.8. Tested on ATAK-CIV 5.8.0.3
+Version 0.3, built for ATAK-CIV 5.6, 5.7 and 5.8. Tested on ATAK-CIV 5.8.0.3
 development builds (Samsung Galaxy S10) and with an official ATAK-CIV 5.8
-device receiving the Data Sync feed.
+device receiving the Data Sync feed; compiled against the 5.6 and 5.7 SDKs.
 
 _________________________________________________________________
 POINT OF CONTACTS
@@ -71,7 +73,7 @@ PORTS REQUIRED
 _________________________________________________________________
 EQUIPMENT REQUIRED
 
-  Android device supported by ATAK-CIV 5.8.
+  Android device supported by ATAK-CIV 5.6, 5.7 or 5.8.
   A TAK Server with Data Sync (missions) to share an IWI. Without a server,
   IWI works on the device alone.
 

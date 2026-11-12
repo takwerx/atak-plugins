@@ -4,6 +4,8 @@
 
 **Download IWI 0.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
+- **ATAK-CIV 5.6:** https://github.com/takwerx/iwi/releases/download/v0.3/ATAK-Plugin-IWI-0.3--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/iwi/releases/download/v0.3/ATAK-Plugin-IWI-0.3--5.7.0-civ-release.apk
 - **ATAK-CIV 5.8:** https://github.com/takwerx/iwi/releases/download/v0.3/ATAK-Plugin-IWI-0.3--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/iwi/releases
@@ -19,7 +21,7 @@ nearest the patient.
 ## Before you start
 
 - **Match the plugin to your ATAK version.** Builds are tied to the ATAK
-  release they were built against. Published builds: **ATAK-CIV 5.8**.
+  release they were built against. Published builds: **ATAK-CIV 5.6, 5.7 and 5.8**.
 - **A reporting aid, not a substitute for the IRPG or your training.** If the
   incident is life threatening, do not let the report delay patient care.
 - **No patient names.** The report holds triage colors, injuries and

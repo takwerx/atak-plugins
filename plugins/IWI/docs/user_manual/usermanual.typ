@@ -35,7 +35,8 @@ the line, and puts the incident on the map for everyone on your Data Sync feed.
 = Before you start
 
 - *Match the plugin to your ATAK version.* Builds are tied to the ATAK release
-  they were built against. This release is published for ATAK 5.8.
+  they were built against. This release is published for ATAK 5.6, 5.7
+  and 5.8.
 - *A reporting aid, not a substitute for the IRPG or your training.* If the
   incident is life threatening, do not let the report delay patient care.
 - *No patient names.* The report holds triage colors, injuries and treatment,
