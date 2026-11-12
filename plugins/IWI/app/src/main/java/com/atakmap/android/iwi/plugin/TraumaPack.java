@@ -251,7 +251,12 @@ public final class TraumaPack {
      * the lessons catalog is checked the same way).
      */
     private static byte[] fetch(String sha) throws IOException {
-        final byte[] body = Http.get(BASE + FILE, MAX_DOWNLOAD);
+        // The pack's hash in the address: each new pack is a new URL, so the CDN's
+        // edge cache can never hand back the last one (2026-11-11: it served the old
+        // pack for hours after the manifest named the new one). The depot ignores it.
+        final String url = BASE + FILE + (sha != null && sha.length() >= 16
+                ? "?v=" + sha.substring(0, 16) : "");
+        final byte[] body = Http.get(url, MAX_DOWNLOAD);
         if (sha != null && !sha.isEmpty() && !sha.equalsIgnoreCase(sha256(body)))
             throw new IOException("the pack does not match its manifest");
         return body;
