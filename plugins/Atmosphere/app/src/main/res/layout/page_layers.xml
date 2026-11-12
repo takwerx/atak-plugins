@@ -628,6 +628,35 @@
                     android:textColor="@color/white"
                     android:textSize="13sp" />
 
+                <TextView
+                    style="@style/TakwerxSectionHeading"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/heading_height" />
+
+                <LinearLayout
+                    android:id="@+id/temperature_level_rows"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+                <TextView
+                    style="@style/TakwerxSectionHeading"
+                    android:id="@+id/temperature_transparency_label"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/raintotals_opacity_heading" />
+
+                <SeekBar
+                    android:id="@+id/temperature_transparency"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="4dp"
+                    android:max="90" />
+
                 <LinearLayout
                     android:id="@+id/temperature_legend"
                     android:layout_width="match_parent"

@@ -454,6 +454,9 @@ public final class AtmospherePane {
     private static final String PREF_TEMPERATURE_OPEN = "weather.temperature.open";
     private final LinearLayout temperatureSettings, temperatureLegend;
     private final WindScaleView temperatureScale;
+    private final LinearLayout temperatureLevelRows;
+    private final android.widget.SeekBar temperatureTransparency;
+    private final TextView temperatureTransparencyLabel;
     private final ImageButton temperatureExpand;
     private final Button temperatureToggle;
     private final TextView temperatureStatus;
@@ -1093,6 +1096,9 @@ public final class AtmospherePane {
         temperatureLegend = find(R.id.temperature_legend);
         temperatureScale = new WindScaleView(pluginContext);
         temperatureLegend.addView(temperatureScale);
+        temperatureLevelRows = find(R.id.temperature_level_rows);
+        temperatureTransparency = find(R.id.temperature_transparency);
+        temperatureTransparencyLabel = find(R.id.temperature_transparency_label);
         snotelSettings = find(R.id.snotel_settings);
         snotelExpand = find(R.id.snotel_expand);
         snotelToggle = find(R.id.snotel_toggle);
@@ -2432,6 +2438,44 @@ public final class AtmospherePane {
             return;
         temperature.setFahrenheit(units != UnitSystem.METRIC);
         updateTemperatureScale();
+        if (temperatureLevelRows.getChildCount() == 0)
+            buildTemperatureLevelRows();
+        updateTemperatureLevel();
+        temperatureTransparency.setMax(RainOverlay.MAX_TRANSPARENCY);
+        temperatureTransparency.setProgress(temperature.transparency());
+        temperatureTransparencyLabel.setText(pluginContext.getString(R.string.raintotals_opacity_heading)
+                + " " + temperature.transparency() + "%");
+        // The bar owns the touch from down to up, or the pager takes a sideways drag
+        // as a page turn (the radar's slider, takwerx/atmosphere#7).
+        temperatureTransparency.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, android.view.MotionEvent e) {
+                final int a = e.getActionMasked();
+                if (a == android.view.MotionEvent.ACTION_DOWN)
+                    v.getParent().requestDisallowInterceptTouchEvent(true);
+                else if (a == android.view.MotionEvent.ACTION_UP
+                        || a == android.view.MotionEvent.ACTION_CANCEL)
+                    v.getParent().requestDisallowInterceptTouchEvent(false);
+                return false;
+            }
+        });
+        temperatureTransparency.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(android.widget.SeekBar bar, int progress, boolean fromUser) {
+                temperatureTransparencyLabel.setText(pluginContext.getString(
+                        R.string.raintotals_opacity_heading) + " " + progress + "%");
+                if (fromUser && temperature != null)
+                    temperature.setTransparency(progress);
+            }
+
+            @Override
+            public void onStartTrackingTouch(android.widget.SeekBar bar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(android.widget.SeekBar bar) {
+            }
+        });
         temperature.setListener(new RainOverlay.Listener() {
             @Override
             public void onFrames(List<String> labels, int shown) {
@@ -2444,7 +2488,10 @@ public final class AtmospherePane {
                     return;
                 final String time = new SimpleDateFormat("MMM d, h:mm a z", Locale.getDefault())
                         .format(new Date(validTime));
-                temperatureStatus.setText("NOAA GFS estimate, valid " + time
+                final NomadsWind.Level level = temperature.level();
+                final String where = level.surface ? "near the ground"
+                        : "at " + level.label(units == UnitSystem.METRIC, units == UnitSystem.AVIATION);
+                temperatureStatus.setText("NOAA GFS estimate " + where + ", valid " + time
                         + (temperature.isCropped() ? " (center of map only; zoom in)" : ""));
             }
 
@@ -2455,6 +2502,85 @@ public final class AtmospherePane {
             }
         });
         updateLayerControls();
+    }
+
+    /**
+     * The heights the temperature is drawn at, as preset buttons four to a row,
+     * the wind's ladder less its 80 m rung (see {@code buildWindLevelRows} for why
+     * buttons and not a slider). The ground is the 2 m temperature.
+     */
+    private void buildTemperatureLevelRows() {
+        final NomadsWind.Level[] all = com.atakmap.android.atmosphere.rain.NomadsTemperature.LEVELS;
+        final int perRow = 4;
+        LinearLayout row = null;
+        for (int i = 0; i < all.length; i++) {
+            if (i % perRow == 0) {
+                row = new LinearLayout(pluginContext);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                temperatureLevelRows.addView(row, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT));
+            }
+            final int index = i;
+            final Button b = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, row, false);
+            b.setText(all[i].shortLabel(units == UnitSystem.METRIC));
+            b.setContentDescription(all[i].surface ? "2 m above ground"
+                    : all[i].label(units == UnitSystem.METRIC, units == UnitSystem.AVIATION));
+            b.setTextSize(13);
+            b.setTag(index);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (temperature == null)
+                        return;
+                    temperature.setLevelIndex(index);
+                    updateTemperatureLevel();
+                }
+            });
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = dp(4);
+            lp.topMargin = dp(4);
+            b.setLayoutParams(lp);
+            row.addView(b);
+        }
+        // Seven rungs on two rows of four: a blank cell keeps the last row's widths.
+        if (row != null && all.length % perRow != 0) {
+            for (int i = all.length % perRow; i < perRow; i++) {
+                final View filler = new View(pluginContext);
+                final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, 1, 1f);
+                lp.rightMargin = dp(4);
+                row.addView(filler, lp);
+            }
+        }
+    }
+
+    /** Light the height being drawn, and relabel the rungs in the operator's unit. */
+    private void updateTemperatureLevel() {
+        if (temperature == null)
+            return;
+        final NomadsWind.Level[] all = com.atakmap.android.atmosphere.rain.NomadsTemperature.LEVELS;
+        final int picked = temperature.levelIndex();
+        for (int i = 0; i < temperatureLevelRows.getChildCount(); i++) {
+            final View r = temperatureLevelRows.getChildAt(i);
+            if (!(r instanceof LinearLayout))
+                continue;
+            final LinearLayout cells = (LinearLayout) r;
+            for (int j = 0; j < cells.getChildCount(); j++) {
+                final View cell = cells.getChildAt(j);
+                if (!(cell instanceof Button) || !(cell.getTag() instanceof Integer))
+                    continue;
+                final int index = (Integer) cell.getTag();
+                if (index >= 0 && index < all.length) {
+                    ((Button) cell).setText(all[index].shortLabel(units == UnitSystem.METRIC));
+                    cell.setContentDescription(all[index].surface ? "2 m above ground"
+                            : all[index].label(units == UnitSystem.METRIC, units == UnitSystem.AVIATION));
+                }
+                ((Button) cell).setTextColor(index == picked
+                        ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+            }
+        }
     }
 
     /**
@@ -7364,6 +7490,7 @@ public final class AtmospherePane {
         if (temperature != null)
             temperature.setFahrenheit(units != UnitSystem.METRIC);
         updateTemperatureScale();
+        updateTemperatureLevel();
         // A unit change is a display change: re-render, never re-fetch.
         render();
         // The Here lines too: the wind said km/h beside a mph legend after the

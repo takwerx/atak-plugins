@@ -1,6 +1,7 @@
 package com.atakmap.android.atmosphere.rain;
 
 import com.atakmap.android.atmosphere.wind.Grib2;
+import com.atakmap.android.atmosphere.wind.NomadsWind;
 
 import java.io.IOException;
 import java.util.List;
@@ -30,8 +31,29 @@ public final class NomadsTemperature {
     }
 
     public static String url(long run, int hour, double west, double south, double east, double north) {
+        return url(run, hour, west, south, east, north, NomadsWind.Level.AGL_10);
+    }
+
+    /**
+     * The heights the temperature is offered at: the wind's ladder less its 80 m
+     * rung, which the model does not carry a temperature for. The ground rung is
+     * the 2 m temperature, the one a thermometer reads; the rest are the standard
+     * pressure surfaces a pilot is briefed on, the freezing level among them.
+     */
+    public static final NomadsWind.Level[] LEVELS = {
+            NomadsWind.Level.AGL_10, NomadsWind.Level.MB_925, NomadsWind.Level.MB_850,
+            NomadsWind.Level.MB_700, NomadsWind.Level.MB_500, NomadsWind.Level.MB_300,
+            NomadsWind.Level.MB_250 };
+
+    /** The filter's name for a rung: the ground is the 2 m temperature. */
+    public static String levelParam(NomadsWind.Level level) {
+        return level.surface ? "lev_2_m_above_ground" : level.param;
+    }
+
+    public static String url(long run, int hour, double west, double south, double east, double north,
+            NomadsWind.Level level) {
         return NomadsRain.url(run, hour, west, south, east, north,
-            "var_TMP=on&lev_2_m_above_ground=on");
+            "var_TMP=on&" + levelParam(level) + "=on");
     }
 
     public static RainGrid read(byte[] body) throws IOException {

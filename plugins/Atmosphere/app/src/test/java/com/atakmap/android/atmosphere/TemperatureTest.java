@@ -23,6 +23,20 @@ public class TemperatureTest {
     }
 
     @Test
+    public void requestAtAltitudeNamesThePressureSurface() {
+        final String url = NomadsTemperature.url(1790488800000L, 6, -120, 15, -100, 30,
+                com.atakmap.android.atmosphere.wind.NomadsWind.Level.MB_850);
+        assertTrue(url, url.contains("var_TMP=on&lev_850_mb=on"));
+        // The ground rung is the 2 m temperature, whatever the wind calls it.
+        assertEquals("lev_2_m_above_ground", NomadsTemperature.levelParam(
+                com.atakmap.android.atmosphere.wind.NomadsWind.Level.AGL_10));
+        assertEquals(com.atakmap.android.atmosphere.wind.NomadsWind.Level.AGL_10,
+                NomadsTemperature.LEVELS[0]);
+        for (com.atakmap.android.atmosphere.wind.NomadsWind.Level l : NomadsTemperature.LEVELS)
+            assertTrue(l.name(), l != com.atakmap.android.atmosphere.wind.NomadsWind.Level.AGL_80);
+    }
+
+    @Test
     public void colorsInterpolateAndMissingValuesAreTransparent() {
         assertEquals(0, NomadsTemperature.color(Float.NaN));
         assertEquals(0xC800C8FF, NomadsTemperature.color(0));

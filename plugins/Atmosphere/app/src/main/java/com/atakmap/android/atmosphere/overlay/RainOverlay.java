@@ -50,6 +50,11 @@ public final class RainOverlay {
     public static final String TEMPERATURE_LAYER_ID = "temperature";
     public static final String HOST = NomadsRain.HOST;
     private static final String PREF_UNITS = "weather.units";
+    private static final String PREF_TRANSPARENCY = "weather.layer.temperature.transparency";
+    private static final String PREF_LEVEL = "weather.layer.temperature.level";
+    /** Percent see-through the operator can ask for, and what the layer starts at. */
+    public static final int MAX_TRANSPARENCY = 90;
+    private static final int DEFAULT_TRANSPARENCY = 0;
 
     /** Eight pixels a quarter-degree cell: a 30-degree box is 960 across. */
     private static final int MAX_PX = 1024;
@@ -103,6 +108,9 @@ public final class RainOverlay {
     private boolean started, on;
     /** Temperature only: band the picture in °F rather than °C. */
     private boolean fahrenheit;
+    /** Temperature only: percent see-through, and the height drawn. */
+    private int transparency = DEFAULT_TRANSPARENCY;
+    private NomadsWind.Level level = NomadsWind.Level.AGL_10;
     private long run;
     private int hours = NomadsRain.HOURS;
     private int hour;
@@ -192,6 +200,16 @@ public final class RainOverlay {
         // bands step in is the operator's, read here, and the pane keeps it current.
         fahrenheit = UnitSystem.fromName(p == null ? null : p.getString(PREF_UNITS, null),
                 UnitSystem.IMPERIAL) != UnitSystem.METRIC;
+        if (temperature && p != null) {
+            transparency = Math.max(0, Math.min(MAX_TRANSPARENCY,
+                    p.getInt(PREF_TRANSPARENCY, DEFAULT_TRANSPARENCY)));
+            try {
+                level = NomadsWind.Level.valueOf(p.getString(PREF_LEVEL, level.name()));
+            } catch (IllegalArgumentException e) {
+                level = NomadsWind.Level.AGL_10;
+            }
+        }
+        layer.setAlpha((100 - transparency) / 100f);
         if (p != null && p.getBoolean("weather.layer." + layerId + ".on", false)
             && egress.isLayerEnabled(layerId))
             setOn(true);
@@ -227,6 +245,52 @@ public final class RainOverlay {
     /** The grid behind the picture on the map, or null; for a legend of what is drawn. */
     public RainGrid shownGrid() {
         return shown == null ? null : shown.grid;
+    }
+
+    public int transparency() {
+        return transparency;
+    }
+
+    /** Percent see-through; the renderer fades what it holds, so the slider moves the picture at once. */
+    public void setTransparency(int percent) {
+        final int v = Math.max(0, Math.min(MAX_TRANSPARENCY, percent));
+        if (v == transparency)
+            return;
+        transparency = v;
+        layer.setAlpha((100 - v) / 100f);
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putInt(PREF_TRANSPARENCY, v).apply();
+    }
+
+    public NomadsWind.Level level() {
+        return level;
+    }
+
+    public int levelIndex() {
+        for (int i = 0; i < NomadsTemperature.LEVELS.length; i++)
+            if (NomadsTemperature.LEVELS[i] == level)
+                return i;
+        return 0;
+    }
+
+    /** The height drawn, by its place in {@link NomadsTemperature#LEVELS}; another height is another fetch. */
+    public void setLevelIndex(int index) {
+        if (!temperature || index < 0 || index >= NomadsTemperature.LEVELS.length)
+            return;
+        final NomadsWind.Level l = NomadsTemperature.LEVELS[index];
+        if (l == level)
+            return;
+        level = l;
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putString(PREF_LEVEL, l.name()).apply();
+        if (!on)
+            return;
+        generation++;
+        pendingKey = null;
+        region = null;
+        ensureRegion();
     }
 
     /**
@@ -399,7 +463,8 @@ public final class RainOverlay {
     // ---- region and frames ---------------------------------------------------------
 
     private String key(long run, int hour, GeoBounds r) {
-        return String.format(Locale.US, "%d|%d|%.3f,%.3f,%.3f,%.3f", run, hour,
+        return String.format(Locale.US, "%d|%d|%s|%.3f,%.3f,%.3f,%.3f", run, hour,
+                temperature ? level.name() : "",
                 r.getWest(), r.getSouth(), r.getEast(), r.getNorth());
     }
 
@@ -559,7 +624,7 @@ public final class RainOverlay {
         final double west = Math.max(-180, r.getWest() - 0.1), east = Math.min(180, r.getEast() + 0.1);
         final double south = r.getSouth() - 0.1, north = r.getNorth() + 0.1;
         final String url = temperature
-            ? NomadsTemperature.url(tryRun, h, west, south, east, north)
+            ? NomadsTemperature.url(tryRun, h, west, south, east, north, level)
             : NomadsRain.url(tryRun, h, west, south, east, north);
         Http.getBytes(url,
                 egress.userAgent(), new Http.BytesCallback() {
@@ -687,6 +752,7 @@ public final class RainOverlay {
         final int rows = Math.max(1, Math.round(height * (float) ((north - south)
                 / (view.getNorth() - view.getSouth())) / cellPx));
         final boolean fahrenheit = this.fahrenheit;
+        final NomadsWind.Level level = this.level;
         final long validTime = f.grid.validTime;
         final int mine = generation;
         w.execute(new Runnable() {
@@ -706,7 +772,10 @@ public final class RainOverlay {
                         continue;
                     final AttributeSet attrs = new AttributeSet();
                     attrs.setAttribute("Air temperature", text);
+                    attrs.setAttribute("Height", level.surface ? "2 m above ground"
+                            : level.label(!fahrenheit, true));
                     attrs.setAttribute("_details", "Air temperature " + text
+                            + (level.surface ? " near the ground" : " at " + level.label(!fahrenheit, true))
                             + "\nNOAA GFS estimate for the model hour shown; not a station reading.");
                     drawn.add(new AtmosphereFeatures.Drawn(LABELS_NAME, text,
                             AtmosphereFeatures.point(l.lat, l.lon),
