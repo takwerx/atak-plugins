@@ -1,6 +1,6 @@
 # IWI for ATAK — User Guide
 
-**Version 0.2 · takwerx**
+**Version 0.3 · takwerx**
 
 **Download IWI 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
@@ -135,6 +135,14 @@ Where a patient flies is the air crew's call.
 
 ![One hospital's details](screenshots/19_hospital_details.png)
 
+**On the map.** The IWI marker and the hospitals sent with it. Each hospital
+carries a red box: its name on the first line, its kind on the second. Every
+device on the feed sees the same.
+
+![The IWI and its hospitals on the map](screenshots/23_map.png)
+
+![A hospital close: the red box over ATAK's hospital icon](screenshots/24_hospital_close.png)
+
 ## 6. Settings and Clear
 
 ![Settings](screenshots/20_settings.png)
@@ -164,6 +172,13 @@ another device's IWI opens its whole report, read only, with the counts in
 color.
 
 ![ATAK's CASEVAC view beside IWI](screenshots/26_casevac_vs_iwi.png)
+
+**Another device's IWI.** On a device with IWI, a tap on another device's IWI
+opens it read only: the counts in color, who has been transported first, then
+the initial report and the follow-up as the radio script says them. Tap a
+heading to open or close it. It updates as the reporter changes it.
+
+![Another device's IWI, read only](screenshots/22_read_only.png)
 
 In Data Sync, the IWI feed lists the IWI marker, its hospitals, and each update
 to them. A device that joins the feed later gets the IWI as it stands now.

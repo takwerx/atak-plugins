@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "IWI",
-   plugin-version: "0.2",
+   plugin-version: "0.3",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -228,6 +228,27 @@ map. Where a patient flies is the air crew's call.
 ]
 
 #tak-slide[
+= On the map
+
+#align(center, image("23.png", height: 200pt))
+
+The IWI marker and the hospitals sent with it. Each hospital carries a red box:
+its name on the first line, its kind on the second. Every device on the feed
+sees the same.
+]
+
+#tak-slide[
+= A hospital on the map
+
+#toolbox.side-by-side(columns: (6fr, 5fr))[
+  #image("24.png", width: 100%)
+][
+  - The red box: the name, then the trauma level, burn center and helipad.
+  - Under it, ATAK's hospital icon.
+]
+]
+
+#tak-slide[
 = Settings
 
 #align(center, image("20.png", height: 175pt))
@@ -267,6 +288,25 @@ holds the location, the count and the request; its remarks hold the report.
 Right: the same IWI on the reporting device. On a device with IWI, a tap on
 another device's IWI opens its whole report, read only, with the counts in
 color.
+]
+
+#tak-slide[
+= Another device's IWI
+
+#toolbox.side-by-side(columns: (5fr, 6fr))[
+  #image("22.png", height: 250pt)
+][
+  On a device with IWI, a tap on another device's IWI opens it read only.
+
+  - The counts in color, as on the reporter's own screen.
+  - Who has been transported, first.
+  - The initial report and the follow-up as the radio script says them. Tap a
+    heading to open or close it.
+
+  #v(6pt)
+
+  It updates as the reporter changes it.
+]
 ]
 
 #tak-slide[
