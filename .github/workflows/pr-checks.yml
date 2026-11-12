@@ -61,6 +61,39 @@ jobs:
           fi
           echo "No SDK artifacts or signing material in this PR."
 
+  # No-SDK static check of each touched plugin (ops #692): the build files, manifest and
+  # proguard rule that decide whether it builds and loads, and the publish scrub. Free runner,
+  # no SDK, so it also runs on a fork PR, which the Studio build never does.
+  static:
+    needs: detect
+    if: needs.detect.outputs.plugins != '[]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        plugin: ${{ fromJSON(needs.detect.outputs.plugins) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - env:
+          PLUGIN: ${{ matrix.plugin }}
+        run: bash scripts/ci-static-check.sh "plugins/$PLUGIN"
+
+  # The offline tests of the check scripts themselves (ops #692): the load-smoke log judge and
+  # the static check. Free runner; a few seconds. A broken check that says PASS is worse than none.
+  tooling-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - run: bash scripts/test-ci-load-smoke.sh
+      - run: bash scripts/test-ci-static-check.sh
+      - run: bash scripts/test-ci-cloudtak-plugin-check.sh
+
   # One build per touched plugin, one at a time, on the Studio.
   build:
     needs: detect
@@ -86,7 +119,7 @@ jobs:
 
   # One stable name to require in branch protection.
   checks-ok:
-    needs: [detect, sdk-guard, build]
+    needs: [detect, sdk-guard, static, tooling-tests, build]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -94,6 +127,8 @@ jobs:
       - env:
           DETECT: ${{ needs.detect.result }}
           GUARD: ${{ needs.sdk-guard.result }}
+          STATIC: ${{ needs.static.result }}
+          TESTS: ${{ needs.tooling-tests.result }}
           BUILD: ${{ needs.build.result }}
           PLUGINS: ${{ needs.detect.outputs.plugins }}
           ENABLED: ${{ vars.TIER1_PLUGIN_BUILDS }}
@@ -101,6 +136,9 @@ jobs:
         run: |
           [ "$DETECT" = success ] || { echo "::error::detect: $DETECT"; exit 1; }
           [ "$GUARD" = success ]  || { echo "::error::sdk-guard: $GUARD"; exit 1; }
+          [ "$TESTS" = success ]  || { echo "::error::tooling-tests: $TESTS"; exit 1; }
+          # static is skipped when no plugin is touched, and must pass when one is.
+          if [ "$PLUGINS" != '[]' ]; then [ "$STATIC" = success ] || { echo "::error::static: $STATIC"; exit 1; }; fi
           if [ "$PLUGINS" != '[]' ] && [ "$ENABLED" = true ]; then
             if [ "$SAME_REPO" != true ]; then
               echo "::error::Fork PR: its code is never run on the Studio. A maintainer must push the branch to takwerx/atak-plugins so it gets built."

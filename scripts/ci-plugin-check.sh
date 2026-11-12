@@ -4,6 +4,12 @@
 # the Studio, and you can run the very same thing by hand:
 #
 #   scripts/ci-plugin-check.sh <Plugin>
+#   scripts/ci-plugin-check.sh <Plugin> --release
+#
+# --release is the check /ship runs on the candidate commit (ops #692): the civ
+# RELEASE build, which turns on minify and proguard and so catches what a debug
+# build hides (CLAUDE.md, "Release builds differ from debug builds"), plus the
+# same unit tests. Both modes end by printing the APK path as `APK=<path>`.
 #
 # It builds against the ATAK SDK under ~/atak-sdk (local-properties.sh picks the
 # newest one for the plugin's ATAK_VERSION). The SDK license forbids shipping it,
@@ -15,7 +21,9 @@
 # Exit 1 when the build or a test fails, 2 on a usage error.
 set -euo pipefail
 PLUGIN="${1:-}"
-[ $# -eq 1 ] && [ -n "$PLUGIN" ] || { echo "usage: $0 <Plugin>" >&2; exit 2; }
+VARIANT=debug
+case "${2:-}" in "") ;; --release) VARIANT=release ;; *) PLUGIN="" ;; esac
+[ $# -le 2 ] && [ -n "$PLUGIN" ] || { echo "usage: $0 <Plugin> [--release]" >&2; exit 2; }
 case "$PLUGIN" in *[!A-Za-z0-9]*) echo "ci-plugin-check: plugin names are letters and digits only" >&2; exit 2 ;; esac
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -32,11 +40,15 @@ HEAVY=""
 cd "$DIR"
 # A Gradle daemon left running holds a gigabyte or two after the job ends.
 trap './gradlew --stop >/dev/null 2>&1 || true' EXIT
+# An APK left from an earlier build must not let a failed build look like a pass.
+# Removing it also makes Gradle run the assemble task again, never "UP-TO-DATE".
+rm -rf "app/build/outputs/apk/civ/$VARIANT"
 
 # The SDK template ships an ExampleTest and no junit, so on a plugin that never
 # added the dependency testCivDebugUnitTest cannot even compile. Such a plugin
 # gets the build alone -- unless it has real tests, which would then never run.
-TASKS="assembleCivDebug testCivDebugUnitTest"
+if [ "$VARIANT" = release ]; then BUILD_TASK=assembleCivRelease; else BUILD_TASK=assembleCivDebug; fi
+TASKS="$BUILD_TASK testCivDebugUnitTest"
 if ! grep -qE "^[[:space:]]*testImplementation[[:space:]]+['\"]junit:junit" app/build.gradle; then
   REAL="$(find app/src/test -name '*.java' -o -name '*.kt' 2>/dev/null | grep -v '/ExampleTest\.java$' || true)"
   if [ -n "$REAL" ]; then
@@ -46,13 +58,14 @@ if ! grep -qE "^[[:space:]]*testImplementation[[:space:]]+['\"]junit:junit" app/
     exit 1
   fi
   echo "notice: $PLUGIN has no unit tests (template ExampleTest only, no junit); building only"
-  TASKS="assembleCivDebug"
+  TASKS="$BUILD_TASK"
 fi
 
 echo "== $PLUGIN: $TASKS"
 # shellcheck disable=SC2086
 $HEAVY ./gradlew --console=plain $TASKS
 
-ls app/build/outputs/apk/civ/debug/ATAK-Plugin-*.apk >/dev/null 2>&1 \
-  || { echo "ci-plugin-check: $PLUGIN built but no ATAK-Plugin-*.apk came out" >&2; exit 1; }
+APK="$(find "app/build/outputs/apk/civ/$VARIANT" -name 'ATAK-Plugin-*.apk' 2>/dev/null | head -1)"
+[ -n "$APK" ] || { echo "ci-plugin-check: $PLUGIN built but no ATAK-Plugin-*.apk came out ($VARIANT)" >&2; exit 1; }
 echo "== $PLUGIN: ok"
+echo "APK=$DIR/$APK"
