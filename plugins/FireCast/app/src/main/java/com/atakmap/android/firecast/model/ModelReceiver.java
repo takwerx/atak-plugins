@@ -222,8 +222,13 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             @Override
             public void onClick(View v) {
                 final String[] keys = { FireModel.COND_OBSERVED, FireModel.COND_GUST, FireModel.COND_DRY, FireModel.COND_DRY_WINDY };
-                final String[] labels = { "As observed at the station picked",
-                        "As observed, but at the gust",
+                // Name the weather the run will use: a hand-entered observation is not
+                // "the station picked" (operator, 2026-11-12).
+                final Observation ob = model.observation();
+                final String source = ob == null ? "at the station picked"
+                        : "(" + (ob.source.startsWith("Kestrel") ? ob.source : "my obs " + clock(ob.at)) + ")";
+                final String[] labels = { "As observed " + source,
+                        "As observed " + source + ", but at the gust",
                         "Dry day: 1 h 4%, 10 h 5%, 100 h 7%, wind as observed",
                         "Dry and 20 mph wind" };
                 int current = 0;
