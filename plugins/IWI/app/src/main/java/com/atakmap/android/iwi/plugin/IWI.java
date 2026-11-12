@@ -88,7 +88,7 @@ public class IWI implements IPlugin {
             iwiDetailHandler = new IwiDetailHandler();
         CotDetailManager.getInstance().registerHandler(iwiDetailHandler);
         // Read from disk on a worker, refreshed from the depot in the background.
-        trauma = new TraumaManager(mapView);
+        trauma = new TraumaManager(mapView, pluginContext);
         trauma.start();
         hospitalLabels = new HospitalLabels(mapView);
         hospitalLabels.start();

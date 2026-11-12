@@ -45,16 +45,81 @@ public final class TraumaPack {
     /** The manifest is under a kilobyte. */
     private static final int MAX_MANIFEST = 64 * 1024;
 
-    private final File dir;
+    /**
+     * The copy built into the APK, under assets/hospitals/: the depot's manifest and
+     * pack at build time. The pack is renamed because the Android build drops a ".gz"
+     * suffix from an asset, and then the two names collide.
+     */
+    private static final String ASSET_DIR = "hospitals/";
+    private static final String ASSET_PACK = "pack.bin";
+    private static final String ASSET_MANIFEST = "manifest.json";
 
-    public TraumaPack() {
-        this(new File(FileSystemUtils.getItem("tools/iwi"), "hospitals"));
+    private final File dir;
+    /** Where the built-in copy is read from; null in a test. */
+    private final android.content.Context pluginContext;
+
+    public TraumaPack(android.content.Context pluginContext) {
+        this(new File(FileSystemUtils.getItem("tools/iwi"), "hospitals"), pluginContext);
     }
 
-    TraumaPack(File dir) {
+    TraumaPack(File dir, android.content.Context pluginContext) {
         this.dir = dir;
+        this.pluginContext = pluginContext;
         if (!dir.exists() && !dir.mkdirs())
             Log.w(TAG, "could not make " + dir);
+    }
+
+    /**
+     * With no pack on the device, the one built into the plugin is written there, so a
+     * device loaded with no network still lists hospitals (operator, 2026-11-11). Its
+     * manifest is dated long ago, so the first refresh with a network asks the depot at
+     * once and replaces the copy when the depot has a newer one. Worker thread only.
+     */
+    public void seed() {
+        if (pluginContext == null || new File(dir, FILE).exists())
+            return;
+        try {
+            final byte[] gz = asset(ASSET_PACK, MAX_DOWNLOAD);
+            final byte[] manifest = asset(ASSET_MANIFEST, MAX_MANIFEST);
+            // Only a copy that agrees with its own manifest is written.
+            final Index idx = read(new String(manifest, Charset.forName("UTF-8")));
+            if (idx.isEmpty() || !idx.sha.equalsIgnoreCase(sha256(gz))) {
+                Log.w(TAG, "the built-in pack does not match its manifest");
+                return;
+            }
+            write(new File(dir, FILE), gz);
+            final File m = new File(dir, MANIFEST);
+            write(m, manifest);
+            if (!m.setLastModified(0L))
+                Log.d(TAG, "could not age the built-in manifest");
+            Log.d(TAG, "seeded the built-in pack, " + idx.count + " hospitals");
+        } catch (Exception e) {
+            Log.w(TAG, "could not seed the built-in pack", e);
+        }
+    }
+
+    private byte[] asset(String name, int max) throws IOException {
+        InputStream in = null;
+        try {
+            in = pluginContext.getAssets().open(ASSET_DIR + name);
+            final ByteArrayOutputStream out = new ByteArrayOutputStream(128 * 1024);
+            final byte[] buf = new byte[32 * 1024];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                out.write(buf, 0, n);
+                if (out.size() > max)
+                    throw new IOException(name + " is larger than " + max + " bytes");
+            }
+            return out.toByteArray();
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ignored) {
+                    // Already have the body or the failure.
+                }
+            }
+        }
     }
 
     /** What the manifest says about the pack. */

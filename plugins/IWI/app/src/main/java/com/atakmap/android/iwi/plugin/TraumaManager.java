@@ -55,10 +55,10 @@ public final class TraumaManager {
     private volatile boolean busy;
     private Listener listener;
 
-    public TraumaManager(MapView mapView) {
+    public TraumaManager(MapView mapView, android.content.Context pluginContext) {
         this.mapView = mapView;
         this.prefs = mapView.getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        this.pack = new TraumaPack();
+        this.pack = new TraumaPack(pluginContext);
         this.worker = Executors.newSingleThreadExecutor(new ThreadFactory() {
             @Override
             public Thread newThread(Runnable r) {
@@ -78,6 +78,9 @@ public final class TraumaManager {
         worker.execute(new Runnable() {
             @Override
             public void run() {
+                // A first load with no network still has hospitals: the copy built
+                // into the plugin, replaced by the depot's as soon as there is one.
+                pack.seed();
                 // Disk only, so the line is right the moment the pane opens.
                 index = pack.index(false);
                 try {
