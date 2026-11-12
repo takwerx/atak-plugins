@@ -13,8 +13,10 @@ import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.StyleSpan;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -559,24 +561,29 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         if (when.length() > 0)
             scriptContainer.addView(note(when.toString()));
 
-        final GeoPoint p = v.point();
-        final String coords = p == null ? null : Coords.ddm(p.getLatitude(), p.getLongitude());
-        // The report as the reporter's Radio Script shows it, without the radio
-        // instructions: those are for the one on the radio.
-        scriptContainer.addView(heading("Initial report"));
-        render(RadioScript.initial(v, coords), true);
-        final List<RadioScript.Section> more = RadioScript.followUp(v);
-        if (!more.isEmpty()) {
-            scriptContainer.addView(heading("Follow-up"));
-            render(more, true);
-        }
+        // Who has left the scene first: that is what a reader comes back for (operator,
+        // 2026-11-11: "transported list should be at top of viewer").
         final List<Patient> gone = v.transported();
         if (!gone.isEmpty()) {
             scriptContainer.addView(heading("Transported"));
-            for (Patient g : gone)
-                scriptContainer.addView(note(g.label() + " " + Patient.name(g.color) + ", "
-                        + Clock.hhmm(g.transportedMs)));
+            for (Patient g : gone) {
+                final TextView t = line(g.label() + " " + Patient.name(g.color) + ", "
+                        + Clock.hhmm(g.transportedMs), 18, Color.WHITE);
+                t.setPadding(0, dp(4), 0, dp(2));
+                scriptContainer.addView(t);
+            }
         }
+
+        final GeoPoint p = v.point();
+        final String coords = p == null ? null : Coords.ddm(p.getLatitude(), p.getLongitude());
+        // The report as the reporter's Radio Script shows it, without the radio
+        // instructions: those are for the one on the radio. Each part folds, and stays
+        // as it was left (operator, 2026-11-11: "ability to collapse radio report").
+        final LinearLayout initial = viewFold("Initial report", "initial");
+        render(RadioScript.initial(v, coords), true, initial);
+        final List<RadioScript.Section> more = RadioScript.followUp(v);
+        if (!more.isEmpty())
+            render(more, true, viewFold("Follow-up", "followup"));
         refreshTally();
         refreshSteps();
         return true;
@@ -1469,6 +1476,11 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
 
     /** @param readOnly another device's report: its words, not the radio instructions */
     private boolean render(List<RadioScript.Section> sections, boolean readOnly) {
+        return render(sections, readOnly, scriptContainer);
+    }
+
+    private boolean render(List<RadioScript.Section> sections, boolean readOnly,
+            LinearLayout scriptContainer) {
         boolean anyMissing = false;
         for (RadioScript.Section s : sections) {
             final TextView title = line(s.number + ". " + s.title, 17, color(R.color.amber));
@@ -1508,6 +1520,46 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                 scriptContainer.addView(action(s.after));
         }
         return anyMissing;
+    }
+
+    /**
+     * A heading in the read-only view that opens and closes what is under it: the
+     * heading itself and the arrow beside it both flip it. Open until closed, and
+     * remembered on this device.
+     */
+    private LinearLayout viewFold(String title, String key) {
+        final LinearLayout headRow = new LinearLayout(ctx);
+        headRow.setOrientation(LinearLayout.HORIZONTAL);
+        headRow.setGravity(Gravity.CENTER_VERTICAL);
+        final Button head = new Button(ctx, null, 0, R.style.TakwerxButton);
+        head.setText(title);
+        head.setTextColor(0xFF00E5FF);
+        head.setTypeface(Typeface.DEFAULT_BOLD);
+        head.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        headRow.addView(head, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        final ImageButton chev = new ImageButton(ctx, null, 0, R.style.TakwerxIconButton);
+        chev.setImageResource(R.drawable.ic_expand);
+        chev.setContentDescription(title);
+        final LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(dp(44), dp(44));
+        clp.leftMargin = dp(2);
+        headRow.addView(chev, clp);
+        final LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        hlp.topMargin = dp(12);
+        scriptContainer.addView(headRow, hlp);
+        final LinearLayout body = new LinearLayout(ctx);
+        body.setOrientation(LinearLayout.VERTICAL);
+        scriptContainer.addView(body, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        final android.content.SharedPreferences ui = mapView.getContext()
+                .getSharedPreferences("iwi_view_ui", Context.MODE_PRIVATE);
+        final String pref = "fold." + key;
+        // Fold reads "closed" as its default; the report opens until it is closed.
+        if (!ui.contains(pref))
+            ui.edit().putBoolean(pref, true).apply();
+        new Fold(head, chev, body, ui, pref);
+        return body;
     }
 
     /** What to do, not say: pause, or wait for an answer. Yellow. */
