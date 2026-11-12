@@ -11,17 +11,19 @@ public final class NomadsTemperature {
      * The broadcast weather map's scale: purple through blue, cyan, green, yellow,
      * orange and red to magenta, saturated and nearly opaque, so the bands read from
      * across a room (operator, 2026-11-12: "the 90's weather report look"). Below
-     * the purple the scale keeps changing hue every five degrees, magenta, pink,
-     * white, then steel to slate, because at 34,000 ft the whole sky is colder than
-     * -40 and was one purple (operator, the same day: "we lose differentiation in
-     * color at higher altitudes"); the aloft charts reuse colors the same way. Stops
-     * in °C; the gradient between them is read at each band's middle.
+     * the purple the scale lightens every five degrees, violet, lavender, lilac to
+     * white at -80: at 34,000 ft the whole sky is colder than -40 and was one
+     * purple (operator, the same day: "we lose differentiation in color at higher
+     * altitudes"), and the cold stays its own family rather than borrowing the
+     * temperate hues, so cold reads as cold (operator: "it made it distinct from the
+     * temperate colors"). Stops in °C; the gradient between them is read at each
+     * band's middle.
      */
     private static final float[] STOPS = { -80, -75, -70, -65, -60, -55, -50, -45, -40, -30, -20,
             -10, 0, 5, 10, 15, 20, 25, 30, 35, 40, 45 };
     private static final int[] COLORS = {
-            0xC8323C50, 0xC85A6E82, 0xC88CA0B4, 0xC8C8D2E6, 0xC8FFFFFF, 0xC8FFB4DC, 0xC8FF64C8,
-            0xC8E000E0,
+            0xC8FFFFFF, 0xC8E6E6FA, 0xC8D2CDF5, 0xC8BEB4F0, 0xC8AA96EC, 0xC89678E6, 0xC88C5AE0,
+            0xC89A3CD2,
             0xC8B000C8, 0xC87B1FE0, 0xC81E3CFF, 0xC80A78FF, 0xC800C8FF, 0xC800D28C, 0xC828C832,
             0xC8A0E600, 0xC8FFE600, 0xC8FFB400, 0xC8FF7800, 0xC8FF3C00, 0xC8E00000, 0xC8B40064 };
 
@@ -55,21 +57,6 @@ public final class NomadsTemperature {
     /** The filter's name for a rung: the ground is the 2 m temperature. */
     public static String levelParam(NomadsWind.Level level) {
         return level.surface ? "lev_2_m_above_ground" : level.param;
-    }
-
-    /**
-     * How far the scale slides for a height, °C: the standard atmosphere's drop
-     * from the ground to there (6.5 °C a kilometer, to the tropopause), so the
-     * typical temperature at every height lands on the same color 15 °C does at
-     * the ground. Aloft the whole sky is colder than -40, and on the ground's
-     * scale it was one purple (operator, 2026-11-12); the aloft charts a pilot
-     * reads each carry their own scale, and this is that. The bands and their
-     * labels are still the real temperature; only the color slides.
-     */
-    public static float scaleShift(NomadsWind.Level level) {
-        if (level == null || level.surface)
-            return 0f;
-        return Math.min(level.approxMeters, 11_000) * 0.0065f;
     }
 
     public static String url(long run, int hour, double west, double south, double east, double north,
@@ -143,15 +130,10 @@ public final class NomadsTemperature {
      * so every point in one band is one color and the bands step rather than blend.
      */
     public static int bandColor(float celsius, boolean fahrenheit) {
-        return bandColor(celsius, fahrenheit, 0f);
-    }
-
-    /** The band's color on a scale slid up by {@code shift} °C; see {@link #scaleShift}. */
-    public static int bandColor(float celsius, boolean fahrenheit, float shift) {
         final float floor = bandFloor(celsius, fahrenheit);
         if (Float.isNaN(floor))
             return 0;
-        return color(toCelsius(floor + BAND_DEGREES / 2f, fahrenheit) + shift);
+        return color(toCelsius(floor + BAND_DEGREES / 2f, fahrenheit));
     }
 
     /**
@@ -182,26 +164,18 @@ public final class NomadsTemperature {
 
     /** One opaque color per band in {@code edges}, for the legend bar. */
     public static int[] bandColors(float[] edges, boolean fahrenheit) {
-        return bandColors(edges, fahrenheit, 0f);
-    }
-
-    public static int[] bandColors(float[] edges, boolean fahrenheit, float shift) {
         final int[] out = new int[edges.length];
         for (int i = 0; i < edges.length; i++)
-            out[i] = color(toCelsius(edges[i] + BAND_DEGREES / 2f, fahrenheit) + shift) | 0xff000000;
+            out[i] = color(toCelsius(edges[i] + BAND_DEGREES / 2f, fahrenheit)) | 0xff000000;
         return out;
     }
 
     public static int[] render(RainGrid grid, int width, int height) {
-        return render(grid, width, height, false, 0f);
+        return render(grid, width, height, false);
     }
 
+    /** The picture in five-degree steps of the unit shown; see {@link #bandColor}. */
     public static int[] render(RainGrid grid, int width, int height, boolean fahrenheit) {
-        return render(grid, width, height, fahrenheit, 0f);
-    }
-
-    /** The picture in five-degree steps of the unit shown, on a scale slid by {@code shift}; see {@link #bandColor}. */
-    public static int[] render(RainGrid grid, int width, int height, boolean fahrenheit, float shift) {
         final int[] pixels = new int[width * height];
         final double deltaLon = (grid.east - grid.west) / width;
         final double deltaLat = (grid.north - grid.south) / height;
@@ -209,7 +183,7 @@ public final class NomadsTemperature {
             final double lat = grid.north - (row + 0.5) * deltaLat;
             for (int column = 0; column < width; column++)
                 pixels[row * width + column] = bandColor(
-                        grid.sample(lat, grid.west + (column + 0.5) * deltaLon), fahrenheit, shift);
+                        grid.sample(lat, grid.west + (column + 0.5) * deltaLon), fahrenheit);
         }
         return pixels;
     }

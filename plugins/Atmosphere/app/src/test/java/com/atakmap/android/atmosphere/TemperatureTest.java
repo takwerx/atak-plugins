@@ -34,14 +34,6 @@ public class TemperatureTest {
                 NomadsTemperature.LEVELS[0]);
         for (com.atakmap.android.atmosphere.wind.NomadsWind.Level l : NomadsTemperature.LEVELS)
             assertTrue(l.name(), l != com.atakmap.android.atmosphere.wind.NomadsWind.Level.AGL_80);
-        // The scale slides with height by the standard lapse, so the typical
-        // temperature aloft takes the color the typical ground temperature does.
-        assertEquals(0f, NomadsTemperature.scaleShift(com.atakmap.android.atmosphere.wind.NomadsWind.Level.AGL_10), 0f);
-        assertEquals(1500 * 0.0065f, NomadsTemperature.scaleShift(com.atakmap.android.atmosphere.wind.NomadsWind.Level.MB_850), 0.001f);
-        final float aloft = NomadsTemperature.scaleShift(com.atakmap.android.atmosphere.wind.NomadsWind.Level.MB_250);
-        assertTrue(aloft > 60 && aloft < 75);
-        assertNotEquals(NomadsTemperature.bandColor(-52f, false), NomadsTemperature.bandColor(-52f, false, aloft));
-        assertNotEquals(NomadsTemperature.bandColor(-50f, false, aloft), NomadsTemperature.bandColor(-55f, false, aloft));
     }
 
     @Test
