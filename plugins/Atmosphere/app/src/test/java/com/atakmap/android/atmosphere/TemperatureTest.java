@@ -34,6 +34,14 @@ public class TemperatureTest {
                 NomadsTemperature.LEVELS[0]);
         for (com.atakmap.android.atmosphere.wind.NomadsWind.Level l : NomadsTemperature.LEVELS)
             assertTrue(l.name(), l != com.atakmap.android.atmosphere.wind.NomadsWind.Level.AGL_80);
+        // The scale slides with height by the standard lapse, so the typical
+        // temperature aloft takes the color the typical ground temperature does.
+        assertEquals(0f, NomadsTemperature.scaleShift(com.atakmap.android.atmosphere.wind.NomadsWind.Level.AGL_10), 0f);
+        assertEquals(1500 * 0.0065f, NomadsTemperature.scaleShift(com.atakmap.android.atmosphere.wind.NomadsWind.Level.MB_850), 0.001f);
+        final float aloft = NomadsTemperature.scaleShift(com.atakmap.android.atmosphere.wind.NomadsWind.Level.MB_250);
+        assertTrue(aloft > 60 && aloft < 75);
+        assertNotEquals(NomadsTemperature.bandColor(-52f, false), NomadsTemperature.bandColor(-52f, false, aloft));
+        assertNotEquals(NomadsTemperature.bandColor(-50f, false, aloft), NomadsTemperature.bandColor(-55f, false, aloft));
     }
 
     @Test
@@ -42,8 +50,11 @@ public class TemperatureTest {
         assertEquals(0xC800C8FF, NomadsTemperature.color(0));
         assertNotEquals(NomadsTemperature.color(0), NomadsTemperature.color(5));
         assertNotEquals(NomadsTemperature.color(5), NomadsTemperature.color(10));
-        assertEquals(NomadsTemperature.color(-40), NomadsTemperature.color(-80));
+        assertEquals(NomadsTemperature.color(-80), NomadsTemperature.color(-120));
         assertEquals(NomadsTemperature.color(45), NomadsTemperature.color(80));
+        // The upper air at 250 mb, -40 to -60, still steps by band.
+        assertNotEquals(NomadsTemperature.bandColor(-42f, false), NomadsTemperature.bandColor(-52f, false));
+        assertNotEquals(NomadsTemperature.bandColor(-52f, false), NomadsTemperature.bandColor(-62f, false));
     }
 
     @Test

@@ -2605,7 +2605,8 @@ public final class AtmospherePane {
         for (int i = 0; i < joins.length; i++)
             joins[i] = edges[i + 1];
         temperatureScale.setBands(
-                com.atakmap.android.atmosphere.rain.NomadsTemperature.bandColors(edges, fahrenheit),
+                com.atakmap.android.atmosphere.rain.NomadsTemperature.bandColors(edges, fahrenheit,
+                        com.atakmap.android.atmosphere.rain.NomadsTemperature.scaleShift(temperature.level())),
                 joins, fahrenheit ? "°F" : "°C");
         temperatureScale.setEnds(null, null);
     }

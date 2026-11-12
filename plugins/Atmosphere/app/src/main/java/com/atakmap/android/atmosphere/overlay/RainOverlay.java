@@ -335,7 +335,8 @@ public final class RainOverlay {
         final int maxPx = temperature ? MAX_PX_TEMPERATURE : MAX_PX;
         final int pw = Math.max(64, Math.min(maxPx, g.nx * PX_PER_CELL));
         final int ph = Math.max(64, Math.min(maxPx, g.ny * PX_PER_CELL));
-        final int[] px = temperature ? NomadsTemperature.render(g, pw, ph, fahrenheit)
+        final int[] px = temperature
+                ? NomadsTemperature.render(g, pw, ph, fahrenheit, NomadsTemperature.scaleShift(level))
                 : NomadsRain.render(g, pw, ph);
         Log.d(TAG, String.format(Locale.US, "drawn %dx%d over %.2f,%.2f..%.2f,%.2f, %s",
                 pw, ph, g.west, g.south, g.east, g.north,
@@ -766,7 +767,8 @@ public final class RainOverlay {
                 for (BandLabels.Label l : placed) {
                     final String text = BandLabels.text(l.floor, fahrenheit);
                     final int fill = NomadsTemperature.bandColor(
-                            NomadsTemperature.toCelsius(l.floor + 1f, fahrenheit), fahrenheit);
+                            NomadsTemperature.toCelsius(l.floor + 1f, fahrenheit), fahrenheit,
+                            NomadsTemperature.scaleShift(level));
                     final ZonePills.Pill pill = pills.pill(text, textOn(fill), fill);
                     if (pill == null)
                         continue;
