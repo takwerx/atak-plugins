@@ -138,6 +138,19 @@ people offered work on takwerx/comms in September 2026 and neither could open a
 pull request, and the same question sat unanswered on takwerx/map-depot for a
 week.
 
+**Every plugin carries its issue forms and SECURITY.md.** `.github/ISSUE_TEMPLATE/`
+(`bug.yml`, `feature.yml`, `config.yml`) and `SECURITY.md`, so a bug report
+arrives with the plugin version, ATAK version and device already in it instead
+of after a round trip, and a vulnerability goes to the repo's private reporting
+rather than a public issue. The text lives once in
+`scripts/templates/community-health/`; `scripts/add-community-health.sh
+<Plugin>|--all [--force]` writes it, filling in the display name and public
+repo name from the README (title line and the `All releases:` link), and
+`new-plugin.sh` runs it. Change the template, re-run with `--force`, and
+publish each plugin with `/ship <Plugin> docs`. No email address goes in these
+files: publish-scrub blocks them, and SECURITY.md points at GitHub's private
+reporting instead.
+
 The exception matters and is not boilerplate. A plugin's classes load into
 ATAK's process and call its API directly, so the AGPL needs an additional
 permission under §7 for the TAK Software; and `new-plugin.sh` copies the SDK's
@@ -323,6 +336,47 @@ Consequence: **GitHub Actions cannot build these plugins today.** CI would need 
 which we may not ship. The supported CI path is `takrepo.url/user/password`
 (artifacts.tak.gov Artifactory) as repo secrets — wire that up if/when a tak.gov
 Artifactory account exists. Do not "solve" CI by committing the SDK.
+
+**PR checks (`.github/workflows/pr-checks.yml`, takwerx/ops#238).** The Studio can
+build them, because the SDK is on its disk: every pull request runs
+`scripts/ci-plugin-check.sh <Plugin>` (civ debug build + unit tests, through
+`heavy`) for each plugin it touches, and a free GitHub job fails any PR that adds
+SDK binaries or signing keys. The build job only runs for same-repo branches,
+never forks, and only once repo variable `TIER1_PLUGIN_BUILDS` is `true` and a
+`tak-worker` runner is registered to this repo. Branch protection requires
+`checks-ok`. The same command works by hand. A plugin with no `junit`
+dependency (the SDK template ships none) is built without running tests.
+
+**Release checks (ops #692).** A green debug build says nothing about what ships.
+`scripts/ci-plugin-check.sh <Plugin> --release` builds `assembleCivRelease` (minify
+and proguard on) plus the unit tests, and prints `APK=<path>`. `scripts/ci-load-smoke.sh
+<apk>` installs that APK on the tak-dev emulator, answers ATAK's "Load plugin?" prompt
+and judges ATAK's own log: `PASS`, or a refusal quoting the log line. Exit 3 means it
+could not run (emulator down, wrong ATAK) and is never a pass. `--catalog <Plugin>` checks
+the exact file the TAKwerx Market would download (size, SHA-256, version code, package);
+it can only load a tak.gov-signed APK on official ATAK, so on the dev-ATAK emulator that
+step reports "not run" and the phone check stays. `scripts/ci-static-check.sh [<plugin
+dir>]` needs no SDK and no network: build-file invariants, manifest, proguard keep rule,
+SDK artifacts, publish scrub; the `static` job runs it on every PR, forks included.
+Their offline tests are `scripts/test-ci-*.sh`. `/ship` runs the first two in pre-flight
+(the patch is in ops #692).
+
+**CloudTAK web plugins (ops #692).** No APK, so the emulator is not the gate. The gate is a
+real Marketplace install on a box with TAK Portal and CloudTAK, then a look at what CloudTAK
+serves: `scripts/ci-cloudtak-plugin-check.py --via '<cmd that runs a shell line on the box>'
+--plugin <marketplace id> --map-url https://map.<domain> [--reinstall] [--label '<menu text>']
+[--screenshot FILE]`. It stages the install and presses Deploy (the Marketplace page's own two
+calls to TAK Portal on the box), waits for the job (it must end `complete`), checks the plugin's
+folder and the Portal's installed flag, then fetches the map page's scripts and requires
+`plugins/<id>/index` for the plugin AND for every other plugin the Portal lists installed. A
+folder on disk is not proof: on Nov 12, 2026 installs ended `complete` with the files in place
+while CloudTAK's app loaded no plugin (ops #687). With `--screenshot` a headless browser signs
+in (token signed inside the api container) and screenshots the plugin's menu entry. Examples of
+`--via`: `ssh test12`, or `fresh-install/box <run id>` from the ops checkout for a kept
+fresh-install VM. Exit 0 is the only pass (3 = could not run). Offline test:
+`scripts/test-ci-cloudtak-plugin-check.sh` (real broken and good served apps). Use a fresh
+box (`fresh-install/run --full --keep`) or a fleet box nobody else is using
+(`testing-activity.py` first); never test8. A rebuild takes 15 to 40 minutes.
 
 ## Toolchain (already installed on the dev Mac)
 
