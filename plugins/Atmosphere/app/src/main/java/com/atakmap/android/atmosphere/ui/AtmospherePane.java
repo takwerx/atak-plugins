@@ -451,6 +451,13 @@ public final class AtmospherePane {
     private final LinearLayout sstLegend;
     private SstOverlay sst;
     private boolean sstOpen = true;
+    private static final String PREF_TEMPERATURE_OPEN = "weather.temperature.open";
+    private final LinearLayout temperatureSettings, temperatureLegend;
+    private final ImageButton temperatureExpand;
+    private final Button temperatureToggle;
+    private final TextView temperatureStatus;
+    private RainOverlay temperature;
+    private boolean temperatureOpen = true;
     private static final String PREF_SNOTEL_OPEN = "weather.snotel.open";
     private final LinearLayout snotelSettings;
     private final ImageButton snotelExpand;
@@ -1078,6 +1085,11 @@ public final class AtmospherePane {
         sstToggle = find(R.id.sst_toggle);
         sstStatus = find(R.id.sst_status);
         sstLegend = find(R.id.sst_legend);
+        temperatureSettings = find(R.id.temperature_settings);
+        temperatureExpand = find(R.id.temperature_expand);
+        temperatureToggle = find(R.id.temperature_toggle);
+        temperatureStatus = find(R.id.temperature_status);
+        temperatureLegend = find(R.id.temperature_legend);
         snotelSettings = find(R.id.snotel_settings);
         snotelExpand = find(R.id.snotel_expand);
         snotelToggle = find(R.id.snotel_toggle);
@@ -1298,6 +1310,15 @@ public final class AtmospherePane {
             public void onClick(View v) {
                 sstOpen = !sstOpen;
                 rememberFold(PREF_SST_OPEN, sstOpen);
+                updateLayerControls();
+            }
+        });
+        temperatureOpen = prefs == null || prefs.getBoolean(PREF_TEMPERATURE_OPEN, true);
+        temperatureExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                temperatureOpen = !temperatureOpen;
+                rememberFold(PREF_TEMPERATURE_OPEN, temperatureOpen);
                 updateLayerControls();
             }
         });
@@ -2402,6 +2423,42 @@ public final class AtmospherePane {
         updateLayerControls();
     }
 
+    public void setTemperature(RainOverlay overlay) {
+        temperature = overlay;
+        if (temperature == null)
+            return;
+        temperatureLegend.removeAllViews();
+        final int[] stops = { -40, -20, 0, 10, 20, 30, 40, 50 };
+        for (int celsius : stops) {
+            final String label = String.format(Locale.US, "%d °C / %d °F", celsius,
+                    Math.round(celsius * 1.8f + 32));
+            temperatureLegend.addView(legendLine(label,
+                    com.atakmap.android.atmosphere.rain.NomadsTemperature.color(celsius) | 0xff000000));
+        }
+        temperature.setListener(new RainOverlay.Listener() {
+            @Override
+            public void onFrames(List<String> labels, int shown) {
+            }
+
+            @Override
+            public void onFrameShown(int index, long validTime) {
+                if (validTime == 0)
+                    return;
+                final String time = new SimpleDateFormat("MMM d, h:mm a z", Locale.getDefault())
+                        .format(new Date(validTime));
+                temperatureStatus.setText("NOAA GFS estimate, valid " + time
+                        + (temperature.isCropped() ? " (center of map only; zoom in)" : ""));
+            }
+
+            @Override
+            public void onStatus(String status) {
+                if (!status.isEmpty())
+                    temperatureStatus.setText(status);
+            }
+        });
+        updateLayerControls();
+    }
+
     private boolean sstLegendAsked;
 
     /** The legend graphic is asked for once the layer is allowed, never before. */
@@ -3190,6 +3247,22 @@ public final class AtmospherePane {
                     updateLayerControls();
                 } else {
                     askToAllowSst();
+                }
+            }
+        });
+        temperatureToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (temperature == null)
+                    return;
+                if (temperature.isOn()) {
+                    temperature.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(RainOverlay.TEMPERATURE_LAYER_ID)) {
+                    temperature.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowTemperature();
                 }
             }
         });
@@ -4732,6 +4805,10 @@ public final class AtmospherePane {
             rain.setOn(on);
         else if (rain != null && on)
             blocked++;
+        if (temperature != null && (!on || allowed(RainOverlay.TEMPERATURE_LAYER_ID)))
+            temperature.setOn(on);
+        else if (temperature != null && on)
+            blocked++;
         if (smoke != null && (!on || allowed(SmokeOverlay.LAYER_ID)))
             smoke.setOn(on);
         else if (smoke != null && on)
@@ -5826,6 +5903,27 @@ public final class AtmospherePane {
                 .show();
     }
 
+    private void askToAllowTemperature() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.temperature_allow_title))
+                .setMessage(pluginContext.getString(R.string.temperature_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(RainOverlay.TEMPERATURE_LAYER_ID, true);
+                                if (temperature != null)
+                                    temperature.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
     private void askToAllowSst() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
@@ -6803,6 +6901,13 @@ public final class AtmospherePane {
         sstSettings.setVisibility(sstOn && sstOpen ? View.VISIBLE : View.GONE);
         if (sstOn)
             ensureSstLegend();
+        final boolean temperatureOn = temperature != null && temperature.isOn();
+        temperatureToggle.setText(temperatureOn ? R.string.temperature_on : R.string.temperature_off);
+        temperatureToggle.setTextColor(pluginContext.getResources().getColor(
+            temperatureOn ? R.color.state_on : R.color.state_off));
+        temperatureExpand.setVisibility(temperatureOn ? View.VISIBLE : View.GONE);
+        temperatureExpand.setRotation(temperatureOpen ? 180f : 0f);
+        temperatureSettings.setVisibility(temperatureOn && temperatureOpen ? View.VISIBLE : View.GONE);
         final boolean beachOn = beach != null && beach.isOn();
         beachToggle.setText(beachOn ? R.string.beach_on : R.string.beach_off);
         beachToggle.setTextColor(pluginContext.getResources().getColor(
@@ -7139,6 +7244,11 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_sst, SstOverlay.HOST));
+        }
+        if (temperature != null && temperature.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_temperature, RainOverlay.HOST));
         }
         if (avalanche != null && avalanche.isOn()) {
             if (out.length() > 0)

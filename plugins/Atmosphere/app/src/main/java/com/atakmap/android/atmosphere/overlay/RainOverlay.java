@@ -7,6 +7,7 @@ import com.atakmap.android.atmosphere.compat.MapCompat;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.net.Http;
 import com.atakmap.android.atmosphere.rain.NomadsRain;
+import com.atakmap.android.atmosphere.rain.NomadsTemperature;
 import com.atakmap.android.atmosphere.rain.RainGrid;
 import com.atakmap.android.atmosphere.wind.NomadsWind;
 import com.atakmap.android.maps.MapView;
@@ -41,9 +42,9 @@ public final class RainOverlay {
 
     private static final String TAG = "AtmosphereRain";
     public static final String LAYER_ID = "rain";
+    public static final String TEMPERATURE_LAYER_ID = "temperature";
     public static final String HOST = NomadsRain.HOST;
 
-    private static final String PREF_ON = "weather.layer.rain.on";
     /** Eight pixels a quarter-degree cell: a 30-degree box is 960 across. */
     private static final int MAX_PX = 1024;
     private static final int PX_PER_CELL = 8;
@@ -72,7 +73,9 @@ public final class RainOverlay {
 
     private final MapView mapView;
     private final EgressPolicy egress;
-    private final RasterLayer layer = new RasterLayer("Atmosphere rain");
+    private final RasterLayer layer;
+    private final boolean temperature;
+    private final String layerId;
     private final Map<String, Frame> cache = new LinkedHashMap<String, Frame>(16, 0.75f, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<String, Frame> eldest) {
@@ -119,8 +122,15 @@ public final class RainOverlay {
     };
 
     public RainOverlay(MapView mapView, EgressPolicy egress) {
+        this(mapView, egress, false);
+    }
+
+    public RainOverlay(MapView mapView, EgressPolicy egress, boolean temperature) {
         this.mapView = mapView;
         this.egress = egress;
+        this.temperature = temperature;
+        this.layerId = temperature ? TEMPERATURE_LAYER_ID : LAYER_ID;
+        this.layer = new RasterLayer(temperature ? "Atmosphere air temperature" : "Atmosphere rain");
     }
 
     public void setListener(Listener l) {
@@ -148,7 +158,8 @@ public final class RainOverlay {
         layer.setVisible(false);
         mapView.addOnMapMovedListener(moved);
         final SharedPreferences p = MapCompat.prefs();
-        if (p != null && p.getBoolean(PREF_ON, false) && egress.isLayerEnabled(LAYER_ID))
+        if (p != null && p.getBoolean("weather.layer." + layerId + ".on", false)
+            && egress.isLayerEnabled(layerId))
             setOn(true);
     }
 
@@ -196,7 +207,8 @@ public final class RainOverlay {
             if (latest != run || (now - latest) / 3_600_000L != firstHour) {
                 final long shownTime = run + hour * 3_600_000L;
                 setRun(latest);
-                hour = (int) Math.max(firstHour, Math.min(hours, Math.round((shownTime - latest) / 3_600_000.0)));
+                hour = temperature ? firstHour
+                    : (int) Math.max(firstHour, Math.min(hours, Math.round((shownTime - latest) / 3_600_000.0)));
                 cache.clear();
                 region = null;
                 generation++;
@@ -216,9 +228,11 @@ public final class RainOverlay {
         on = value;
         final SharedPreferences p = MapCompat.prefs();
         if (p != null)
-            p.edit().putBoolean(PREF_ON, value).apply();
+            p.edit().putBoolean("weather.layer." + layerId + ".on", value).apply();
         if (value) {
             setRun(NomadsRain.latestRun(System.currentTimeMillis()));
+            if (temperature)
+                hour = firstHour;
             if (listener != null)
                 listener.onFrames(labels(), hourIndex());
             layer.setVisible(true);
@@ -302,6 +316,10 @@ public final class RainOverlay {
     }
 
     private void clearMap(String why) {
+        if (temperature) {
+            generation++;
+            pendingKey = null;
+        }
         layer.clear();
         shown = null;
         region = null;
@@ -319,7 +337,7 @@ public final class RainOverlay {
                 || bounds.getEast() <= bounds.getWest()
                 || bounds.getEast() - bounds.getWest() >= 355;
         if (wholeWorld) {
-            clearMap("Zoom in to see the rain");
+            clearMap(temperature ? "Zoom in to see air temperature" : "Zoom in to see the rain");
             return;
         }
         final GeoBounds clamped = new GeoBounds(Math.min(90, bounds.getNorth()), bounds.getWest(),
@@ -339,12 +357,23 @@ public final class RainOverlay {
         if (!refetch) {
             final double viewSpan = clamped.getEast() - clamped.getWest();
             final double regionSpan = region.getEast() - region.getWest();
-            refetch = viewSpan < regionSpan / 3.5 || viewSpan > regionSpan * 1.6;
+                refetch = (viewSpan < regionSpan / 3.5 && (!temperature || regionSpan > 2.01))
+                    || viewSpan > regionSpan * 1.6;
         }
         if (refetch) {
             double w = clamped.getWest(), e = clamped.getEast();
             double s = clamped.getSouth(), n = clamped.getNorth();
             cropped = false;
+            if (temperature && e - w < 1) {
+                final double center = (w + e) / 2;
+                w = Math.max(-180, center - 0.5);
+                e = Math.min(180, center + 0.5);
+            }
+            if (temperature && n - s < 1) {
+                final double center = (n + s) / 2;
+                s = Math.max(-90, center - 0.5);
+                n = Math.min(90, center + 0.5);
+            }
             if (e - w > maxLon) {
                 final double c = (e + w) / 2;
                 w = c - maxLon / 2;
@@ -384,9 +413,13 @@ public final class RainOverlay {
 
     private void fetch(final long tryRun, final int stepsBack, final int h, final GeoBounds r,
             final String k, final int mine) {
-        status("Getting the rain…");
-        Http.getBytes(NomadsRain.url(tryRun, h, r.getWest() - 0.1, r.getSouth() - 0.1,
-                r.getEast() + 0.1, r.getNorth() + 0.1),
+        status(temperature ? "Getting air temperature…" : "Getting the rain…");
+        final String url = temperature
+            ? NomadsTemperature.url(tryRun, h, r.getWest() - 0.1, r.getSouth() - 0.1,
+                r.getEast() + 0.1, r.getNorth() + 0.1)
+            : NomadsRain.url(tryRun, h, r.getWest() - 0.1, r.getSouth() - 0.1,
+                r.getEast() + 0.1, r.getNorth() + 0.1);
+        Http.getBytes(url,
                 egress.userAgent(), new Http.BytesCallback() {
                     @Override
                     public void onSuccess(byte[] body) {
@@ -396,11 +429,12 @@ public final class RainOverlay {
                         }
                         if (!NomadsWind.looksLikeGrib(body)) {
                             if (stepsBack < RUN_STEPS_BACK) {
-                                fetch(NomadsRain.previousRun(tryRun), stepsBack + 1, h, r, k, mine);
+                                fetch(NomadsRain.previousRun(tryRun), stepsBack + 1,
+                                    temperature ? h + 6 : h, r, k, mine);
                                 return;
                             }
                             if (k.equals(pendingKey)) pendingKey = null;
-                            status("No rain forecast published yet");
+                            status(temperature ? "No temperature forecast published yet" : "No rain forecast published yet");
                             return;
                         }
                         build(body, tryRun, h, r, k, mine);
@@ -428,22 +462,23 @@ public final class RainOverlay {
                 Frame frame = null;
                 String error = null;
                 try {
-                    final RainGrid g = NomadsRain.read(body);
+                    final RainGrid g = temperature ? NomadsTemperature.read(body) : NomadsRain.read(body);
                     final int pw = Math.max(64, Math.min(MAX_PX, g.nx * PX_PER_CELL));
                     final int ph = Math.max(64, Math.min(MAX_PX, g.ny * PX_PER_CELL));
-                    final int[] px = NomadsRain.render(g, pw, ph);
+                    final int[] px = temperature ? NomadsTemperature.render(g, pw, ph)
+                            : NomadsRain.render(g, pw, ph);
                     frame = new Frame(g, Bitmap.createBitmap(px, pw, ph,
                             Bitmap.Config.ARGB_8888));
                     Log.d(TAG, String.format(Locale.US,
-                            "+%d h run %d drawn %dx%d over %.2f,%.2f..%.2f,%.2f, rain on %.1f%%",
+                            "+%d h run %d drawn %dx%d over %.2f,%.2f..%.2f,%.2f, %s on %.1f%%",
                             h, answeredRun, pw, ph, g.west, g.south, g.east, g.north,
-                            NomadsRain.rainPercent(px)));
+                            temperature ? "temperature" : "rain", NomadsRain.rainPercent(px)));
                 } catch (IOException e) {
-                    Log.w(TAG, "rain grid unreadable", e);
+                    Log.w(TAG, temperature ? "temperature grid unreadable" : "rain grid unreadable", e);
                     error = e.getMessage();
                 } catch (RuntimeException e) {
-                    Log.e(TAG, "rain grid failed", e);
-                    error = "rain could not be drawn";
+                    Log.e(TAG, temperature ? "temperature grid failed" : "rain grid failed", e);
+                    error = temperature ? "air temperature could not be drawn" : "rain could not be drawn";
                 }
                 final Frame f = frame;
                 final String err = error;
@@ -460,6 +495,8 @@ public final class RainOverlay {
                         }
                         if (answeredRun != run) {
                             setRun(answeredRun);
+                            if (temperature)
+                                hour = h;
                             if (listener != null)
                                 listener.onFrames(labels(), hourIndex());
                         }
