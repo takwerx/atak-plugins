@@ -334,6 +334,20 @@ never forks, and only once repo variable `TIER1_PLUGIN_BUILDS` is `true` and a
 `checks-ok`. The same command works by hand. A plugin with no `junit`
 dependency (the SDK template ships none) is built without running tests.
 
+**Release checks (ops #692).** A green debug build says nothing about what ships.
+`scripts/ci-plugin-check.sh <Plugin> --release` builds `assembleCivRelease` (minify
+and proguard on) plus the unit tests, and prints `APK=<path>`. `scripts/ci-load-smoke.sh
+<apk>` installs that APK on the tak-dev emulator, answers ATAK's "Load plugin?" prompt
+and judges ATAK's own log: `PASS`, or a refusal quoting the log line. Exit 3 means it
+could not run (emulator down, wrong ATAK) and is never a pass. `--catalog <Plugin>` checks
+the exact file the TAKwerx Market would download (size, SHA-256, version code, package);
+it can only load a tak.gov-signed APK on official ATAK, so on the dev-ATAK emulator that
+step reports "not run" and the phone check stays. `scripts/ci-static-check.sh [<plugin
+dir>]` needs no SDK and no network: build-file invariants, manifest, proguard keep rule,
+SDK artifacts, publish scrub; the `static` job runs it on every PR, forks included.
+Their offline tests are `scripts/test-ci-*.sh`. `/ship` runs the first two in pre-flight
+(the patch is in ops #692).
+
 ## Toolchain (already installed on the dev Mac)
 
 - JDK 17 — `/opt/homebrew/opt/openjdk@17` (`JAVA_HOME`)
