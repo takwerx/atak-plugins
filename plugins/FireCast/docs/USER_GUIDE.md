@@ -97,7 +97,7 @@ The top line is always there: **Back**, **Run model**, **Rerun** (the run you ha
 ![Start the Run From](screenshots/25_how_the_fire_starts.png)
 
 2. Set what you know:
-   - **Conditions:** *As observed* at the weather station, *As observed but at the gust*, *Dry day*, or *Dry and 20 mph wind*. The last two are for planning what a bad day would do.
+   - **Conditions:** *As observed*, *As observed but at the gust*, *Dry day*, or *Dry and 20 mph wind*. *As observed* uses the weather the **Weather** button shows, and the choice names it: *As observed (my obs 13:56)* for your own observation, a Kestrel's name, or *at the station picked*. The last two are for planning what a bad day would do. They replace your fuel moisture, and *Dry and 20 mph wind* also replaces your wind speed; only the wind direction is kept.
    - **Weather:** where the wind, temperature and humidity come from:
 
      ![Weather for the run](screenshots/28_weather.png)
