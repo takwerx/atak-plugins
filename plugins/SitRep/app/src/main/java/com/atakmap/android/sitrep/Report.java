@@ -14,7 +14,7 @@ import java.util.Map;
 
 /**
  * One saved sit rep: the area, when it was made, and every section's answer. Read
- * only: nothing in it is set by the operator (PLAN decision 5).
+ * only (PLAN decision 5), except for the name, which the operator may change.
  */
 public final class Report {
 
@@ -83,6 +83,8 @@ public final class Report {
     public final Area area;
     /** The county (or place) the area is in, once a section has found it; null until then. */
     public String place;
+    /** The name the operator gave this report; null keeps the automatic name. */
+    public String label;
     /** Section key to answer, in report order. */
     public final Map<String, Answer> answers = new LinkedHashMap<>();
 
@@ -94,6 +96,8 @@ public final class Report {
 
     /** {@code Riverside Co, Nov 12 14:05}. */
     public String name() {
+        if (label != null)
+            return label;
         return (place != null ? place : "Area") + ", "
                 + new SimpleDateFormat("MMM d HH:mm", Locale.US).format(new Date(made));
     }
@@ -123,6 +127,8 @@ public final class Report {
                 .put("area", area.toJson());
         if (place != null)
             o.put("place", place);
+        if (label != null)
+            o.put("label", label);
         final JSONObject s = new JSONObject();
         for (Map.Entry<String, Answer> e : answers.entrySet())
             s.put(e.getKey(), e.getValue().toJson());
@@ -139,6 +145,7 @@ public final class Report {
             return null;
         final Report r = new Report(id, Math.max(0, o.optLong("made", 0)), area);
         r.place = text(o.optString("place", null), 80);
+        r.label = cleanLabel(o.optString("label", null));
         final JSONObject s = o.optJSONObject("sections");
         if (s != null) {
             final java.util.Iterator<String> keys = s.keys();
@@ -159,6 +166,16 @@ public final class Report {
 
     static Answer newLoading() {
         return Answer.loading();
+    }
+
+    /** A name as typed: one line, trimmed, at most 60 characters; null when blank. */
+    public static String cleanLabel(String s) {
+        if (s == null)
+            return null;
+        s = s.replaceAll("\\s+", " ").trim();
+        if (s.isEmpty())
+            return null;
+        return s.length() <= 60 ? s : s.substring(0, 60).trim();
     }
 
     private static String text(String s, int max) {

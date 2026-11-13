@@ -10,6 +10,7 @@
     <string name="back">Back</string>
     <string name="refresh">Refresh</string>
     <string name="delete">Delete</string>
+    <string name="rename">Rename</string>
     <string name="go_to">Go to</string>
     <string name="heading_reports">Reports</string>
     <string name="show_settings">Open or close</string>

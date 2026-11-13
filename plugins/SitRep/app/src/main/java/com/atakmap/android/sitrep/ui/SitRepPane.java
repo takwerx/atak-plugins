@@ -142,6 +142,12 @@ public final class SitRepPane {
                     manager.refresh(r);
             }
         });
+        root.findViewById(R.id.btn_report_rename).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                askRename();
+            }
+        });
         root.findViewById(R.id.btn_report_delete).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -268,6 +274,44 @@ public final class SitRepPane {
                     v += " (" + ago(a.at) + ")";
                 return v;
         }
+    }
+
+    private void askRename() {
+        final Report r = openId == null ? null : manager.find(openId);
+        if (r == null)
+            return;
+        final android.content.Context host = mapView.getContext();
+        final android.widget.EditText box = new android.widget.EditText(host);
+        box.setSingleLine(true);
+        box.setText(r.name());
+        box.setSelectAllOnFocus(true);
+        box.setHint("Empty = automatic name");
+        box.setFilters(new android.text.InputFilter[] {
+                new android.text.InputFilter.LengthFilter(60)
+        });
+        box.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+        final int pad = (int) (20 * host.getResources().getDisplayMetrics().density);
+        final android.widget.FrameLayout frame = new android.widget.FrameLayout(host);
+        frame.setPadding(pad, 0, pad, 0);
+        frame.addView(box);
+        final AlertDialog d = new AlertDialog.Builder(host)
+                .setTitle("Rename")
+                .setView(frame)
+                .setPositiveButton("Save", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dlg, int which) {
+                        manager.rename(r, box.getText().toString());
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .create();
+        if (d.getWindow() != null)
+            d.getWindow().setSoftInputMode(
+                    android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+                            | android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        d.show();
+        box.requestFocus();
     }
 
     private void confirmDelete() {

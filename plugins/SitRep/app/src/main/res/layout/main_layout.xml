@@ -116,6 +116,14 @@
                 android:textColor="@color/white"
                 android:maxLines="2"
                 android:ellipsize="end" />
+
+            <Button
+                android:id="@+id/btn_report_rename"
+                style="@style/TakwerxButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="6dp"
+                android:text="@string/rename" />
         </LinearLayout>
 
         <ScrollView

@@ -346,6 +346,16 @@ public final class SitRepManager {
         changed();
     }
 
+    /** Gives a report the operator's own name; a blank name goes back to the automatic one. */
+    public void rename(Report r, String typed) {
+        if (!reports.contains(r))
+            return;
+        r.label = Report.cleanLabel(typed);
+        save(r);
+        outlines.sync(reports, areasVisible());
+        changed();
+    }
+
     public void delete(Report r) {
         note = null;
         if (!reports.remove(r))
