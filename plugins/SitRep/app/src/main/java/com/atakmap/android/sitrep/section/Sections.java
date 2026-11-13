@@ -15,6 +15,9 @@ public final class Sections {
     static {
         final List<Section> s = new ArrayList<>();
         s.add(new Alerts());
+        s.add(new Fires());
+        s.add(new Roads());
+        s.add(new Airspace());
         s.add(new Structures());
         ALL = Collections.unmodifiableList(s);
     }

@@ -271,13 +271,14 @@ public final class SitRepManager {
      * refresh keeps the answer it had and says how old that is (PLAN section 3).
      */
     private void run(final Report r, final Section s) {
+        final int nearby = nearbyMiles();
         fetch.execute(new Runnable() {
             @Override
             public void run() {
                 Section.Result got = null;
                 Throwable failed = null;
                 try {
-                    got = s.fetch(r.area);
+                    got = s.fetch(r.area, nearby);
                 } catch (Throwable e) {
                     failed = e;
                     Log.w(TAG, s.key + " not available: " + e);
@@ -329,8 +330,12 @@ public final class SitRepManager {
         for (Section s : Sections.all()) {
             Report.Answer a = r.answer(s.key);
             if (a == null) {
-                a = Report.newLoading();
-                r.answers.put(s.key, a);
+                // A section added since this report was made: fetch it now. Marking it
+                // loading and then falling through to the loading check below skipped
+                // it, and it said Loading forever (s10-dev-2, 2026-11-13).
+                r.answers.put(s.key, Report.newLoading());
+                run(r, s);
+                continue;
             }
             final boolean answered = a.state == Report.State.OK || a.state == Report.State.NOT_HERE;
             if (answered && !s.live)

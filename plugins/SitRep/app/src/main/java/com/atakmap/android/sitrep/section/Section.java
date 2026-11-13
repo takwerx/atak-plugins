@@ -43,6 +43,14 @@ public abstract class Section {
 
     public abstract Result fetch(Area area) throws Exception;
 
+    /**
+     * The same, for a section that also looks around the area: things within the
+     * operator's Nearby distance (PLAN section 3, "One Nearby radius").
+     */
+    public Result fetch(Area area, int nearbyMiles) throws Exception {
+        return fetch(area);
+    }
+
     /** What a section found. */
     public static final class Result {
         /** The head's value, read after the name: {@code 2,018; 1,925 residential}. */

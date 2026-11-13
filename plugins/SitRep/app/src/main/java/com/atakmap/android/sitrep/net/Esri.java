@@ -74,6 +74,38 @@ public final class Esri {
         return out;
     }
 
+    /**
+     * Point features inside the area or within {@code nearbyMiles} of it: each the
+     * feature's attributes plus {@code _lat} and {@code _lon}.
+     */
+    public static List<JSONObject> points(String layer, String where, Area area, String outFields,
+            int nearbyMiles) throws IOException {
+        final String form = "f=json&returnGeometry=true&outSR=4326"
+                + "&where=" + enc(where == null ? "1=1" : where)
+                + "&outFields=" + enc(outFields)
+                + area.esriQueryForm()
+                + (nearbyMiles > 0 ? "&distance=" + nearbyMiles + "&units=esriSRUnit_StatuteMile" : "");
+        final JSONArray feats = features(Http.post(layer + "/query", form));
+        final List<JSONObject> out = new ArrayList<>(feats.length());
+        for (int i = 0; i < feats.length(); i++) {
+            final JSONObject f = feats.optJSONObject(i);
+            final JSONObject a = f == null ? null : f.optJSONObject("attributes");
+            final JSONObject g = f == null ? null : f.optJSONObject("geometry");
+            if (a == null || g == null || !g.has("x") || !g.has("y"))
+                continue;
+            final double lon = g.optDouble("x"), lat = g.optDouble("y");
+            if (!(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180))
+                continue;
+            try {
+                a.put("_lat", lat).put("_lon", lon);
+            } catch (org.json.JSONException e) {
+                continue;
+            }
+            out.add(a);
+        }
+        return out;
+    }
+
     private static JSONArray features(String body) throws IOException {
         final JSONArray a = parse(body).optJSONArray("features");
         if (a == null)

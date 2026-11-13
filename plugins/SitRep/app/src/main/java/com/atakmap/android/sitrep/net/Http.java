@@ -46,6 +46,17 @@ public final class Http {
         return new String(request(url, null), StandardCharsets.UTF_8);
     }
 
+    /** A gzipped file (our tile packs), unpacked; capped like any other answer. */
+    public static String getGzip(String url) throws IOException {
+        final java.util.zip.GZIPInputStream in = new java.util.zip.GZIPInputStream(
+                new java.io.ByteArrayInputStream(request(url, null)));
+        try {
+            return new String(read(in), StandardCharsets.UTF_8);
+        } finally {
+            in.close();
+        }
+    }
+
     /** POSTs an already-encoded form body ({@code a=1&b=2}). */
     public static String post(String url, String form) throws IOException {
         return new String(request(url, form), StandardCharsets.UTF_8);

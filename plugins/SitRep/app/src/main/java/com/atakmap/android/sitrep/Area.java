@@ -143,6 +143,38 @@ public final class Area {
         return false;
     }
 
+    /** Whether a point is inside the area. */
+    public boolean contains(double lat, double lon) {
+        return inside(ring, new double[] { lat, lon });
+    }
+
+    /** Meters from a point to the area's edge; 0 inside. Flat at the area's latitude. */
+    public double distanceMeters(double lat, double lon) {
+        if (contains(lat, lon))
+            return 0;
+        final double mLat = 111_320d, mLon = 111_320d * Math.cos(Math.toRadians(lat));
+        double best = Double.MAX_VALUE;
+        for (int i = 0; i < ring.length; i++) {
+            final double[] a = ring[i], b = ring[(i + 1) % ring.length];
+            final double ax = (a[1] - lon) * mLon, ay = (a[0] - lat) * mLat;
+            final double bx = (b[1] - lon) * mLon, by = (b[0] - lat) * mLat;
+            final double dx = bx - ax, dy = by - ay, len = dx * dx + dy * dy;
+            double t = len == 0 ? 0 : -(ax * dx + ay * dy) / len;
+            t = Math.max(0, Math.min(1, t));
+            final double x = ax + t * dx, y = ay + t * dy;
+            best = Math.min(best, Math.sqrt(x * x + y * y));
+        }
+        return best;
+    }
+
+    /** {@code NE}: which way a point lies from the area's center. */
+    public String directionTo(double lat, double lon) {
+        final double c = Math.cos(Math.toRadians((south + north) / 2));
+        final double deg = (Math.toDegrees(Math.atan2((lon - (west + east) / 2) * c, lat - (south + north) / 2)) + 360) % 360;
+        final String[] d = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
+        return d[(int) Math.round(deg / 45) % 8];
+    }
+
     private static boolean inside(double[][] r, double[] p) {
         boolean in = false;
         for (int i = 0, j = r.length - 1; i < r.length; j = i++) {
