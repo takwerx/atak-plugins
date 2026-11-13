@@ -1,0 +1,60 @@
+--------- beginning of main
+11-12 07:39:45.638  5300  5300 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+11-12 07:39:45.640  5300  5300 I AndroidRuntime: Using default boot image
+11-12 07:39:45.640  5300  5300 I AndroidRuntime: Leaving lock profiling enabled
+11-12 07:39:45.695  5300  5300 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+11-12 07:39:46.048  4496  4496 D AtakPluginRegistry: Plugin has not been scanned, scanning now: com.atakmap.android.plss.plugin
+11-12 07:39:46.050  4496  4496 D AtakPluginRegistry: Successfully loaded plugin descriptor for com.atakmap.android.plss.plugin: [Extension type=gov.tak.api.plugin.IPlugin, impl=com.atakmap.android.plss.plugin.PLSS], 
+11-12 07:39:46.051  4496  4496 D AtakPluginRegistry: com.atakmap.android.plss.plugin: [Extension type=gov.tak.api.plugin.IPlugin, impl=com.atakmap.android.plss.plugin.PLSS],  will NOT load
+11-12 07:39:46.052  4496  4496 D AtakPluginRegistry: Scanned and found plugin: com.atakmap.android.plss.plugin
+11-12 07:39:46.071  4496  4496 D AtakPluginRegistry: Plugin was previously scanned: com.atakmap.android.plss.plugin
+11-12 07:39:46.072  4496  4496 D AtakPluginRegistry: Plugin was previously scanned: com.atakmap.android.plss.plugin
+11-12 07:39:47.130  5300  5300 D AndroidRuntime: Shutting down VM
+11-12 07:39:48.026  4496  4496 D AtakPluginRegistry: Loading plugin: com.atakmap.android.plss.plugin
+11-12 07:39:48.026  4496  4496 D AtakPluginRegistry: Plugin was previously scanned: com.atakmap.android.plss.plugin
+11-12 07:39:48.027  4496  4496 D AtakPluginRegistry: Plugin was previously scanned: com.atakmap.android.plss.plugin
+11-12 07:39:48.030  4496  4496 D AtakPluginRegistry: Loading com.atak.plugins.impl.IToolbarItem extensions for com.atakmap.android.plss.plugin: [Extension type=gov.tak.api.plugin.IPlugin, impl=com.atakmap.android.plss.plugin.PLSS], 
+11-12 07:39:48.030  4496  4496 D AtakPluginRegistry: Found 0 plugin extensions matching IToolbarItem in 5 plugins
+11-12 07:39:48.030  4496  4496 D AtakPluginRegistry: Loading gov.tak.api.plugin.IPlugin extensions for com.atakmap.android.plss.plugin: [Extension type=gov.tak.api.plugin.IPlugin, impl=com.atakmap.android.plss.plugin.PLSS], 
+11-12 07:39:48.030  4496  4496 D AtakPluginRegistry: api matches[ com.atakmap.android.plss.plugin]; pluginApiVersion:com.atakmap.app@5.8.0.CIV
+11-12 07:39:48.030  4496  4496 D AtakPluginRegistry: SDK skipping signature check[com.atakmap.android.plss.plugin]
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: No class com.atakmap.android.plss.plugin.PLSS found in plugin com.atakmap.android.plss.plugin: [Extension type=gov.tak.api.plugin.IPlugin, impl=com.atakmap.android.plss.plugin.PLSS], 
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: java.lang.ClassNotFoundException: Didn't find class "com.atakmap.android.plss.plugin.PLSS" on path: DexPathList[[zip file "/data/app/~~vSwrQJh7sdpQr_cqRyTyUg==/com.atakmap.android.plss.plugin-ESqdIUHByeur7Xx0aYUQbw==/base.apk"],nativeLibraryDirectories=[/data/app/~~vSwrQJh7sdpQr_cqRyTyUg==/com.atakmap.android.plss.plugin-ESqdIUHByeur7Xx0aYUQbw==/lib/arm64, /system/lib64, /system_ext/lib64]]
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 	at dalvik.system.BaseDexClassLoader.findClass(BaseDexClassLoader.java:259)
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 	at java.lang.ClassLoader.loadClass(ClassLoader.java:637)
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 	at java.lang.ClassLoader.loadClass(ClassLoader.java:573)
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 	at com.atak.plugins.impl.AtakPluginRegistry.loadExtension(SourceFile:656)
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 	at com.atak.plugins.impl.AtakPluginRegistry.loadExtension(SourceFile:577)
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 	at com.atak.plugins.impl.AtakPluginRegistry.loadUniversalPlugins(SourceFile:1656)
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 	at com.atak.plugins.impl.AtakPluginRegistry.loadPlugin(SourceFile:1404)
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 	at com.atakmap.android.update.ApkUpdateReceiver$3.onClick(SourceFile:204)
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 	at com.android.internal.app.AlertController$ButtonHandler.handleMessage(AlertController.java:175)
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 	at android.os.Handler.dispatchMessage(Handler.java:107)
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 	at android.os.Looper.loopOnce(Looper.java:232)
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 	at android.os.Looper.loop(Looper.java:317)
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 	at android.app.ActivityThread.main(ActivityThread.java:8705)
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 	at java.lang.reflect.Method.invoke(Native Method)
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:580)
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:886)
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 	Suppressed: java.lang.NoClassDefFoundError: Failed resolution of: Lcom/atakmap/android/overlay/k$b;
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 		at java.lang.VMClassLoader.findLoadedClass(Native Method)
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 		at java.lang.ClassLoader.findLoadedClass(ClassLoader.java:1276)
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 		at java.lang.ClassLoader.loadClass(ClassLoader.java:621)
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 		... 14 more
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 	Caused by: java.lang.ClassNotFoundException: Didn't find class "com.atakmap.android.overlay.k$b" on path: DexPathList[[zip file "/data/app/~~vSwrQJh7sdpQr_cqRyTyUg==/com.atakmap.android.plss.plugin-ESqdIUHByeur7Xx0aYUQbw==/base.apk"],nativeLibraryDirectories=[/data/app/~~vSwrQJh7sdpQr_cqRyTyUg==/com.atakmap.android.plss.plugin-ESqdIUHByeur7Xx0aYUQbw==/lib/arm64, /system/lib64, /system_ext/lib64]]
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 		at dalvik.system.BaseDexClassLoader.findClass(BaseDexClassLoader.java:259)
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 		at java.lang.ClassLoader.loadClass(ClassLoader.java:637)
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 		at java.lang.ClassLoader.loadClass(ClassLoader.java:573)
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: 		... 17 more
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: Error creating com.atakmap.android.plss.plugin.PLSS, gov.tak.api.plugin.IPlugin
+11-12 07:39:48.031  4496  4496 W AtakPluginRegistry: failed to load extension: [Extension type=gov.tak.api.plugin.IPlugin, impl=com.atakmap.android.plss.plugin.PLSS]
+11-12 07:39:48.031  4496  4496 D AtakPluginRegistry: Found 0 plugin extensions matching IPlugin in 5 plugins
+11-12 07:39:48.031  4496  4496 D AtakPluginRegistry: Unloading plugin: com.atakmap.android.plss.plugin
+11-12 07:39:48.031  4496  4496 D AtakPluginRegistry: Unloading plugin descriptor: com.atakmap.android.plss.plugin
+11-12 07:39:48.031  4496  4496 D AtakPluginRegistry: Plugin was previously scanned: com.atakmap.android.plss.plugin
+11-12 07:39:48.032  4496  4496 D AtakPluginRegistry: Unloading app info: com.atakmap.android.plss.plugin
+11-12 07:39:48.032  4496  4496 D AtakPluginRegistry: Unloading the classloader for item: com.atakmap.android.plss.plugin
+11-12 07:39:48.032  4496  4496 D AtakPluginRegistry: Unloaded plugin: com.atakmap.android.plss.plugin
+11-12 07:39:48.032  4496  4496 D AtakPluginRegistry: Loaded plugin: com.atakmap.android.plss.plugin, with extension count: 0
+11-12 07:39:48.032  4496  4496 D AtakPluginRegistry: SDK skipping signature check[com.atakmap.android.plss.plugin]
+11-12 07:39:48.032  4496  4496 D AtakPluginRegistry: api matches[ com.atakmap.android.plss.plugin]; pluginApiVersion:com.atakmap.app@5.8.0.CIV
