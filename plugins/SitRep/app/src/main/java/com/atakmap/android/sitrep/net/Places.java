@@ -87,6 +87,37 @@ public final class Places {
         return out.size() > 40 ? new ArrayList<>(out.subList(0, 40)) : out;
     }
 
+    /** The city, community and county at a point, smallest first. */
+    public static List<Place> at(GeoPoint p) throws Exception {
+        final List<Place> out = new ArrayList<>();
+        final String geom = Esri.enc(String.format(Locale.US, "%.6f,%.6f", p.getLongitude(), p.getLatitude()));
+        for (String layer : LAYERS) {
+            final String form = "f=json&returnGeometry=false&where=1%3D1"
+                    + "&outFields=" + Esri.enc("NAME,STATE,GEOID,AREALAND")
+                    + "&geometry=" + geom + "&geometryType=esriGeometryPoint&inSR=4326"
+                    + "&spatialRel=esriSpatialRelIntersects";
+            final JSONArray f = Esri.parse(Http.post(BASE + layer + "/query", form)).optJSONArray("features");
+            for (int i = 0; f != null && i < f.length(); i++) {
+                final JSONObject a = f.optJSONObject(i) == null ? null : f.optJSONObject(i).optJSONObject("attributes");
+                if (a == null)
+                    continue;
+                final String geoid = a.optString("GEOID", "");
+                final String st = POSTAL.get(a.optString("STATE", ""));
+                if (!geoid.matches("\\d{5,7}") || st == null)
+                    continue;
+                out.add(new Place(a.optString("NAME", "").replace(" CDP", " (community)") + ", " + st,
+                        layer, geoid, st, a.optDouble("AREALAND", 0)));
+            }
+        }
+        Collections.sort(out, new Comparator<Place>() {
+            @Override
+            public int compare(Place a, Place b) {
+                return Double.compare(a.areaLand, b.areaLand);
+            }
+        });
+        return out;
+    }
+
     /** Postal code of the state a point is in (NWS county layer); empty when not known. */
     public static String stateAt(GeoPoint p) {
         if (p == null || !(Math.abs(p.getLatitude()) <= 90) || !(Math.abs(p.getLongitude()) <= 180))

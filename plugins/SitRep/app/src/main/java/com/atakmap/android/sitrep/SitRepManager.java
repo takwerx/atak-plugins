@@ -73,6 +73,7 @@ public final class SitRepManager {
     private String note;
 
     public SitRepManager(MapView mapView) {
+        this.pick = new com.atakmap.android.sitrep.MapPick(mapView);
         this.mapView = mapView;
         this.prefs = mapView.getContext().getSharedPreferences("sitrep", Context.MODE_PRIVATE);
         this.root = FileSystemUtils.getItem("tools/sitrep");
@@ -119,6 +120,7 @@ public final class SitRepManager {
 
     public void stop() {
         stopped = true;
+        pick.cancel();
         if (picker != null) {
             picker.dispose();
             picker = null;
@@ -300,6 +302,46 @@ public final class SitRepManager {
                 });
             }
         });
+    }
+
+    /** The place pick and the shape pick share one map tap. */
+    public final com.atakmap.android.sitrep.MapPick pick;
+
+    /** The status line, from the pane (what a pick is waiting for). */
+    public void setNote(String n) {
+        note = n;
+        changed();
+    }
+
+    /** The city, community and county at a point, on a worker. */
+    public void placesAt(final GeoPoint p, final PlaceAnswer<java.util.List<com.atakmap.android.sitrep.net.Places.Place>> answer) {
+        fetch.execute(new Runnable() {
+            @Override
+            public void run() {
+                java.util.List<com.atakmap.android.sitrep.net.Places.Place> got = null;
+                Throwable error = null;
+                try {
+                    got = com.atakmap.android.sitrep.net.Places.at(p);
+                } catch (Throwable e) {
+                    error = e;
+                    Log.w(TAG, "places at a point failed: " + e);
+                }
+                final java.util.List<com.atakmap.android.sitrep.net.Places.Place> g = got;
+                final Throwable err = error;
+                main.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        answer.done(g, err);
+                    }
+                });
+            }
+        });
+    }
+
+    /** A shape the operator tapped becomes the area. */
+    public void reportForShape(GeoPoint[] outline, String title) {
+        note = null;
+        startReport(outline, title);
     }
 
     /** An answer that arrives on the main thread. */

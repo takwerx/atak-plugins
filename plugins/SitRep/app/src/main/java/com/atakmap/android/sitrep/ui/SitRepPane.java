@@ -98,7 +98,10 @@ public final class SitRepPane {
             public void onClick(View v) {
                 if (manager.isDrawing())
                     manager.cancelDrawing();
-                else
+                else if (manager.pick.isActive()) {
+                    manager.pick.cancel();
+                    manager.setNote(null);
+                } else
                     chooseNewArea();
             }
         });
@@ -220,7 +223,10 @@ public final class SitRepPane {
     /** Everything on screen from the manager's state. Main thread. */
     public void refresh() {
         status.setText(manager.status());
-        if (manager.isDrawing()) {
+        if (manager.pick.isActive()) {
+            drawButton.setText("Cancel tap");
+            drawButton.setTextColor(WORKING);
+        } else if (manager.isDrawing()) {
             drawButton.setText("Drawing...");
             drawButton.setTextColor(WORKING);
         } else {
@@ -368,6 +374,20 @@ public final class SitRepPane {
                 manager.drawArea();
             }
         });
+        v.findViewById(R.id.new_here).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View x) {
+                d.dismiss();
+                pickPlaceHere();
+            }
+        });
+        v.findViewById(R.id.new_shape).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View x) {
+                d.dismiss();
+                pickShape();
+            }
+        });
         v.findViewById(R.id.new_name).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View x) {
@@ -378,6 +398,53 @@ public final class SitRepPane {
         d.show();
     }
 
+    /** County or city here: one tap on the map, then the places at that point. */
+    private void pickPlaceHere() {
+        final boolean ok = manager.pick.start(false, new com.atakmap.android.sitrep.MapPick.Callback() {
+            @Override
+            public void picked(GeoPoint point, GeoPoint[] outline) {
+                manager.setNote("Finding the county and city there...");
+                manager.placesAt(point, new SitRepManager.PlaceAnswer<List<com.atakmap.android.sitrep.net.Places.Place>>() {
+                    @Override
+                    public void done(List<com.atakmap.android.sitrep.net.Places.Place> found, Throwable error) {
+                        manager.setNote(null);
+                        if (found != null && found.isEmpty()) {
+                            new AlertDialog.Builder(mapView.getContext()).setTitle("County or city here")
+                                    .setMessage("No US county or city there.")
+                                    .setPositiveButton("OK", null).show();
+                            return;
+                        }
+                        showPlaces("", found, error);
+                    }
+                });
+            }
+
+            @Override
+            public void missed(String why) {
+                manager.setNote(why);
+            }
+        });
+        manager.setNote(ok ? "Tap a point on the map. Sit Rep lists the city and county there."
+                : "Could not take the map for a tap. Try again.");
+    }
+
+    /** Use a shape: one tap on a shape already on the map; its outline is the area. */
+    private void pickShape() {
+        final boolean ok = manager.pick.start(true, new com.atakmap.android.sitrep.MapPick.Callback() {
+            @Override
+            public void picked(GeoPoint point, GeoPoint[] outline) {
+                manager.reportForShape(outline, null);
+            }
+
+            @Override
+            public void missed(String why) {
+                manager.setNote(why);
+            }
+        });
+        manager.setNote(ok ? "Tap the edge of a polygon, circle or rectangle on the map."
+                : "Could not take the map for a tap. Try again.");
+    }
+
     /** Type a name: a city, town, community or county, then pick one from the list. */
     private void askPlaceName() {
         final android.content.Context host = mapView.getContext();
@@ -386,7 +453,10 @@ public final class SitRepPane {
         box.setHint("City, town or county");
         box.setInputType(android.text.InputType.TYPE_CLASS_TEXT
                 | android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS);
-        box.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
+        // No full-screen keyboard in landscape: it covers the dialog with a white edit box.
+        box.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
+                | android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI
+                | android.view.inputmethod.EditorInfo.IME_FLAG_NO_FULLSCREEN);
         final int pad = (int) (20 * host.getResources().getDisplayMetrics().density);
         final android.widget.FrameLayout frame = new android.widget.FrameLayout(host);
         frame.setPadding(pad, 0, pad, 0);
@@ -481,6 +551,9 @@ public final class SitRepPane {
         box.setSingleLine(true);
         box.setText(r.name());
         box.setSelectAllOnFocus(true);
+        box.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_DONE
+                | android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI
+                | android.view.inputmethod.EditorInfo.IME_FLAG_NO_FULLSCREEN);
         box.setHint("Empty = automatic name");
         box.setFilters(new android.text.InputFilter[] {
                 new android.text.InputFilter.LengthFilter(60)
