@@ -106,6 +106,62 @@ public final class Area {
                 + "&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects";
     }
 
+    /**
+     * Whether a ring of GeoJSON positions ({@code [lon, lat]}) touches this area: a
+     * corner of either inside the other, or two edges crossing.
+     */
+    public boolean touches(JSONArray lonLatRing) {
+        if (lonLatRing == null || lonLatRing.length() < 3)
+            return false;
+        final int m = lonLatRing.length();
+        final double[][] other = new double[m][];
+        double s = 90, w = 180, n = -90, e = -180;
+        for (int i = 0; i < m; i++) {
+            final JSONArray p = lonLatRing.optJSONArray(i);
+            if (p == null || p.length() < 2)
+                return false;
+            other[i] = new double[] { p.optDouble(1), p.optDouble(0) };
+            s = Math.min(s, other[i][0]);
+            n = Math.max(n, other[i][0]);
+            w = Math.min(w, other[i][1]);
+            e = Math.max(e, other[i][1]);
+        }
+        if (s > north || n < south || w > east || e < west)
+            return false;
+        for (double[] p : other)
+            if (inside(ring, p))
+                return true;
+        for (double[] p : ring)
+            if (inside(other, p))
+                return true;
+        for (int i = 0; i < ring.length; i++) {
+            final double[] a = ring[i], b = ring[(i + 1) % ring.length];
+            for (int j = 0; j < m; j++)
+                if (cross(a, b, other[j], other[(j + 1) % m]))
+                    return true;
+        }
+        return false;
+    }
+
+    private static boolean inside(double[][] r, double[] p) {
+        boolean in = false;
+        for (int i = 0, j = r.length - 1; i < r.length; j = i++) {
+            if ((r[i][0] > p[0]) != (r[j][0] > p[0])
+                    && p[1] < (r[j][1] - r[i][1]) * (p[0] - r[i][0]) / (r[j][0] - r[i][0]) + r[i][1])
+                in = !in;
+        }
+        return in;
+    }
+
+    private static boolean cross(double[] a, double[] b, double[] c, double[] d) {
+        final double d1 = turn(c, d, a), d2 = turn(c, d, b), d3 = turn(a, b, c), d4 = turn(a, b, d);
+        return ((d1 > 0) != (d2 > 0)) && ((d3 > 0) != (d4 > 0));
+    }
+
+    private static double turn(double[] o, double[] a, double[] b) {
+        return (a[1] - o[1]) * (b[0] - o[0]) - (a[0] - o[0]) * (b[1] - o[1]);
+    }
+
     public JSONArray toJson() throws JSONException {
         final JSONArray a = new JSONArray();
         for (double[] p : ring)

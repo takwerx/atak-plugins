@@ -16,7 +16,7 @@ import java.util.Map;
 /**
  * Structures by occupancy, from FEMA's USA Structures: one grouped count inside the
  * area. Many residential buildings carry no type ("Unclassified"), so the head leads
- * with all structures, then homes (PLAN section 4.3).
+ * with all structures, then residential (PLAN section 4.3).
  */
 public final class Structures extends Section {
 
@@ -62,12 +62,12 @@ public final class Structures extends Section {
         }
         final int homes = single + multi + manufactured + untyped;
         final Result r = new Result(total == 0 ? "None in the area"
-                : count(total) + "; " + count(homes) + (homes == 1 ? " home" : " homes"),
-                total == 0 ? null : count(homes) + (homes == 1 ? " home" : " homes"));
+                : count(total) + "; " + count(homes) + " residential",
+                total == 0 ? null : count(homes) + " residential");
         if (total == 0)
             return r.line("No buildings are mapped inside the area.");
         if (homes > 0) {
-            r.line("Homes " + count(homes) + ":");
+            r.line(Section.GROUP + "Residential: " + count(homes));
             if (single > 0)
                 r.line("  " + count(single) + " single-family");
             if (multi > 0)
@@ -90,7 +90,10 @@ public final class Structures extends Section {
             }
         });
         if (!classes.isEmpty()) {
-            r.line("Other buildings:");
+            int others = 0;
+            for (Map.Entry<String, Integer> e : classes)
+                others += e.getValue();
+            r.line(Section.GROUP + "Other buildings: " + count(others));
             for (Map.Entry<String, Integer> e : classes)
                 r.line("  " + count(e.getValue()) + " " + e.getKey());
         }

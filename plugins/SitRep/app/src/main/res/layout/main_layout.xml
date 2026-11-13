@@ -124,6 +124,16 @@
                 android:layout_height="wrap_content"
                 android:layout_marginLeft="6dp"
                 android:text="@string/rename" />
+
+            <ImageButton
+                android:id="@+id/btn_wide_report"
+                style="@style/TakwerxIconButton"
+                android:layout_width="48dp"
+                android:layout_weight="0"
+                android:layout_marginLeft="6dp"
+                android:layout_marginRight="0dp"
+                android:contentDescription="@string/wide"
+                android:src="@drawable/ic_wide" />
         </LinearLayout>
 
         <ScrollView

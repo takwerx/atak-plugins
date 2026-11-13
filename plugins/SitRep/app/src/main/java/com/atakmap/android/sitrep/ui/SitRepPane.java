@@ -142,6 +142,15 @@ public final class SitRepPane {
                     manager.refresh(r);
             }
         });
+        final View.OnClickListener wide = new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (wideToggle != null)
+                    wideToggle.run();
+            }
+        };
+        header.findViewById(R.id.btn_wide_main).setOnClickListener(wide);
+        root.findViewById(R.id.btn_wide_report).setOnClickListener(wide);
         root.findViewById(R.id.btn_report_rename).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -156,6 +165,13 @@ public final class SitRepPane {
         });
         buildSettings();
         refresh();
+    }
+
+    /** What the wide button does; the drop-down hosting the pane sets it. */
+    private Runnable wideToggle;
+
+    public void setWideToggle(Runnable r) {
+        wideToggle = r;
     }
 
     public View getView() {
@@ -238,9 +254,10 @@ public final class SitRepPane {
                 continue;
             final Fold f = new Fold(reportSections, "sitrep.fold." + s.key);
             f.head.setText(head(r, s, a));
-            f.head.setTextColor(a.state == Report.State.LOADING || manager.isRefreshing(r, s.key) ? WORKING : 0xFFFFFFFF);
-            for (String line : a.lines)
-                f.body.addView(body(line, 14));
+            // Section heads are cyan, the category color of the plugin-ui standard, so
+            // Alerts and Structures read as categories and the groups inside as white.
+            f.head.setTextColor(a.state == Report.State.LOADING || manager.isRefreshing(r, s.key) ? WORKING : CATEGORY);
+            addLines(f.body, s.key, a.lines);
             if (a.state == Report.State.OK && a.lastTryFailed)
                 f.body.addView(body((a.lastTryOffline ? "No network" : "The last Refresh did not answer")
                         + ", showing what this device saved " + ago(a.at) + ".", 13));
@@ -251,6 +268,29 @@ public final class SitRepPane {
             src.setPadding(0, dp(6), 0, dp(4));
             f.body.addView(src);
             f.show();
+        }
+    }
+
+    /**
+     * Detail lines under a section. A group line ({@link Section#GROUP}) becomes its
+     * own drop-down, closed until tapped, holding the indented lines after it.
+     */
+    private void addLines(LinearLayout into, String sectionKey, List<String> lines) {
+        Fold group = null;
+        for (String line : lines) {
+            if (line.startsWith(Section.GROUP)) {
+                final String text = line.substring(Section.GROUP.length());
+                final int colon = text.indexOf(':');
+                final String name = colon > 0 ? text.substring(0, colon) : text;
+                group = new Fold(into, "sitrep.fold." + sectionKey + "." + name.toLowerCase(Locale.US));
+                group.head.setText(text);
+                group.show();
+            } else if (group != null && line.startsWith("  ")) {
+                group.body.addView(body(line.trim(), 14));
+            } else {
+                group = null;
+                into.addView(body(line, 14));
+            }
         }
     }
 
@@ -406,6 +446,9 @@ public final class SitRepPane {
         b.setText(thing + (on ? " ON" : " OFF"));
         b.setTextColor(on ? 0xFF3DDC61 : 0xFFFF5B52);
     }
+
+    /** TakwerxSectionHeading cyan. */
+    private static final int CATEGORY = 0xFF00E5FF;
 
     private TextView body(String text, int sp) {
         final TextView t = new TextView(plugin);

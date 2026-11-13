@@ -35,6 +35,16 @@
             android:layout_weight="1"
             android:layout_height="wrap_content"
             android:layout_marginLeft="6dp" />
+
+        <ImageButton
+            android:id="@+id/btn_wide_main"
+            style="@style/TakwerxIconButton"
+            android:layout_width="48dp"
+            android:layout_weight="0"
+            android:layout_marginLeft="6dp"
+            android:layout_marginRight="0dp"
+            android:contentDescription="@string/wide"
+            android:src="@drawable/ic_wide" />
     </LinearLayout>
 
     <TextView

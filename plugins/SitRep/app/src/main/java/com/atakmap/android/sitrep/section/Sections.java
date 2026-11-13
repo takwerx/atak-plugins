@@ -14,6 +14,7 @@ public final class Sections {
 
     static {
         final List<Section> s = new ArrayList<>();
+        s.add(new Alerts());
         s.add(new Structures());
         ALL = Collections.unmodifiableList(s);
     }

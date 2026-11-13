@@ -35,13 +35,19 @@ public abstract class Section {
         this.source = source;
     }
 
+    /**
+     * Starts a group line: {@code GROUP + "Residential: 1,925"}. The indented lines
+     * after it are the group's body, folded closed under it on the report page.
+     */
+    public static final String GROUP = "\u00A7 ";
+
     public abstract Result fetch(Area area) throws Exception;
 
     /** What a section found. */
     public static final class Result {
-        /** The head's value, read after the name: {@code 2,018; 1,925 homes}. */
+        /** The head's value, read after the name: {@code 2,018; 1,925 residential}. */
         public final String value;
-        /** A few words for the report's row in the list, or null: {@code 1,925 homes}. */
+        /** A few words for the report's row in the list, or null: {@code 1,925 residential}. */
         public final String summary;
         /** The detail lines under the head. */
         public final List<String> lines = new ArrayList<>();

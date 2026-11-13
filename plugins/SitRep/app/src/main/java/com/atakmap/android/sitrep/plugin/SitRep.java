@@ -8,14 +8,13 @@ import com.atakmap.android.maps.MapView;
 import com.atakmap.android.sitrep.AreaOutlines;
 import com.atakmap.android.sitrep.Report;
 import com.atakmap.android.sitrep.SitRepManager;
+import com.atakmap.android.sitrep.ui.SitRepDropDown;
 import com.atakmap.android.sitrep.ui.SitRepPane;
 import com.atakmap.coremap.log.Log;
 
 import gov.tak.api.plugin.IPlugin;
 import gov.tak.api.plugin.IServiceController;
 import gov.tak.api.ui.IHostUIService;
-import gov.tak.api.ui.Pane;
-import gov.tak.api.ui.PaneBuilder;
 import gov.tak.api.ui.ToolbarItem;
 import gov.tak.api.ui.ToolbarItemAdapter;
 import gov.tak.platform.marshal.MarshalManager;
@@ -35,7 +34,7 @@ public class SitRep implements IPlugin {
     Context pluginContext;
     IHostUIService uiService;
     ToolbarItem toolbarItem;
-    Pane pane;
+    SitRepDropDown pane;
     SitRepPane paneUi;
     SitRepManager manager;
     MapView mapView;
@@ -97,10 +96,10 @@ public class SitRep implements IPlugin {
     public void onStop() {
         // ATAK keeps a plugin's pane on screen across a reload, and a pane whose
         // buttons point at a stopped instance does nothing when tapped.
-        if (pane != null && uiService != null) {
+        if (pane != null) {
             try {
-                if (uiService.isPaneVisible(pane))
-                    uiService.closePane(pane);
+                pane.close();
+                pane.dispose();
             } catch (Exception ignored) {
                 // Already gone.
             }
@@ -118,22 +117,24 @@ public class SitRep implements IPlugin {
 
     /** Opens the pane: on the main screen, or on one report. */
     private void showPane(String reportId) {
-        if (manager == null || mapView == null || uiService == null)
+        if (manager == null || mapView == null)
             return;
         if (pane == null) {
             paneUi = new SitRepPane(mapView, pluginContext, manager);
-            pane = new PaneBuilder(paneUi.getView())
-                    .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)
-                    .setMetaValue(Pane.PREFERRED_WIDTH_RATIO, 0.5D)
-                    .setMetaValue(Pane.PREFERRED_HEIGHT_RATIO, 0.5D)
-                    .build();
+            pane = new SitRepDropDown(mapView, paneUi.getView());
+            final SitRepDropDown host = pane;
+            paneUi.setWideToggle(new Runnable() {
+                @Override
+                public void run() {
+                    host.toggleWide();
+                }
+            });
         }
         if (reportId == null)
             paneUi.showMain();
         else
             paneUi.showReport(reportId);
-        if (!uiService.isPaneVisible(pane))
-            uiService.showPane(pane, null);
+        pane.show();
     }
 
     /**

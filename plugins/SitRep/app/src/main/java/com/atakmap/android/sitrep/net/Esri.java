@@ -57,6 +57,23 @@ public final class Esri {
         return o.optInt("count", 0);
     }
 
+    /** The attributes of every feature inside the area that matches; no geometry. */
+    public static List<JSONObject> attributes(String layer, String where, Area area, String outFields)
+            throws IOException {
+        final String form = "f=json&returnGeometry=false"
+                + "&where=" + enc(where == null ? "1=1" : where)
+                + "&outFields=" + enc(outFields)
+                + area.esriQueryForm();
+        final JSONArray feats = features(Http.post(layer + "/query", form));
+        final List<JSONObject> out = new ArrayList<>(feats.length());
+        for (int i = 0; i < feats.length(); i++) {
+            final JSONObject a = feats.optJSONObject(i) == null ? null : feats.optJSONObject(i).optJSONObject("attributes");
+            if (a != null)
+                out.add(a);
+        }
+        return out;
+    }
+
     private static JSONArray features(String body) throws IOException {
         final JSONArray a = parse(body).optJSONArray("features");
         if (a == null)
