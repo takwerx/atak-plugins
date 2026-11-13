@@ -21,6 +21,8 @@ public final class Sections {
         s.add(new Airspace());
         s.add(new Cameras());
         s.add(new Declarations());
+        s.add(new Terrain());
+        s.add(new Daylight());
         s.add(new Structures());
         ALL = Collections.unmodifiableList(s);
     }
