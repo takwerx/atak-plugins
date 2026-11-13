@@ -41,6 +41,9 @@ public final class Alerts extends Section {
         super("alerts", "Alerts", true,
                 "National Weather Service active alerts, including the civil alerts it relays for local authorities.");
         seeIn = "See them on the map in Atmosphere and IPAWS Alerts.";
+        openName = "Atmosphere";
+        openPackage = "com.atakmap.android.atmosphere.plugin";
+        openAction = "com.atakmap.android.atmosphere.SHOW";
     }
 
     @Override

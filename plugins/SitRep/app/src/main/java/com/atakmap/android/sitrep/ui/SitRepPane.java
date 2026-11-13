@@ -99,7 +99,7 @@ public final class SitRepPane {
                 if (manager.isDrawing())
                     manager.cancelDrawing();
                 else
-                    manager.drawArea();
+                    chooseNewArea();
             }
         });
         header.findViewById(R.id.btn_settings).setOnClickListener(new View.OnClickListener() {
@@ -264,10 +264,41 @@ public final class SitRepPane {
             if (a.state == Report.State.FAILED || a.state == Report.State.OFFLINE)
                 f.body.addView(body("Tap Refresh to try again.", 14));
             if (s.seeIn != null && (a.state == Report.State.OK || a.state == Report.State.NOT_HERE)) {
-                final TextView see = body(s.seeIn, 14);
-                see.setTextColor(CATEGORY);
-                see.setPadding(0, dp(6), 0, 0);
-                f.body.addView(see);
+                final boolean loaded = s.openPackage == null || pluginLoaded(s.openPackage);
+                if (!loaded) {
+                    final TextView see = body(s.openName + " shows this on the map.", 14);
+                    see.setTextColor(CATEGORY);
+                    see.setPadding(0, dp(6), 0, 0);
+                    f.body.addView(see);
+                    final Button get = (Button) PluginLayoutInflater.inflate(plugin, R.layout.open_button, null);
+                    get.setText("Get " + s.openName);
+                    get.setTextColor(CATEGORY);
+                    get.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            openPluginPage();
+                        }
+                    });
+                    f.body.addView(get);
+                } else if (s.openAction != null) {
+                    final Button open = (Button) PluginLayoutInflater.inflate(plugin, R.layout.open_button, null);
+                    open.setText("Open " + s.openName);
+                    open.setTextColor(CATEGORY);
+                    final String action = s.openAction;
+                    final Report report = r;
+                    open.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            openPlugin(report, action);
+                        }
+                    });
+                    f.body.addView(open);
+                } else {
+                    final TextView see = body(s.seeIn, 14);
+                    see.setTextColor(CATEGORY);
+                    see.setPadding(0, dp(6), 0, 0);
+                    f.body.addView(see);
+                }
             }
             final TextView src = body("Source: " + s.source
                     + (a.at > 0 ? " Fetched " + clock(a.at) + "." : ""), 12);
@@ -320,6 +351,125 @@ public final class SitRepPane {
                     v += " (" + ago(a.at) + ")";
                 return v;
         }
+    }
+
+    /** New area: how the area is chosen, as TakwerxButton tiles (popup standard). */
+    private void chooseNewArea() {
+        final View v = PluginLayoutInflater.inflate(plugin, R.layout.new_area, null);
+        final AlertDialog d = new AlertDialog.Builder(mapView.getContext())
+                .setTitle("New area")
+                .setView(v)
+                .setNegativeButton("Cancel", null)
+                .create();
+        v.findViewById(R.id.new_draw).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View x) {
+                d.dismiss();
+                manager.drawArea();
+            }
+        });
+        v.findViewById(R.id.new_name).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View x) {
+                d.dismiss();
+                askPlaceName();
+            }
+        });
+        d.show();
+    }
+
+    /** Type a name: a city, town, community or county, then pick one from the list. */
+    private void askPlaceName() {
+        final android.content.Context host = mapView.getContext();
+        final android.widget.EditText box = new android.widget.EditText(host);
+        box.setSingleLine(true);
+        box.setHint("City, town or county");
+        box.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+        box.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
+        final int pad = (int) (20 * host.getResources().getDisplayMetrics().density);
+        final android.widget.FrameLayout frame = new android.widget.FrameLayout(host);
+        frame.setPadding(pad, 0, pad, 0);
+        frame.addView(box);
+        final AlertDialog d = new AlertDialog.Builder(host)
+                .setTitle("Type a name")
+                .setView(frame)
+                .setPositiveButton("Search", null)
+                .setNegativeButton("Cancel", null)
+                .create();
+        final Runnable search = new Runnable() {
+            @Override
+            public void run() {
+                final String typed = box.getText().toString().trim();
+                if (typed.length() < 2) {
+                    box.setError("Two letters or more");
+                    return;
+                }
+                d.dismiss();
+                manager.centerForSearch = mapView.getCenterPoint().get();
+                manager.searchPlaces(typed, new SitRepManager.PlaceAnswer<List<com.atakmap.android.sitrep.net.Places.Place>>() {
+                    @Override
+                    public void done(List<com.atakmap.android.sitrep.net.Places.Place> found, Throwable error) {
+                        showPlaces(typed, found, error);
+                    }
+                });
+            }
+        };
+        box.setOnEditorActionListener(new android.widget.TextView.OnEditorActionListener() {
+            @Override
+            public boolean onEditorAction(android.widget.TextView t, int action, android.view.KeyEvent e) {
+                search.run();
+                return true;
+            }
+        });
+        d.setOnShowListener(new DialogInterface.OnShowListener() {
+            @Override
+            public void onShow(DialogInterface di) {
+                d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View x) {
+                        search.run();
+                    }
+                });
+            }
+        });
+        if (d.getWindow() != null)
+            d.getWindow().setSoftInputMode(
+                    android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+                            | android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        d.show();
+        box.requestFocus();
+    }
+
+    private void showPlaces(String typed, final List<com.atakmap.android.sitrep.net.Places.Place> found, Throwable error) {
+        final android.content.Context host = mapView.getContext();
+        if (error != null || found == null) {
+            new AlertDialog.Builder(host).setTitle("Type a name")
+                    .setMessage(com.atakmap.android.sitrep.net.Http.noNetwork(error)
+                            ? "No network. Try again when this device is connected."
+                            : "The Census place search did not answer. Try again.")
+                    .setPositiveButton("OK", null).show();
+            return;
+        }
+        if (found.isEmpty()) {
+            new AlertDialog.Builder(host).setTitle("Type a name")
+                    .setMessage("No city, town or county starts with \"" + typed + "\".")
+                    .setPositiveButton("OK", null).show();
+            return;
+        }
+        final String[] names = new String[found.size()];
+        for (int i = 0; i < names.length; i++)
+            names[i] = found.get(i).label;
+        new AlertDialog.Builder(host)
+                .setTitle("Pick a place")
+                .setItems(names, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface di, int which) {
+                        manager.reportForPlace(found.get(which));
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void askRename() {
@@ -451,6 +601,48 @@ public final class SitRepPane {
     private static void setState(Button b, String thing, boolean on) {
         b.setText(thing + (on ? " ON" : " OFF"));
         b.setTextColor(on ? 0xFF3DDC61 : 0xFFFF5B52);
+    }
+
+    /**
+     * Whether another plugin is loaded in ATAK. A plugin cannot ask Android which
+     * packages are installed, so ATAK's own registry is asked; if that fails (an
+     * obfuscated build), the button shows and a plugin that is not there ignores it.
+     */
+    private static boolean pluginLoaded(String pkg) {
+        try {
+            final com.atak.plugins.impl.AtakPluginRegistry reg = com.atak.plugins.impl.AtakPluginRegistry.get();
+            return reg == null || reg.isPluginLoaded(pkg) || reg.isPluginLoaded(pkg + ".civ");
+        } catch (Throwable t) {
+            return true;
+        }
+    }
+
+    /** Where every takwerx plugin is listed with its download. */
+    static final String PLUGIN_PAGE = "https://thetaksyndicate.org/plugins/";
+
+    /** Opens the plugin page in the device's browser. */
+    private void openPluginPage() {
+        try {
+            final android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_VIEW,
+                    android.net.Uri.parse(PLUGIN_PAGE));
+            i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+            mapView.getContext().startActivity(i);
+        } catch (RuntimeException e) {
+            new AlertDialog.Builder(mapView.getContext()).setTitle("No browser")
+                    .setMessage("Open " + PLUGIN_PAGE + " in a browser to get the plugin.")
+                    .setPositiveButton("OK", null).show();
+        }
+    }
+
+    /** Puts the report's area in view, then asks the other plugin to open its pane. */
+    private void openPlugin(Report r, String action) {
+        goTo(r);
+        try {
+            com.atakmap.android.ipc.AtakBroadcast.getInstance()
+                    .sendSystemBroadcast(new android.content.Intent(action));
+        } catch (RuntimeException e) {
+            Log.w(TAG, "could not open the other plugin", e);
+        }
     }
 
     /** TakwerxSectionHeading cyan. */

@@ -28,6 +28,8 @@ public final class Terrain extends Section {
         super("terrain", "Terrain", false,
                 "USGS 3D Elevation Program (3DEP), about 30 m cells; slope limits from USFS/NWCG S-236.");
         seeIn = "See slope on the map in Dozer Country.";
+        openName = "Dozer Country";
+        openPackage = "com.atakmap.android.dozercountry.plugin";
     }
 
     @Override

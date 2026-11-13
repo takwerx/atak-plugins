@@ -46,7 +46,8 @@ public final class SitRepManager {
     private static final String PREF_AREAS = "sitrep.areasVisible";
     public static final String PREF_NEARBY = "sitrep.nearbyMi";
     /** The widest area a report is made for: past this the servers time out and the counts stop meaning much. */
-    static final double MAX_SPAN_M = 200_000;
+    /** Larger than any county a crew would ask about (PLAN decision 12); a state is refused. */
+    static final double MAX_SPAN_M = 700_000;
 
     public interface Listener {
         void changed();
@@ -236,6 +237,80 @@ public final class SitRepManager {
     }
 
     private void areaDrawn(GeoPoint[] ring) {
+        startReport(ring, null);
+    }
+
+    /**
+     * Places found by name, on a worker; the answer arrives on the main thread. The
+     * state of the map's center is listed first.
+     */
+    public void searchPlaces(final String typed, final PlaceAnswer<java.util.List<com.atakmap.android.sitrep.net.Places.Place>> answer) {
+        final GeoPoint center = centerForSearch;
+        fetch.execute(new Runnable() {
+            @Override
+            public void run() {
+                java.util.List<com.atakmap.android.sitrep.net.Places.Place> got = null;
+                Throwable error = null;
+                try {
+                    got = com.atakmap.android.sitrep.net.Places.search(typed,
+                            com.atakmap.android.sitrep.net.Places.stateAt(center));
+                } catch (Throwable e) {
+                    error = e;
+                    Log.w(TAG, "place search failed: " + e);
+                }
+                final java.util.List<com.atakmap.android.sitrep.net.Places.Place> g = got;
+                final Throwable err = error;
+                main.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        answer.done(g, err);
+                    }
+                });
+            }
+        });
+    }
+
+    /** Fetches a place's outline and makes a report for it, named after the place. */
+    public void reportForPlace(final com.atakmap.android.sitrep.net.Places.Place p) {
+        note = "Getting the outline of " + p.label + "...";
+        changed();
+        fetch.execute(new Runnable() {
+            @Override
+            public void run() {
+                GeoPoint[] ring = null;
+                try {
+                    ring = com.atakmap.android.sitrep.net.Places.outline(p);
+                } catch (Throwable e) {
+                    Log.w(TAG, "place outline failed: " + e);
+                }
+                final GeoPoint[] r = ring;
+                main.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (stopped)
+                            return;
+                        if (r == null) {
+                            note = "Could not get the outline of " + p.label + ". Try again.";
+                            changed();
+                            return;
+                        }
+                        note = null;
+                        startReport(r, p.label);
+                    }
+                });
+            }
+        });
+    }
+
+    /** An answer that arrives on the main thread. */
+    public interface PlaceAnswer<T> {
+        void done(T result, Throwable error);
+    }
+
+    /** The map's center when a search was asked for; its state is listed first. */
+    public volatile GeoPoint centerForSearch;
+
+    private void startReport(GeoPoint[] ring, String label) {
         final Area area;
         try {
             area = Area.of(ring);
@@ -245,12 +320,13 @@ public final class SitRepManager {
             return;
         }
         if (area.spanMeters() > MAX_SPAN_M) {
-            note = "That area is " + Units.distance(area.spanMeters()) + " across. Draw one under "
+            note = "That area is " + Units.distance(area.spanMeters()) + " across. Pick one under "
                     + Units.distance(MAX_SPAN_M) + ".";
             changed();
             return;
         }
         final Report r = new Report(UUID.randomUUID().toString(), System.currentTimeMillis(), area);
+        r.label = Report.cleanLabel(label);
         for (Section s : Sections.all())
             r.answers.put(s.key, Report.newLoading());
         reports.add(0, r);

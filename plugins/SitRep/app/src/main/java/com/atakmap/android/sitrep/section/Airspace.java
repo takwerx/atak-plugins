@@ -39,6 +39,9 @@ public final class Airspace extends Section {
         super("airspace", "Airspace", true,
                 "FAA Airspace (classes B to E and special use), through the takwerx AirAware tiles; FAA TFR list and TFR map service.");
         seeIn = "See them on the map in AirAware.";
+        openName = "AirAware";
+        openPackage = "com.atakmap.android.airaware.plugin";
+        openAction = "com.atakmap.android.airaware.SHOW";
     }
 
     @Override

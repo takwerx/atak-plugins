@@ -46,6 +46,8 @@ public final class Roads extends Section {
         super("roads", "Roads", true,
                 "State 511 systems (Caltrans, CHP and the other state DOTs), through the takwerx 511 relay.");
         seeIn = "See them on the map in Traffic.";
+        openName = "Traffic";
+        openPackage = "com.atakmap.android.traffic.plugin";
     }
 
     @Override

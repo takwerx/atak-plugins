@@ -25,6 +25,8 @@ public final class Evacuations extends Section {
         super("evacuations", "Evacuations", true,
                 "The agency evacuation feeds in the takwerx Evac Zone catalog (Cal OES, Oregon OSFM, county feeds).");
         seeIn = "See them on the map in Evac Zone.";
+        openName = "Evac Zone";
+        openPackage = "com.atakmap.android.evaczone.plugin";
     }
 
     @Override

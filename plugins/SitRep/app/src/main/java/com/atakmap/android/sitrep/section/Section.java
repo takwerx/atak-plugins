@@ -33,6 +33,12 @@ public abstract class Section {
      * 2026-11-13).
      */
     public String seeIn;
+    /**
+     * The plugin {@link #seeIn} names: its display name, its package, and the SHOW
+     * action when it answers one. Loaded with an action, the line is an Open button;
+     * not installed, it is a Get button to the plugin page (operator, 2026-11-13).
+     */
+    public String openName, openPackage, openAction;
 
     protected Section(String key, String name, boolean live, String source) {
         this.key = key;

@@ -26,6 +26,8 @@ public final class Cameras extends Section {
         super("cameras", "Cameras", false,
                 "The Cam Depot catalog: state DOT traffic cameras, ALERTWildfire and other wildfire cameras, FAA weather cameras.");
         seeIn = "Watch them in Cam Depot.";
+        openName = "Cam Depot";
+        openPackage = "com.atakmap.android.camdepot.plugin";
     }
 
     @Override
