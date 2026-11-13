@@ -4,4 +4,14 @@
     <string name="app_name">Sit Rep</string>
     <!-- description -->
     <string name="app_desc">Sit Rep</string>
+
+    <string name="draw_area">Draw area</string>
+    <string name="settings">Settings</string>
+    <string name="back">Back</string>
+    <string name="refresh">Refresh</string>
+    <string name="delete">Delete</string>
+    <string name="go_to">Go to</string>
+    <string name="heading_reports">Reports</string>
+    <string name="show_settings">Open or close</string>
+    <string name="status_start">Draw an area to make a sit rep.</string>
 </resources>

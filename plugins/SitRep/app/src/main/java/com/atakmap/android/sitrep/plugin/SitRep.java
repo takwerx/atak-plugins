@@ -1,10 +1,15 @@
-
 package com.atakmap.android.sitrep.plugin;
 
 import android.content.Context;
 
 import com.atak.plugins.impl.PluginContextProvider;
-import com.atak.plugins.impl.PluginLayoutInflater;
+import com.atakmap.android.maps.MapItem;
+import com.atakmap.android.maps.MapView;
+import com.atakmap.android.sitrep.AreaOutlines;
+import com.atakmap.android.sitrep.Report;
+import com.atakmap.android.sitrep.SitRepManager;
+import com.atakmap.android.sitrep.ui.SitRepPane;
+import com.atakmap.coremap.log.Log;
 
 import gov.tak.api.plugin.IPlugin;
 import gov.tak.api.plugin.IServiceController;
@@ -15,13 +20,26 @@ import gov.tak.api.ui.ToolbarItem;
 import gov.tak.api.ui.ToolbarItemAdapter;
 import gov.tak.platform.marshal.MarshalManager;
 
+/**
+ * Sit Rep: draw an area, read an all-hazard situation report for it.
+ *
+ * <p>The manager lives for the plugin's life and owns the reports; the pane is only
+ * how they are read. Nothing is a {@code Tool}, so a report keeps fetching when the
+ * operator switches tools, opens a dropdown or closes the pane.
+ */
 public class SitRep implements IPlugin {
+
+    private static final String TAG = "SitRep";
 
     IServiceController serviceController;
     Context pluginContext;
     IHostUIService uiService;
     ToolbarItem toolbarItem;
-    Pane templatePane;
+    Pane pane;
+    SitRepPane paneUi;
+    SitRepManager manager;
+    MapView mapView;
+    private com.atakmap.android.menu.MapMenuEventListener tapOpensReport;
 
     public SitRep(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -31,15 +49,9 @@ public class SitRep implements IPlugin {
             pluginContext = ctxProvider.getPluginContext();
             pluginContext.setTheme(R.style.ATAKPluginTheme);
         }
-
-        // obtain the UI service
         uiService = serviceController.getService(IHostUIService.class);
-
-        // initialize the toolbar button for the plugin
-
-        // create the button and set the identifier to be well known
-        // if you fail to do this, the toolbar configuration will never
-        // be able to find it again after the user moves the icon.
+        // A well-known identifier, or the toolbar configuration cannot find the
+        // button again after the operator moves it.
         toolbarItem = new ToolbarItem.Builder(
                 pluginContext.getString(R.string.app_name),
                 MarshalManager.marshal(
@@ -49,7 +61,7 @@ public class SitRep implements IPlugin {
                 .setListener(new ToolbarItemAdapter() {
                     @Override
                     public void onClick(ToolbarItem item) {
-                        showPane();
+                        showPane(null);
                     }
                 }).setIdentifier(pluginContext.getPackageName())
                 .build();
@@ -57,44 +69,114 @@ public class SitRep implements IPlugin {
 
     @Override
     public void onStart() {
-        // the plugin is starting, add the button to the toolbar
-        if (uiService == null)
+        if (uiService != null)
+            uiService.addToolbarItem(toolbarItem);
+        mapView = MapView.getMapView();
+        if (mapView == null) {
+            Log.w(TAG, "no map view at start");
             return;
+        }
+        manager = new SitRepManager(mapView);
+        manager.setListener(new SitRepManager.Listener() {
+            @Override
+            public void changed() {
+                if (paneUi != null)
+                    paneUi.refresh();
+            }
 
-        uiService.addToolbarItem(toolbarItem);
+            @Override
+            public void reportStarted(Report r) {
+                showPane(r.id);
+            }
+        });
+        manager.start();
+        registerTap();
     }
 
     @Override
     public void onStop() {
-        // the plugin is stopping, remove the button from the toolbar
-        if (uiService == null)
-            return;
-
-        uiService.removeToolbarItem(toolbarItem);
+        // ATAK keeps a plugin's pane on screen across a reload, and a pane whose
+        // buttons point at a stopped instance does nothing when tapped.
+        if (pane != null && uiService != null) {
+            try {
+                if (uiService.isPaneVisible(pane))
+                    uiService.closePane(pane);
+            } catch (Exception ignored) {
+                // Already gone.
+            }
+        }
+        pane = null;
+        paneUi = null;
+        unregisterTap();
+        if (manager != null) {
+            manager.stop();
+            manager = null;
+        }
+        if (uiService != null)
+            uiService.removeToolbarItem(toolbarItem);
     }
 
-    private void showPane() {
-        // instantiate the plugin view if necessary
-        if(templatePane == null) {
-            // Remember to use the PluginLayoutInflator if you are actually inflating a custom view
-            // In this case, using it is not necessary - but I am putting it here to remind
-            // developers to look at this Inflator
-
-            templatePane = new PaneBuilder(PluginLayoutInflater.inflate(pluginContext,
-                    R.layout.main_layout, null))
-                    // relative location is set to default; pane will switch location dependent on
-                    // current orientation of device screen
+    /** Opens the pane: on the main screen, or on one report. */
+    private void showPane(String reportId) {
+        if (manager == null || mapView == null || uiService == null)
+            return;
+        if (pane == null) {
+            paneUi = new SitRepPane(mapView, pluginContext, manager);
+            pane = new PaneBuilder(paneUi.getView())
                     .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)
-                    // pane will take up 50% of screen width in landscape mode
                     .setMetaValue(Pane.PREFERRED_WIDTH_RATIO, 0.5D)
-                    // pane will take up 50% of screen height in portrait mode
                     .setMetaValue(Pane.PREFERRED_HEIGHT_RATIO, 0.5D)
                     .build();
         }
+        if (reportId == null)
+            paneUi.showMain();
+        else
+            paneUi.showReport(reportId);
+        if (!uiService.isPaneVisible(pane))
+            uiService.showPane(pane, null);
+    }
 
-        // if the plugin pane is not visible, show it!
-        if(!uiService.isPaneVisible(templatePane)) {
-            uiService.showPane(templatePane, null);
-        }
+    /**
+     * A tap on a report's area opens that report in the pane, no radial (PLAN section
+     * 11). Only our outlines are claimed; everyone else's items keep their radials.
+     */
+    private void registerTap() {
+        tapOpensReport = new com.atakmap.android.menu.MapMenuEventListener() {
+            @Override
+            public boolean onShowMenu(MapItem item) {
+                final String id = AreaOutlines.reportOf(item);
+                if (id == null || manager == null || manager.find(id) == null)
+                    return false;
+                // A moment later: a pick from ATAK's Select Item list posts its own
+                // show-details, which would close a page opened inline.
+                mapView.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        showPane(id);
+                    }
+                }, 250);
+                return true;
+            }
+
+            @Override
+            public void onHideMenu(MapItem item) {
+            }
+        };
+        final com.atakmap.android.menu.MapMenuReceiver menus =
+                com.atakmap.android.menu.MapMenuReceiver.getInstance();
+        if (menus != null)
+            menus.addEventListener(tapOpensReport);
+        else
+            Log.w(TAG, "no radial menu receiver; taps on areas keep the radial");
+    }
+
+    private void unregisterTap() {
+        if (tapOpensReport == null)
+            return;
+        final com.atakmap.android.menu.MapMenuReceiver menus =
+                com.atakmap.android.menu.MapMenuReceiver.getInstance();
+        if (menus != null)
+            menus.removeEventListener(tapOpensReport);
+        tapOpensReport = null;
     }
 }

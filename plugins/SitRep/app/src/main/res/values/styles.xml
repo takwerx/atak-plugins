@@ -122,5 +122,38 @@
         <item name="android:textSize">@dimen/fontSize</item>
     </style>
 
+    <!-- The takwerx pane standard (plugin-ui skill, section 9). Every button uses it. -->
+    <style name="TakwerxButton" parent="@style/darkButton">
+        <item name="android:paddingLeft">12dp</item>
+        <item name="android:paddingRight">12dp</item>
+        <item name="android:paddingTop">6dp</item>
+        <item name="android:paddingBottom">8dp</item>
+        <item name="android:minHeight">44dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:ellipsize">end</item>
+    </style>
 
+    <!-- The square arrow beside a drop-down row. -->
+    <style name="TakwerxIconButton">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_height">44dp</item>
+        <item name="android:layout_marginLeft">2dp</item>
+        <item name="android:layout_marginRight">2dp</item>
+        <item name="android:background">@drawable/btn_gray</item>
+        <item name="android:scaleType">centerInside</item>
+        <item name="android:padding">9dp</item>
+    </style>
+
+    <!-- One heading style, everywhere, and it is cyan. -->
+    <style name="TakwerxSectionHeading">
+        <item name="android:textSize">12sp</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">#00E5FF</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingBottom">2dp</item>
+    </style>
 </resources>
