@@ -1,10 +1,10 @@
 ATAK Plugin — FireCast
 
-**Download FireCast 0.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download FireCast 0.6** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/firecast/releases/download/v0.5/ATAK-Plugin-FireCast-0.5--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/firecast/releases/download/v0.5/ATAK-Plugin-FireCast-0.5--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/firecast/releases/download/v0.5/ATAK-Plugin-FireCast-0.5--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/firecast/releases/download/v0.6/ATAK-Plugin-FireCast-0.6--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/firecast/releases/download/v0.6/ATAK-Plugin-FireCast-0.6--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/firecast/releases/download/v0.6/ATAK-Plugin-FireCast-0.6--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/firecast/releases
 
@@ -142,8 +142,9 @@ empty ground, that a hot pixel is a wildfire rather than a flare or a solar farm
 _________________________________________________________________
 STATUS
 
-0.5, the first public release, built and signed by tak.gov for ATAK-CIV 5.6, 5.7
-and 5.8. Heat detections, a fire spread model that runs on the device, and other
+0.6, built and signed by tak.gov for ATAK-CIV 5.6, 5.7 and 5.8. 0.6 names the
+weather the model uses on the Conditions choices (your own observation, a
+Kestrel, or a station). Heat detections, a fire spread model that runs on the device, and other
 agencies' published forecasts, all on the ATAK map. The model gives a direction
 and an order of magnitude, not a perimeter to plan on; the user guide says what
 it leaves out.

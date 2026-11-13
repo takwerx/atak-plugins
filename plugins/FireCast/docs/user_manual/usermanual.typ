@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "FireCast",
-   plugin-version: "0.5",
+   plugin-version: "0.6",
    platform: "ATAK",
    platform-version: "5.7.0",
 )
@@ -166,6 +166,9 @@ perimeter* starts a run from that outline.
   Then the settings:
 
   - *Conditions:* as observed, at the gust, a dry day, or dry with 20 mph wind.
+    As observed uses the weather the Weather button shows, and names it
+    (my obs, a Kestrel, or the station). Dry day replaces your fuel
+    moisture; dry with 20 mph wind also replaces your wind speed.
   - *Weather:* a station, your own observation, or a Kestrel station.
   - *Ignition:* when it started; the rings run from then.
   - *Horizon:* one or three hours ahead.
