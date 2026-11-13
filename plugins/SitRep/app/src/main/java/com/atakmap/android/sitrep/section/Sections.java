@@ -16,8 +16,11 @@ public final class Sections {
         final List<Section> s = new ArrayList<>();
         s.add(new Alerts());
         s.add(new Fires());
+        s.add(new Evacuations());
         s.add(new Roads());
         s.add(new Airspace());
+        s.add(new Cameras());
+        s.add(new Declarations());
         s.add(new Structures());
         ALL = Collections.unmodifiableList(s);
     }

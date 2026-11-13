@@ -40,6 +40,7 @@ public final class Alerts extends Section {
     public Alerts() {
         super("alerts", "Alerts", true,
                 "National Weather Service active alerts, including the civil alerts it relays for local authorities.");
+        seeIn = "See them on the map in Atmosphere and IPAWS Alerts.";
     }
 
     @Override

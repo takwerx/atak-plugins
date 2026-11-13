@@ -38,6 +38,7 @@ public final class Airspace extends Section {
     public Airspace() {
         super("airspace", "Airspace", true,
                 "FAA Airspace (classes B to E and special use), through the takwerx AirAware tiles; FAA TFR list and TFR map service.");
+        seeIn = "See them on the map in AirAware.";
     }
 
     @Override

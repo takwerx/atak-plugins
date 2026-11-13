@@ -27,6 +27,12 @@ public abstract class Section {
     public final boolean live;
     /** Where the numbers come from, for the line behind the tap. No source names on the head. */
     public final String source;
+    /**
+     * The takwerx plugin that shows this section's data on the map, as a closing
+     * line: {@code See them on the map in AirAware.} Null when none does (operator,
+     * 2026-11-13).
+     */
+    public String seeIn;
 
     protected Section(String key, String name, boolean live, String source) {
         this.key = key;

@@ -263,6 +263,12 @@ public final class SitRepPane {
                         + ", showing what this device saved " + ago(a.at) + ".", 13));
             if (a.state == Report.State.FAILED || a.state == Report.State.OFFLINE)
                 f.body.addView(body("Tap Refresh to try again.", 14));
+            if (s.seeIn != null && (a.state == Report.State.OK || a.state == Report.State.NOT_HERE)) {
+                final TextView see = body(s.seeIn, 14);
+                see.setTextColor(CATEGORY);
+                see.setPadding(0, dp(6), 0, 0);
+                f.body.addView(see);
+            }
             final TextView src = body("Source: " + s.source
                     + (a.at > 0 ? " Fetched " + clock(a.at) + "." : ""), 12);
             src.setPadding(0, dp(6), 0, dp(4));

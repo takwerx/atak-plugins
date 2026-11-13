@@ -27,6 +27,7 @@ public final class Fires extends Section {
     public Fires() {
         super("fires", "Fires", true,
                 "NIFC WFIGS current incidents: every wildfire and prescribed burn reported to IRWIN, placed by its point of origin.");
+        seeIn = "See them on the map in Feature Layer.";
     }
 
     @Override
