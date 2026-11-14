@@ -58,6 +58,11 @@ public final class Places {
      * largest. At most 40.
      */
     public static List<Place> search(String typed, final String preferState) throws Exception {
+        return search(typed, preferState, null);
+    }
+
+    /** As above, nearest to the map's center first when it is given. */
+    public static List<Place> search(String typed, final String preferState, final GeoPoint center) throws Exception {
         String t = typed == null ? "" : typed.trim().toUpperCase(Locale.US).replaceAll("[^A-Z0-9 .,'-]", "");
         // "bayview idaho", "Bayview, ID": the state off the end, as a filter (2026-11-13:
         // the whole string was matched as a name and found nothing).
@@ -76,7 +81,7 @@ public final class Places {
         for (String layer : LAYERS) {
             final String form = "f=json&returnGeometry=false&resultRecordCount=25"
                     + "&where=" + Esri.enc("UPPER(BASENAME) LIKE '" + q + "%'" + inState)
-                    + "&outFields=" + Esri.enc("NAME,BASENAME,STATE,GEOID,AREALAND");
+                    + "&outFields=" + Esri.enc("NAME,BASENAME,STATE,GEOID,AREALAND,INTPTLAT,INTPTLON");
             final JSONObject o = Esri.parse(Http.post(BASE + layer + "/query", form));
             final JSONArray f = o.optJSONArray("features");
             if (f == null)
@@ -90,7 +95,8 @@ public final class Places {
                 if (!geoid.matches("\\d{5,7}") || st == null)
                     continue;
                 final String name = a.optString("NAME", "").replace(" CDP", " (community)");
-                out.add(new Place(name + ", " + st, layer, geoid, st, a.optDouble("AREALAND", 0)));
+                out.add(new Place(name + ", " + st, layer, geoid, st, a.optDouble("AREALAND", 0),
+                        num(a.optString("INTPTLAT", "")), num(a.optString("INTPTLON", ""))));
                 named.add(a.optString("BASENAME", "").toUpperCase(Locale.US) + "|" + st);
             }
         }
@@ -110,9 +116,17 @@ public final class Places {
         } catch (Exception e) {
             // Census answers alone are still a result.
         }
+        // Nearest to the map first (2026-11-13: "bayview" listed 40 Bayviews and cut
+        // the one in Idaho the operator was looking at); without a center, the map's
+        // state first, then the largest.
         Collections.sort(out, new Comparator<Place>() {
             @Override
             public int compare(Place a, Place b) {
+                if (center != null) {
+                    final double da = away(a, center), db = away(b, center);
+                    if (da != db)
+                        return Double.compare(da, db);
+                }
                 final boolean ah = a.state.equals(preferState), bh = b.state.equals(preferState);
                 if (ah != bh)
                     return ah ? -1 : 1;
@@ -120,6 +134,23 @@ public final class Places {
             }
         });
         return out.size() > 40 ? new ArrayList<>(out.subList(0, 40)) : out;
+    }
+
+    /** Rough meters from the center to a place's point; places with none go last. */
+    private static double away(Place p, GeoPoint c) {
+        if (!(Math.abs(p.lat) <= 90) || !(Math.abs(p.lon) <= 180))
+            return Double.MAX_VALUE;
+        final double dy = (p.lat - c.getLatitude()) * 111_320d;
+        final double dx = (p.lon - c.getLongitude()) * 111_320d * Math.cos(Math.toRadians(c.getLatitude()));
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    private static double num(String s) {
+        try {
+            return Double.parseDouble(s.trim());
+        } catch (RuntimeException e) {
+            return Double.NaN;
+        }
     }
 
     /** The city, community and county at a point, smallest first. */
@@ -183,7 +214,7 @@ public final class Places {
             List<Place> out) throws Exception {
         final String where = like + (postal == null ? "" : " AND state_alpha='" + postal + "'");
         final String url = GNIS + "/query?f=json&returnGeometry=true&outSR=4326&resultRecordCount="
-                + (near == null ? 25 : 400) + "&where=" + Esri.enc(where)
+                + (near != null ? 400 : postal == null ? 200 : 25) + "&where=" + Esri.enc(where)
                 + "&outFields=" + Esri.enc("gaz_id,gaz_name,state_alpha,county_name");
         final JSONArray f = Esri.parse(Http.get(url)).optJSONArray("features");
         final List<Object[]> picked = new ArrayList<>();
@@ -222,9 +253,9 @@ public final class Places {
                 return (Integer) x[0] - (Integer) y[0];
             }
         });
-        for (int i = 0; i < picked.size() && i < 25; i++)
+        for (int i = 0; i < picked.size(); i++)
             out.add((Place) picked.get(i)[1]);
-        return Math.min(picked.size(), 25);
+        return picked.size();
     }
 
     /** Levenshtein distance, for the fuzzy town match. */

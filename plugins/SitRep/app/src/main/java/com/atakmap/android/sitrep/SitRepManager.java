@@ -317,7 +317,7 @@ public final class SitRepManager {
                 Throwable error = null;
                 try {
                     got = com.atakmap.android.sitrep.net.Places.search(typed,
-                            com.atakmap.android.sitrep.net.Places.stateAt(center));
+                            com.atakmap.android.sitrep.net.Places.stateAt(center), center);
                 } catch (Throwable e) {
                     error = e;
                     Log.w(TAG, "place search failed: " + e);
