@@ -55,6 +55,17 @@ public abstract class Section {
      */
     public static final String GROUP = "\u00A7 ";
 
+    /**
+     * Joins a line's text and a web page: {@code link("  1959 Decker Fire", url)}. The
+     * report shows the text, and a tap opens the page in the device's browser. Only
+     * https pages are opened.
+     */
+    public static final String LINK = "\u0001";
+
+    public static String link(String text, String url) {
+        return text + LINK + url;
+    }
+
     public abstract Result fetch(Area area) throws Exception;
 
     /**

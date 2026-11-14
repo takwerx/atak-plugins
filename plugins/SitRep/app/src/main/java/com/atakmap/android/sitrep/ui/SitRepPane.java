@@ -418,11 +418,47 @@ public final class SitRepPane {
                 group.head.setText(text);
                 group.show();
             } else if (group != null && line.startsWith("  ")) {
-                group.body.addView(body(line.trim(), 14));
+                group.body.addView(lineView(line.trim()));
             } else {
                 group = null;
-                into.addView(body(line, 14));
+                into.addView(lineView(line));
             }
+        }
+    }
+
+    /**
+     * One detail line. A line that carries a web page ({@link Section#link}) shows its
+     * text underlined, and a tap opens the page in the device's browser.
+     */
+    private TextView lineView(String line) {
+        final int k = line.indexOf(Section.LINK);
+        if (k < 0)
+            return body(line, 14);
+        final String url = line.substring(k + Section.LINK.length()).trim();
+        final TextView t = body(line.substring(0, k).trim(), 14);
+        if (!url.startsWith("https://"))
+            return t;
+        t.setPaintFlags(t.getPaintFlags() | android.graphics.Paint.UNDERLINE_TEXT_FLAG);
+        t.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openPage(url);
+            }
+        });
+        return t;
+    }
+
+    /** Opens an https page in the device's browser. */
+    private void openPage(String url) {
+        try {
+            final android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_VIEW,
+                    android.net.Uri.parse(url));
+            i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+            mapView.getContext().startActivity(i);
+        } catch (RuntimeException e) {
+            new AlertDialog.Builder(mapView.getContext()).setTitle("No browser")
+                    .setMessage("Open " + url + " in a browser.")
+                    .setPositiveButton("OK", null).show();
         }
     }
 
