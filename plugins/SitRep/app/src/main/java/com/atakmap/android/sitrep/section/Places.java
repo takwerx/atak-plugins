@@ -119,17 +119,21 @@ public final class Places extends Section {
         // a Level I 8.8 mi out of Corona was left off at a 5 mi Nearby (2026-11-13).
         try {
             final JSONArray all = new JSONObject(Http.getGzip(HOSPITALS)).optJSONArray("hospitals");
-            // The nearest ER, then trauma care by level: the nearest of any level is
-            // often a Level IV, and the Level II a crew would fly to was left off
-            // (Kootenai Health for Bayview, ID, operator 2026-11-14).
-            final String[] needs = { "er", "trauma", "level2", "level1", "ped", "burn" };
+            // The nearest ER, then a ladder of trauma care, one rung per level: the
+            // nearest of any level is often a Level IV, and the next step up was left
+            // off (Kootenai Health, Level II, for Bayview, ID; Mercy Regional, Level
+            // III in Durango, for Pagosa Springs, CO; operator 2026-11-14). One
+            // hospital that is the nearest at several rungs is listed once.
+            final String[] needs = { "er", "trauma", "level3", "level2", "level1", "ped", "burn" };
             final String[] needWords = { "Nearest emergency room", "Nearest trauma center",
+                    "Nearest Level III or higher trauma center",
                     "Nearest Level II or higher trauma center", "Nearest Level I trauma center",
                     "Nearest pediatric trauma center", "Nearest burn center" };
             final JSONObject[] nearest = new JSONObject[needs.length];
             final double[] nearestD = new double[needs.length];
             java.util.Arrays.fill(nearestD, Double.MAX_VALUE);
             final List<JSONObject> within = new ArrayList<>();
+            final List<JSONObject> ers = new ArrayList<>();
             for (int i = 0; all != null && i < all.length(); i++) {
                 final JSONObject h = all.optJSONObject(i);
                 if (h == null)
@@ -144,8 +148,11 @@ public final class Places extends Section {
                 h.put("_d", d);
                 if (d <= reach)
                     within.add(h);
+                if (hasEr(h))
+                    ers.add(h);
                 final int level = h.optInt("trauma", 0);
-                final boolean[] has = { hasEr(h), level > 0, level == 1 || level == 2, level == 1,
+                final boolean[] has = { hasEr(h), level > 0, level >= 1 && level <= 3,
+                        level == 1 || level == 2, level == 1,
                         h.optInt("ped", 0) > 0, h.has("burn") };
                 for (int k = 0; k < needs.length; k++)
                     if (has[k] && d < nearestD[k]) {
@@ -166,6 +173,33 @@ public final class Places extends Section {
                         within.add(nearest[k]);
                 }
                 m.add(needWords[k]);
+            }
+            // And the three nearest ERs, however far: the ladder alone skipped the
+            // places between its rungs (operator, 2026-11-14: "you put other stuff 160
+            // miles away, why would Durango be left off").
+            java.util.Collections.sort(ers, new java.util.Comparator<JSONObject>() {
+                @Override
+                public int compare(JSONObject a, JSONObject b) {
+                    return Double.compare(a.optDouble("_d"), b.optDouble("_d"));
+                }
+            });
+            for (int k = 0; k < Math.min(3, ers.size()); k++)
+                if (!within.contains(ers.get(k)))
+                    within.add(ers.get(k));
+            // Nearest first, as the list is read.
+            java.util.Collections.sort(within, new java.util.Comparator<JSONObject>() {
+                @Override
+                public int compare(JSONObject a, JSONObject b) {
+                    return Double.compare(a.optDouble("_d"), b.optDouble("_d"));
+                }
+            });
+            // The highest rung a hospital holds says the rest: the nearest Level I that
+            // is also the nearest Level II and III reads "Nearest Level I trauma center".
+            for (List<String> m : marks.values()) {
+                if (m.contains(needWords[4]) || m.contains(needWords[3]))
+                    m.remove(needWords[2]);
+                if (m.contains(needWords[4]))
+                    m.remove(needWords[3]);
             }
             for (JSONObject h : within) {
                 final double d = h.optDouble("_d", 0);
