@@ -216,6 +216,26 @@ public final class PlaceLayer {
                         }
                         continue;
                     }
+                    // An area place (a military installation): its boundary under the icon.
+                    final JSONArray rings = p.optJSONArray("g");
+                    for (int k = 0; rings != null && k < rings.length(); k++) {
+                        final JSONArray ring = rings.optJSONArray(k);
+                        if (ring == null || ring.length() < 3)
+                            continue;
+                        final com.atakmap.map.layer.feature.geometry.LineString edge =
+                                new com.atakmap.map.layer.feature.geometry.LineString(2);
+                        for (int v = 0; v < ring.length(); v++) {
+                            final JSONArray xy = ring.optJSONArray(v);
+                            if (xy != null)
+                                edge.addPoint(xy.optDouble(0), xy.optDouble(1));
+                        }
+                        final long efid = store.insertFeature(new Feature(set, name, edge,
+                                new com.atakmap.map.layer.feature.style.CompositeStyle(new com.atakmap.map.layer.feature.style.Style[] {
+                                        new com.atakmap.map.layer.feature.style.BasicStrokeStyle(0xFF1B1F10, 5f),
+                                        new com.atakmap.map.layer.feature.style.BasicStrokeStyle(0xFFB5C76A, 2.5f) }),
+                                attrs));
+                        details.put(efid, new String[] { name, c[1] + "\n" + d });
+                    }
                     final PlaceIcons.Composed ic = icons.get(c[0], name);
                     if (ic == null)
                         continue;

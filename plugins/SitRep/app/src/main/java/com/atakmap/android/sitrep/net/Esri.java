@@ -107,6 +107,47 @@ public final class Esri {
     }
 
     /**
+     * Polygon features touching the area or within {@code nearbyMiles} of it: each
+     * outer ring as "_rings" ([[lon, lat], ...] lists) and the service's centroid as
+     * "_lat"/"_lon" (the first ring's middle when it gives none).
+     */
+    public static List<JSONObject> areas(String layer, String where, Area area, String outFields,
+            int nearbyMiles) throws IOException {
+        final String form = "f=json&returnGeometry=true&returnCentroid=true&outSR=4326&maxAllowableOffset=0.0005"
+                + "&where=" + enc(where == null ? "1=1" : where)
+                + "&outFields=" + enc(outFields)
+                + area.esriQueryForm()
+                + (nearbyMiles > 0 ? "&distance=" + nearbyMiles + "&units=esriSRUnit_StatuteMile" : "");
+        final JSONArray feats = features(Http.post(layer + "/query", form));
+        final List<JSONObject> out = new ArrayList<>(feats.length());
+        for (int i = 0; i < feats.length(); i++) {
+            final JSONObject f = feats.optJSONObject(i);
+            final JSONObject a = f == null ? null : f.optJSONObject("attributes");
+            final JSONObject g = f == null ? null : f.optJSONObject("geometry");
+            final JSONArray rings = g == null ? null : g.optJSONArray("rings");
+            if (a == null || rings == null || rings.length() == 0)
+                continue;
+            final JSONObject c = f.optJSONObject("centroid");
+            double lat = c == null ? Double.NaN : c.optDouble("y"), lon = c == null ? Double.NaN : c.optDouble("x");
+            if (!(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180)) {
+                final JSONArray r0 = rings.optJSONArray(0);
+                final JSONArray v = r0 == null ? null : r0.optJSONArray(r0.length() / 2);
+                lon = v == null ? Double.NaN : v.optDouble(0);
+                lat = v == null ? Double.NaN : v.optDouble(1);
+            }
+            if (!(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180))
+                continue;
+            try {
+                a.put("_lat", lat).put("_lon", lon).put("_rings", rings);
+            } catch (org.json.JSONException e) {
+                continue;
+            }
+            out.add(a);
+        }
+        return out;
+    }
+
+    /**
      * Point features in the area's box widened by {@code miles}, for a service that
      * refuses a distance buffer (the National Inventory of Dams). The caller measures
      * the real distance.

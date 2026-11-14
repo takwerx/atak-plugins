@@ -46,6 +46,7 @@ public final class Places extends Section {
             { "heliport", "Heliports", "H", "#000000" },
             { "fire", "Fire stations", "F", "#C62828" },
             { "police", "Police", "P", "#1A237E" },
+            { "military", "Military installations", "M", "#556B2F" },
             { "power", "Power plants", "E", "#EF6C00" },
             { "battery", "Battery storage (BESS)", "B", "#00897B" },
             { "nuclear", "Nuclear plants", "N", "#FBC02D" },
@@ -71,6 +72,7 @@ public final class Places extends Section {
     static final String PACK = "https://mapdepot.takwerx.org/sitrep/places/";
     /** Most places kept per category, nearest first, so fuel cannot crowd out the rest. */
     static final int PER_CATEGORY = 500;
+    static final String MILITARY = "https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_Military_Bases/FeatureServer/0";
     static final String NTAD = "https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/";
     static final String POWER = "https://mapdepot.takwerx.org/sitrep/power/";
     private static final int MAX_POWER_PATHS = 3_000;
@@ -86,7 +88,7 @@ public final class Places extends Section {
         super("places", "Places", true,
                 "Hospitals: takwerx IWI pack (CMS, HHS, HIFLD, state lists, FAA). Schools: USGS National Map. "
                         + "Care homes and dialysis: California CDPH licensed facilities. Shelters: FEMA National Shelter System. Airports and heliports: BTS NTAD Aviation Facilities (FAA data). "
-                        + "Fire and police: USGS National Map. Power plants: CEC (California), EPA (elsewhere). "
+                        + "Fire and police: USGS National Map. Military installations: DoD MIRTA via BTS NTAD. Power plants: CEC (California), EPA (elsewhere). "
                         + "Nuclear: FEMA/NRC. Dams: USACE National Inventory of Dams. Chemical: EPA RMP. "
                         + "Animal shelters, fairgrounds, equestrian centers, pharmacies, groceries, fuel and urgent care: "
                         + "Overture Maps Foundation places (CDLA-Permissive-2.0; Foursquare rows Apache-2.0). "
@@ -427,6 +429,27 @@ public final class Places extends Section {
             missing.add("nuclear plants");
         }
 
+        // Military installations (DoD MIRTA via BTS NTAD): the boundary and a labeled
+        // icon, within Nearby (operator, 2026-11-13).
+        try {
+            for (JSONObject a : Esri.areas(MILITARY, "1=1", area,
+                    "siteName,featureName,siteReportingComponent,siteOperationalStatus,isJointBase,stateNameCode", nearbyMiles)) {
+                final double d = area.distanceMeters(a.optDouble("_lat"), a.optDouble("_lon"));
+                final List<String> info = new ArrayList<>();
+                info.add(branch(a.optString("siteReportingComponent", "")) + ", " + status(a.optString("siteOperationalStatus", ""))
+                        + ("yes".equalsIgnoreCase(a.optString("isJointBase", "")) ? ", joint base." : "."));
+                if (!a.optString("featureName", "").equals(a.optString("siteName", "")))
+                    info.add(a.optString("featureName", ""));
+                info.add("Boundary from DoD MIRTA; access is controlled.");
+                final String name = a.optString("featureName", a.optString("siteName", "Military installation"));
+                final JSONObject pt = point("military", name, a.optDouble("_lat"), a.optDouble("_lon"), d, area, info);
+                pt.put("g", a.optJSONArray("_rings"));
+                found.get("military").add(pt);
+            }
+        } catch (Exception e) {
+            missing.add("military installations");
+        }
+
         // Dams: the service refuses a distance buffer, so a widened box, measured here.
         try {
             for (JSONObject a : Esri.pointsInBox(DAMS, "1=1", area,
@@ -679,6 +702,36 @@ public final class Places extends Section {
 
     private static int floor(double v, int step) {
         return (int) (Math.floor(v / step) * step);
+    }
+
+    /** MIRTA's reporting component in words. */
+    private static String branch(String code) {
+        switch (code == null ? "" : code) {
+            case "usa": return "Army";
+            case "usar": return "Army Reserve";
+            case "armyNationalGuard": return "Army National Guard";
+            case "usaf": return "Air Force";
+            case "afr": return "Air Force Reserve";
+            case "airNationalGuard": return "Air National Guard";
+            case "usn": return "Navy";
+            case "usnr": return "Navy Reserve";
+            case "usmc": return "Marine Corps";
+            case "usmcr": return "Marine Corps Reserve";
+            case "whs": return "Washington Headquarters Services";
+            default: return "Department of Defense";
+        }
+    }
+
+    /** MIRTA's operational status in words. */
+    private static String status(String code) {
+        switch (code == null ? "" : code) {
+            case "act": return "active";
+            case "semi": return "semi-active";
+            case "care": return "caretaker status";
+            case "clsd": return "closed";
+            case "excs": return "excess";
+            default: return "status not given";
+        }
     }
 
     /** CEC and EIA energy source codes in words. */

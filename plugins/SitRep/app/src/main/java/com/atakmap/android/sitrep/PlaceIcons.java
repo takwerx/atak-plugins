@@ -26,7 +26,7 @@ final class PlaceIcons {
 
     private static final String TAG = "SitRep.PlaceIcons";
     /** Bump when the drawing changes: a cached file never redraws. */
-    private static final int VERSION = 10;
+    private static final int VERSION = 11;
     private static final float SIZE_DP = 30f;
 
     /** What the style needs: the file, its size and the offset that puts the glyph on the point. */
@@ -502,6 +502,36 @@ final class PlaceIcons {
                 bolt.lineTo(cx - s * 0.01f, cy - s * 0.03f);
                 bolt.close();
                 c.drawPath(bolt, fill);
+                break;
+            }
+            case "military": {
+                // An olive shield with a white star: not the police badge's square.
+                final Path shield = new Path();
+                shield.moveTo(cx - s * 0.40f, cy - s * 0.40f);
+                shield.lineTo(cx + s * 0.40f, cy - s * 0.40f);
+                shield.lineTo(cx + s * 0.40f, cy + s * 0.02f);
+                shield.quadTo(cx + s * 0.36f, cy + s * 0.32f, cx, cy + s * 0.46f);
+                shield.quadTo(cx - s * 0.36f, cy + s * 0.32f, cx - s * 0.40f, cy + s * 0.02f);
+                shield.close();
+                c.drawPath(shield, white);
+                final android.graphics.Matrix in = new android.graphics.Matrix();
+                in.setScale(0.84f, 0.84f, cx, cy);
+                final Path inner = new Path(shield);
+                inner.transform(in);
+                fill.setColor(0xFF556B2F);
+                c.drawPath(inner, fill);
+                final Path star = new Path();
+                for (int i = 0; i < 10; i++) {
+                    final double a = Math.toRadians(-90 + i * 36);
+                    final float rad = (i % 2 == 0 ? 0.24f : 0.10f) * s;
+                    final float x = cx + (float) (Math.cos(a) * rad), y = cy - s * 0.02f + (float) (Math.sin(a) * rad);
+                    if (i == 0)
+                        star.moveTo(x, y);
+                    else
+                        star.lineTo(x, y);
+                }
+                star.close();
+                c.drawPath(star, white);
                 break;
             }
             case "nuclear": {
