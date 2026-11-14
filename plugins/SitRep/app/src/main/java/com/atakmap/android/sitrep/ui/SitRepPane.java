@@ -56,6 +56,9 @@ public final class SitRepPane {
     private final LinearLayout settingsContainer, reportSections;
     private final TextView reportTitle, reportAbout;
     private final ScrollView reportScroll;
+    /** The place a radial's Details asked for: its row is marked and scrolled to once. */
+    private String focusKey;
+    private View focusRow;
     private final Adapter adapter = new Adapter();
     private List<Report> shown = new ArrayList<>();
     /** The report on the report page, or null when another page is up. */
@@ -186,6 +189,7 @@ public final class SitRepPane {
     /** The main screen, as the pane opens from the toolbar every time. */
     public void showMain() {
         openId = null;
+        focusKey = null;
         settingsPage.setVisibility(View.GONE);
         reportPage.setVisibility(View.GONE);
         list.setVisibility(View.VISIBLE);
@@ -206,6 +210,8 @@ public final class SitRepPane {
             return;
         }
         final boolean other = !id.equals(openId);
+        if (other)
+            focusKey = null;
         openId = id;
         list.setVisibility(View.GONE);
         settingsPage.setVisibility(View.GONE);
@@ -218,6 +224,31 @@ public final class SitRepPane {
                     reportScroll.scrollTo(0, 0);
                 }
             });
+    }
+
+    /**
+     * Details on a place's radial: its report, the Places group and its category
+     * opened, and its row marked with what the source said.
+     */
+    public void showPlace(String reportId, String category, String key) {
+        prefs.edit().putBoolean("sitrep.fold.places", true)
+                .putBoolean("sitrep.fold.places." + category, true).apply();
+        if (!reportId.equals(openId))
+            showReport(reportId);
+        focusKey = key;
+        refresh();
+        reportScroll.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                final View row = focusRow;
+                if (row == null)
+                    return;
+                int y = 0;
+                for (View v = row; v != null && v != reportScroll; v = (View) v.getParent())
+                    y += v.getTop();
+                reportScroll.smoothScrollTo(0, Math.max(0, y - dp(48)));
+            }
+        }, 150);
     }
 
     /** Everything on screen from the manager's state. Main thread. */
@@ -251,6 +282,7 @@ public final class SitRepPane {
     // ------------------------------------------------------------------ report page
 
     private void renderReport(Report r) {
+        focusRow = null;
         reportTitle.setText(r.name());
         reportAbout.setText("Made " + clock(r.made) + ". " + Units.area(r.area.squareMeters()) + ", "
                 + Units.distance(r.area.spanMeters()) + " across.");
@@ -842,9 +874,13 @@ public final class SitRepPane {
             });
             int shown = 0;
             for (org.json.JSONObject p : l) {
-                if (++shown > 40) {
-                    fold.body.addView(body("... and " + (l.size() - 40) + " more on the map.", 14));
-                    break;
+                final boolean focus = focusKey != null
+                        && focusKey.equals(com.atakmap.android.sitrep.PlaceLayer.placeKey(p));
+                // The place a radial asked for is listed even past the first 40.
+                if (++shown > 40 && !focus) {
+                    if (shown == 41)
+                        fold.body.addView(body("... and " + (l.size() - 40) + " more on the map.", 14));
+                    continue;
                 }
                 String where = "";
                 final org.json.JSONArray info = p.optJSONArray("i");
@@ -864,6 +900,20 @@ public final class SitRepPane {
                     }
                 });
                 fold.body.addView(row);
+                if (focus) {
+                    row.setTextColor(CATEGORY);
+                    row.setBackgroundColor(0x2200E5FF);
+                    final StringBuilder d = new StringBuilder();
+                    for (int k = 0; info != null && k < info.length(); k++)
+                        d.append(k == 0 ? "" : "\n").append(info.optString(k));
+                    if (d.length() > 0) {
+                        final TextView more = body(d.toString(), 13);
+                        more.setPadding(dp(12), 0, 0, dp(6));
+                        more.setBackgroundColor(0x2200E5FF);
+                        fold.body.addView(more);
+                    }
+                    focusRow = row;
+                }
             }
             fold.show();
         }

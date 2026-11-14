@@ -75,9 +75,9 @@ public final class SitRepManager {
     /** Something to say once on the status line (a refused area), or null. */
     private String note;
 
-    public SitRepManager(MapView mapView) {
+    public SitRepManager(MapView mapView, Context pluginContext) {
         this.pick = new com.atakmap.android.sitrep.MapPick(mapView);
-        this.places = new PlaceLayer(mapView);
+        this.places = new PlaceLayer(mapView, pluginContext);
         this.mapView = mapView;
         this.prefs = mapView.getContext().getSharedPreferences("sitrep", Context.MODE_PRIVATE);
         this.root = FileSystemUtils.getItem("tools/sitrep");

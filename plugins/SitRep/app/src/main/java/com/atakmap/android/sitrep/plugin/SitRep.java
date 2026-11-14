@@ -39,6 +39,7 @@ public class SitRep implements IPlugin {
     SitRepManager manager;
     MapView mapView;
     private com.atakmap.android.menu.MapMenuEventListener tapOpensReport;
+    private com.atakmap.android.sitrep.PlaceRadial radial;
 
     public SitRep(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -75,7 +76,7 @@ public class SitRep implements IPlugin {
             Log.w(TAG, "no map view at start");
             return;
         }
-        manager = new SitRepManager(mapView);
+        manager = new SitRepManager(mapView, pluginContext);
         manager.setListener(new SitRepManager.Listener() {
             @Override
             public void changed() {
@@ -100,6 +101,17 @@ public class SitRep implements IPlugin {
             }
         });
         manager.start();
+        radial = new com.atakmap.android.sitrep.PlaceRadial(mapView, new com.atakmap.android.sitrep.PlaceRadial.Opener() {
+            @Override
+            public void openPlace(String reportId, String category, String key) {
+                if (manager == null || reportId == null || manager.find(reportId) == null)
+                    return;
+                showPane(reportId);
+                if (paneUi != null)
+                    paneUi.showPlace(reportId, category, key);
+            }
+        });
+        radial.register();
         registerTap();
     }
 
@@ -118,6 +130,10 @@ public class SitRep implements IPlugin {
         pane = null;
         paneUi = null;
         unregisterTap();
+        if (radial != null) {
+            radial.unregister();
+            radial = null;
+        }
         if (manager != null) {
             manager.stop();
             manager = null;
@@ -156,8 +172,14 @@ public class SitRep implements IPlugin {
         tapOpensReport = new com.atakmap.android.menu.MapMenuEventListener() {
             @Override
             public boolean onShowMenu(MapItem item) {
+                if (item != null && item.hasMetaValue("sitrep_key")) {
+                    // A point place: ATAK opens its radial (PLAN section 11).
+                    if (radial != null)
+                        radial.opening(item);
+                    return false;
+                }
                 if (item != null && item.getMetaBoolean("sitrep_place", false)) {
-                    // A place from a report: its details, nothing to edit or send.
+                    // A line or an installation's edge: its details, nothing to edit or send.
                     final String title = item.getMetaString("title", "Place");
                     final String details = item.getMetaString("sitrep_details", "");
                     mapView.post(new Runnable() {

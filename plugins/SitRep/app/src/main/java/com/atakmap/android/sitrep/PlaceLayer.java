@@ -10,6 +10,7 @@ import com.atakmap.android.features.FeatureDataStoreDeepMapItemQuery;
 import com.atakmap.android.features.FeatureDataStoreMapOverlay;
 import com.atakmap.android.maps.MapItem;
 import com.atakmap.android.maps.MapView;
+import com.atakmap.android.menu.PluginMenuParser;
 import com.atakmap.android.sitrep.section.Places;
 import com.atakmap.coremap.filesystem.FileSystemUtils;
 import com.atakmap.coremap.log.Log;
@@ -52,20 +53,30 @@ public final class PlaceLayer {
     private static final double MIN_RES = 5_000d;
 
     private final MapView mapView;
+    private final Context pluginContext;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private FeatureSetDatabase2 store;
     private FeatureLayer3 layer;
     private FeatureDataStoreMapOverlay overlay;
     private final Map<String, Long> sets = new HashMap<>();
     private PlaceIcons icons;
-    /** Feature id to {title, details}: the hit test's copy carries no attributes. */
+    /**
+     * Feature id to {title, details, report id, category, place key}: the hit test's
+     * copy carries no attributes. Report id and key are null for lines and edges.
+     */
     private final Map<Long, String[]> details = new ConcurrentHashMap<>();
     private volatile boolean stopped;
     /** Zoomed out past the places gate: the layer is off, the store is kept. */
     private boolean hidden;
 
-    public PlaceLayer(MapView mapView) {
+    public PlaceLayer(MapView mapView, Context pluginContext) {
         this.mapView = mapView;
+        this.pluginContext = pluginContext;
+    }
+
+    /** One place's identity inside a report: the pane finds its row by it. */
+    public static String placeKey(JSONObject p) {
+        return p.optString("n") + "|" + p.optDouble("lat") + "|" + p.optDouble("lon");
     }
 
     /** Opens the store on its thread, then puts the layer on the map on main. */
@@ -105,6 +116,19 @@ public final class PlaceLayer {
                             item.setMetaString("title", d != null ? d[0] : feature.getName());
                             item.setMetaString("callsign", d != null ? d[0] : feature.getName());
                             item.setMetaString("sitrep_details", d != null ? d[1] : "");
+                            if (d != null && d.length > 4 && d[2] != null) {
+                                // A point: the radial (PLAN section 11). Lines and edges
+                                // keep the details box.
+                                item.setMetaString("menu", PluginMenuParser.getMenu(pluginContext, "menu/place.xml"));
+                                item.setMetaString("sitrep_report", d[2]);
+                                item.setMetaString("sitrep_category", d[3]);
+                                item.setMetaString("sitrep_key", d[4]);
+                                final com.atakmap.map.layer.feature.geometry.Geometry g = feature.getGeometry();
+                                if (g instanceof Point) {
+                                    item.setMetaDouble("sitrep_lat", ((Point) g).getY());
+                                    item.setMetaDouble("sitrep_lon", ((Point) g).getX());
+                                }
+                            }
                             return item;
                         }
                     };
@@ -142,6 +166,7 @@ public final class PlaceLayer {
     public void sync(List<Report> reports) {
         // A snapshot taken on main; the store work is on the worker.
         final Map<String, JSONArray> byCat = new HashMap<>();
+        final Map<JSONObject, String> owner = new java.util.IdentityHashMap<>();
         for (Report r : reports) {
             if (r.placesOn.isEmpty() || !r.onMap)
                 continue;
@@ -158,17 +183,18 @@ public final class PlaceLayer {
                     byCat.put(p.optString("c"), l);
                 }
                 l.put(p);
+                owner.put(p, r.id);
             }
         }
         worker.execute(new Runnable() {
             @Override
             public void run() {
-                write(byCat);
+                write(byCat, owner);
             }
         });
     }
 
-    private void write(Map<String, JSONArray> byCat) {
+    private void write(Map<String, JSONArray> byCat, Map<JSONObject, String> owner) {
         if (store == null || stopped)
             return;
         try {
@@ -249,7 +275,7 @@ public final class PlaceLayer {
                                             com.atakmap.map.layer.feature.style.LabelPointStyle.ScrollMode.DEFAULT) });
                     final long fid = store.insertFeature(new Feature(set, name,
                             new Point(p.optDouble("lon"), p.optDouble("lat")), style, attrs));
-                    details.put(fid, new String[] { name, c[1] + "\n" + d });
+                    details.put(fid, new String[] { name, c[1] + "\n" + d, owner.get(p), c[0], placeKey(p) });
                 }
             }
         } catch (Throwable t) {
