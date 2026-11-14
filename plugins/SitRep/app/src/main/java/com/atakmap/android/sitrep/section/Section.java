@@ -39,6 +39,8 @@ public abstract class Section {
      * not installed, it is a Get button to the plugin page (operator, 2026-11-13).
      */
     public String openName, openPackage, openAction;
+    /** A second plugin for the same data (Alerts: Atmosphere and IPAWS Alerts). */
+    public String alsoName, alsoPackage, alsoAction;
 
     protected Section(String key, String name, boolean live, String source) {
         this.key = key;

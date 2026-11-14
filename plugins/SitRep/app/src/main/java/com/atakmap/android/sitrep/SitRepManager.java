@@ -479,6 +479,16 @@ public final class SitRepManager {
         changed();
     }
 
+    /** One report's own map switch. */
+    public void setOnMap(Report r, boolean on) {
+        if (!reports.contains(r))
+            return;
+        r.onMap = on;
+        save(r);
+        outlines.sync(reports, areasVisible());
+        changed();
+    }
+
     public void delete(Report r) {
         note = null;
         if (!reports.remove(r))

@@ -72,7 +72,7 @@ public final class AreaOutlines {
         return g;
     }
 
-    /** Makes the map match the reports: one outline each, shown or hidden together. */
+    /** Makes the map match the reports: one outline each, shown when Areas and its own switch are ON. */
     void sync(List<Report> reports, boolean visible) {
         try {
             final MapGroup g = group();
@@ -88,10 +88,10 @@ public final class AreaOutlines {
                 }
                 if (!r.name().equals(it.getTitle()))
                     it.setTitle(r.name());
-                it.setVisible(visible);
+                it.setVisible(visible && r.onMap);
             }
             for (Report r : want.values())
-                g.addItem(outline(g, r, visible));
+                g.addItem(outline(g, r, visible && r.onMap));
         } catch (LinkageError | RuntimeException e) {
             Log.w(TAG, "could not draw the report areas: " + e);
         }

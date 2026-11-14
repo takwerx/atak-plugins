@@ -85,6 +85,8 @@ public final class Report {
     public String place;
     /** The name the operator gave this report; null keeps the automatic name. */
     public String label;
+    /** This report's own map switch; the Areas switch on the main screen is over all. */
+    public boolean onMap = true;
     /** Section key to answer, in report order. */
     public final Map<String, Answer> answers = new LinkedHashMap<>();
 
@@ -129,6 +131,7 @@ public final class Report {
             o.put("place", place);
         if (label != null)
             o.put("label", label);
+        o.put("onMap", onMap);
         final JSONObject s = new JSONObject();
         for (Map.Entry<String, Answer> e : answers.entrySet())
             s.put(e.getKey(), e.getValue().toJson());
@@ -146,6 +149,7 @@ public final class Report {
         final Report r = new Report(id, Math.max(0, o.optLong("made", 0)), area);
         r.place = text(o.optString("place", null), 80);
         r.label = cleanLabel(o.optString("label", null));
+        r.onMap = o.optBoolean("onMap", true);
         final JSONObject s = o.optJSONObject("sections");
         if (s != null) {
             final java.util.Iterator<String> keys = s.keys();

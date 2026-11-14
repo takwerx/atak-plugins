@@ -15,6 +15,7 @@ public final class Sections {
     static {
         final List<Section> s = new ArrayList<>();
         s.add(new Alerts());
+        s.add(new Where());
         s.add(new Fires());
         s.add(new Evacuations());
         s.add(new Roads());

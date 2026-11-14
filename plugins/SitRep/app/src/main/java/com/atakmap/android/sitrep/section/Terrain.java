@@ -30,6 +30,7 @@ public final class Terrain extends Section {
         seeIn = "See slope on the map in Dozer Country.";
         openName = "Dozer Country";
         openPackage = "com.atakmap.android.dozercountry.plugin";
+        openAction = "com.atakmap.android.dozercountry.SHOW";
     }
 
     @Override

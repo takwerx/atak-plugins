@@ -44,6 +44,9 @@ public final class Alerts extends Section {
         openName = "Atmosphere";
         openPackage = "com.atakmap.android.atmosphere.plugin";
         openAction = "com.atakmap.android.atmosphere.SHOW";
+        alsoName = "IPAWS Alerts";
+        alsoPackage = "com.atakmap.android.ipaws.plugin";
+        alsoAction = "com.atakmap.android.ipaws.SHOW";
     }
 
     @Override

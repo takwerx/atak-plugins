@@ -28,6 +28,7 @@ public final class Cameras extends Section {
         seeIn = "Watch them in Cam Depot.";
         openName = "Cam Depot";
         openPackage = "com.atakmap.android.camdepot.plugin";
+        openAction = "com.atakmap.android.camdepot.SHOW";
     }
 
     @Override

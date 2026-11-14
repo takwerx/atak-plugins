@@ -27,6 +27,7 @@ public final class Evacuations extends Section {
         seeIn = "See them on the map in Evac Zone.";
         openName = "Evac Zone";
         openPackage = "com.atakmap.android.evaczone.plugin";
+        openAction = "com.atakmap.android.evaczone.SHOW";
     }
 
     @Override

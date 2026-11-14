@@ -270,40 +270,15 @@ public final class SitRepPane {
             if (a.state == Report.State.FAILED || a.state == Report.State.OFFLINE)
                 f.body.addView(body("Tap Refresh to try again.", 14));
             if (s.seeIn != null && (a.state == Report.State.OK || a.state == Report.State.NOT_HERE)) {
-                final boolean loaded = s.openPackage == null || pluginLoaded(s.openPackage);
-                if (!loaded) {
-                    final TextView see = body(s.openName + " shows this on the map.", 14);
-                    see.setTextColor(CATEGORY);
-                    see.setPadding(0, dp(6), 0, 0);
-                    f.body.addView(see);
-                    final Button get = (Button) PluginLayoutInflater.inflate(plugin, R.layout.open_button, null);
-                    get.setText("Get " + s.openName);
-                    get.setTextColor(CATEGORY);
-                    get.setOnClickListener(new View.OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            openPluginPage();
-                        }
-                    });
-                    f.body.addView(get);
-                } else if (s.openAction != null) {
-                    final Button open = (Button) PluginLayoutInflater.inflate(plugin, R.layout.open_button, null);
-                    open.setText("Open " + s.openName);
-                    open.setTextColor(CATEGORY);
-                    final String action = s.openAction;
-                    final Report report = r;
-                    open.setOnClickListener(new View.OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            openPlugin(report, action);
-                        }
-                    });
-                    f.body.addView(open);
-                } else {
+                if (s.openName == null) {
                     final TextView see = body(s.seeIn, 14);
                     see.setTextColor(CATEGORY);
                     see.setPadding(0, dp(6), 0, 0);
                     f.body.addView(see);
+                } else {
+                    pluginLine(f.body, r, s.openName, s.openPackage, s.openAction);
+                    if (s.alsoName != null)
+                        pluginLine(f.body, r, s.alsoName, s.alsoPackage, s.alsoAction);
                 }
             }
             final TextView src = body("Source: " + s.source
@@ -690,6 +665,41 @@ public final class SitRepPane {
         }
     }
 
+    /**
+     * The line that names a plugin showing this on the map: Open when it is loaded and
+     * answers SHOW, a line of text when it is loaded and does not, Get when it is not
+     * installed.
+     */
+    private void pluginLine(LinearLayout into, final Report r, String name, String pkg, final String action) {
+        final boolean loaded = pkg == null || pluginLoaded(pkg);
+        if (loaded && action == null) {
+            final TextView see = body("See it on the map in " + name + ".", 14);
+            see.setTextColor(CATEGORY);
+            see.setPadding(0, dp(6), 0, 0);
+            into.addView(see);
+            return;
+        }
+        if (!loaded) {
+            final TextView see = body(name + " shows this on the map.", 14);
+            see.setTextColor(CATEGORY);
+            see.setPadding(0, dp(6), 0, 0);
+            into.addView(see);
+        }
+        final Button b = (Button) PluginLayoutInflater.inflate(plugin, R.layout.open_button, null);
+        b.setText((loaded ? "Open " : "Get ") + name);
+        b.setTextColor(CATEGORY);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (loaded)
+                    openPlugin(r, action);
+                else
+                    openPluginPage();
+            }
+        });
+        into.addView(b);
+    }
+
     /** Where every takwerx plugin is listed with its download. */
     static final String PLUGIN_PAGE = "https://thetaksyndicate.org/plugins/";
 
@@ -826,6 +836,23 @@ public final class SitRepPane {
             if (busy)
                 s.append(", loading...");
             ((TextView) v.findViewById(R.id.row_summary)).setText(s);
+            final Button map = v.findViewById(R.id.row_map);
+            setState(map, "Map", r.onMap);
+            map.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View x) {
+                    manager.setOnMap(r, !r.onMap);
+                }
+            });
+            // A row with a Button can stop delivering list item clicks: the row
+            // opens its report itself (Cam Depot, 2026-09).
+            v.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View x) {
+                    showReport(r.id);
+                    goTo(r);
+                }
+            });
             return v;
         }
     }

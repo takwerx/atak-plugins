@@ -48,6 +48,7 @@ public final class Roads extends Section {
         seeIn = "See them on the map in Traffic.";
         openName = "Traffic";
         openPackage = "com.atakmap.android.traffic.plugin";
+        openAction = "com.atakmap.android.traffic.SHOW";
     }
 
     @Override
@@ -111,7 +112,7 @@ public final class Roads extends Section {
         final StringBuilder head = new StringBuilder();
         int total = 0;
         for (Map.Entry<String, List<JSONObject>> e : byKind.entrySet()) {
-            final int n = e.getValue().size();
+            final int n = distinct(e.getValue(), area);
             total += n;
             if (n > 0 && head.length() < 60 && !"info".equals(e.getKey()))
                 head.append(head.length() == 0 ? "" : ", ").append(n).append(' ')
@@ -132,14 +133,19 @@ public final class Roads extends Section {
             final List<JSONObject> list = e.getValue();
             if (list.isEmpty())
                 continue;
-            r.line(GROUP + KINDS.get(e.getKey()) + ": " + list.size());
+            r.line(GROUP + KINDS.get(e.getKey()) + ": " + distinct(list, area));
+            // One line per event: 511 lists one closure once per direction or segment
+            // with the same words, and the same text twice says nothing new.
+            final java.util.Set<String> said = new java.util.LinkedHashSet<>();
+            for (JSONObject p : list)
+                said.add(describe(p, area));
             int shown = 0;
-            for (JSONObject p : list) {
+            for (String line : said) {
                 if (++shown > 30) {
-                    r.line("  ... and " + (list.size() - 30) + " more.");
+                    r.line("  ... and " + (said.size() - 30) + " more.");
                     break;
                 }
-                r.line("  " + describe(p, area));
+                r.line("  " + line);
             }
         }
         if (!missing.isEmpty())
@@ -161,9 +167,43 @@ public final class Roads extends Section {
                 s.append(". ").append(first);
         }
         final double d = p.optDouble("_d", 0);
-        s.append(d == 0 ? " (in the area)" : " (" + Units.distance(d) + " "
-                + area.directionTo(p.optDouble("_lat"), p.optDouble("_lon")) + ")");
-        return s.toString();
+        s.append(d == 0 ? " (in the area" : " (" + Units.distance(d) + " "
+                + area.directionTo(p.optDouble("_lat"), p.optDouble("_lon")));
+        // When the agency last touched it: CHP keeps an incident listed until it is
+        // closed, so a rain advisory from the morning is still there at night.
+        final long t = Math.max(time(p.optString("updated", "")), time(p.optString("reported", "")));
+        if (t > 0)
+            s.append("; ").append(new java.text.SimpleDateFormat("MMM d HH:mm", java.util.Locale.US)
+                    .format(new java.util.Date(t))).append(", ").append(ago(t));
+        return s.append(')').toString();
+    }
+
+    private static int distinct(List<JSONObject> list, Area area) {
+        final java.util.Set<String> s = new java.util.HashSet<>();
+        for (JSONObject p : list)
+            s.add(describe(p, area));
+        return s.size();
+    }
+
+    private static long time(String iso) {
+        if (iso == null || iso.isEmpty() || "null".equals(iso))
+            return 0;
+        try {
+            final java.text.SimpleDateFormat f = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", java.util.Locale.US);
+            final java.util.Date d = f.parse(iso);
+            return d == null ? 0 : d.getTime();
+        } catch (java.text.ParseException e) {
+            return 0;
+        }
+    }
+
+    private static String ago(long ms) {
+        final long min = Math.max(0, (System.currentTimeMillis() - ms) / 60_000L);
+        if (min < 60)
+            return min + " min ago";
+        if (min < 48 * 60)
+            return (min / 60) + " h ago";
+        return (min / (24 * 60)) + " days ago";
     }
 
     private static String clip(String s, int max) {
