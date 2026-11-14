@@ -872,8 +872,25 @@ public final class SitRepPane {
                     manager.setPlaceOn(r, c[0], !r.placesOn.contains(c[0]));
                 }
             });
+            // The area's own agency first, its headquarters then its stations by
+            // number, inside the line or just past it; then other agencies inside
+            // the area by name; then the ones outside, nearest first as the section
+            // found them (operator, 2026-11-14: "list their HQ first then stations 1
+            // and on then outside agencies").
+            final String own = ownName(r);
+            final List<org.json.JSONObject> inside = new ArrayList<>(l);
+            java.util.Collections.sort(inside, new java.util.Comparator<org.json.JSONObject>() {
+                @Override
+                public int compare(org.json.JSONObject a, org.json.JSONObject b) {
+                    final int ra = rank(a, own), rb = rank(b, own);
+                    if (ra != rb)
+                        return ra - rb;
+                    // Outside the area: keep the nearest-first order (the sort is stable).
+                    return ra == 3 ? 0 : naturalCompare(a.optString("n"), b.optString("n"));
+                }
+            });
             int shown = 0;
-            for (org.json.JSONObject p : l) {
+            for (org.json.JSONObject p : inside) {
                 final boolean focus = focusKey != null
                         && focusKey.equals(com.atakmap.android.sitrep.PlaceLayer.placeKey(p));
                 // The place a radial asked for is listed even past the first 40.
@@ -892,10 +909,18 @@ public final class SitRepPane {
                 row.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        // A tap on a listed place takes the map there, with its
-                        // category switched on so it is drawn (operator, 2026-11-13).
+                        // A tap on the marked row takes the mark off (operator,
+                        // 2026-11-14). Any other row is marked with its details and
+                        // the map goes there, its category switched on so it is drawn.
+                        if (focus) {
+                            focusKey = null;
+                            refresh();
+                            return;
+                        }
+                        focusKey = com.atakmap.android.sitrep.PlaceLayer.placeKey(place);
                         if (!r.placesOn.contains(c[0]))
                             manager.setPlaceOn(r, c[0], true);
+                        refresh();
                         goToPlace(place);
                     }
                 });
@@ -917,6 +942,78 @@ public final class SitRepPane {
             }
             fold.show();
         }
+    }
+
+    /**
+     * Where a place goes in its list: 0 the area's own headquarters, 1 the area's own
+     * stations, 2 another agency inside the area, 3 another agency outside it.
+     */
+    private static int rank(org.json.JSONObject p, String own) {
+        final String n = p.optString("n");
+        if (startsWithWord(n, own))
+            return n.matches("(?i).*\\b(headquarters|HQ)\\b.*") ? 0 : 1;
+        return outsideArea(p) ? 3 : 2;
+    }
+
+    /** A place the section found outside the area: its last line says where. */
+    private static boolean outsideArea(org.json.JSONObject p) {
+        final org.json.JSONArray info = p.optJSONArray("i");
+        return info != null && info.length() > 0
+                && info.optString(info.length() - 1).endsWith("of the area.");
+    }
+
+    /**
+     * The area's own name as an agency would start with it: "Portland city, OR" is
+     * Portland, "Riverside County" stays Riverside County. Null when there is none.
+     */
+    private static String ownName(Report r) {
+        String n = r.label != null ? r.label : r.place;
+        if (n == null)
+            return null;
+        final int comma = n.indexOf(',');
+        if (comma > 0)
+            n = n.substring(0, comma);
+        n = n.trim().replaceFirst("(?i)\\s+(city|town|village|CDP|borough|municipality)$", "").trim();
+        return n.length() < 3 ? null : n;
+    }
+
+    /** Whether a name starts with the given words, as whole words. */
+    private static boolean startsWithWord(String name, String prefix) {
+        if (prefix == null || name.length() < prefix.length()
+                || !name.regionMatches(true, 0, prefix, 0, prefix.length()))
+            return false;
+        return name.length() == prefix.length() || !Character.isLetterOrDigit(name.charAt(prefix.length()));
+    }
+
+    /** Text order, except that runs of digits compare as numbers. */
+    private static int naturalCompare(String a, String b) {
+        int i = 0, j = 0;
+        while (i < a.length() && j < b.length()) {
+            final char ca = a.charAt(i), cb = b.charAt(j);
+            if (Character.isDigit(ca) && Character.isDigit(cb)) {
+                int ei = i, ej = j;
+                while (ei < a.length() && Character.isDigit(a.charAt(ei)))
+                    ei++;
+                while (ej < b.length() && Character.isDigit(b.charAt(ej)))
+                    ej++;
+                final String na = a.substring(i, ei).replaceFirst("^0+(?=.)", "");
+                final String nb = b.substring(j, ej).replaceFirst("^0+(?=.)", "");
+                if (na.length() != nb.length())
+                    return na.length() - nb.length();
+                final int c = na.compareTo(nb);
+                if (c != 0)
+                    return c;
+                i = ei;
+                j = ej;
+                continue;
+            }
+            final int c = Character.compare(Character.toLowerCase(ca), Character.toLowerCase(cb));
+            if (c != 0)
+                return c;
+            i++;
+            j++;
+        }
+        return (a.length() - i) - (b.length() - j);
     }
 
     /**
