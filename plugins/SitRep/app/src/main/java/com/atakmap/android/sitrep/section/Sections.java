@@ -23,6 +23,7 @@ public final class Sections {
         s.add(new Cameras());
         s.add(new Declarations());
         s.add(new Terrain());
+        s.add(new Flood());
         s.add(new People());
         s.add(new Places());
         s.add(new Structures());
