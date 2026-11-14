@@ -559,8 +559,8 @@ public final class Places extends Section {
     }
 
     /**
-     * Bridges, railroad crossings and rail lines (BTS NTAD, FRA), and California's
-     * power lines (OpenStreetMap pack): what no other takwerx plugin draws (decision 16).
+     * Bridges, railroad crossings and rail lines (BTS NTAD, FRA), and power lines
+     * across the US (OpenStreetMap pack): what no other takwerx plugin draws (decision 16).
      * Inside the area only.
      */
     private static void transport(Area area, Map<String, List<JSONObject>> found, List<String> missing) {
