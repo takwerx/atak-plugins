@@ -14,8 +14,8 @@ public final class Sections {
 
     static {
         final List<Section> s = new ArrayList<>();
+        s.add(new Weather());
         s.add(new Alerts());
-        s.add(new Where());
         s.add(new Fires());
         s.add(new Evacuations());
         s.add(new Roads());
@@ -23,7 +23,6 @@ public final class Sections {
         s.add(new Cameras());
         s.add(new Declarations());
         s.add(new Terrain());
-        s.add(new Daylight());
         s.add(new People());
         s.add(new Places());
         s.add(new Structures());

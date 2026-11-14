@@ -33,7 +33,7 @@ public final class Roads extends Section {
     static {
         KINDS.put("closure", "Closures");
         KINDS.put("chains", "Chain control");
-        KINDS.put("fire", "Fires on the road");
+        KINDS.put("fire", "Vehicle fires");
         KINDS.put("crash", "Crashes");
         KINDS.put("lanes", "Lanes blocked");
         KINDS.put("hazard", "Hazards");

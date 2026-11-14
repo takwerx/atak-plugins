@@ -661,21 +661,20 @@ public final class SitRepPane {
                     west = Math.min(west, p.optDouble("lon", west));
                     east = Math.max(east, p.optDouble("lon", east));
                 }
-            final int mw = mapView.getWidth(), mh = mapView.getHeight();
-            if (root.isShown() && mw > 0 && mh > 0) {
-                final int pw = root.getWidth(), ph = root.getHeight();
-                if (ph >= mh * 0.8 && pw > 0 && pw < mw * 0.9)
-                    east = east + (east - west) * pw / (double) (mw - pw);
-                else if (pw >= mw * 0.8 && ph > 0 && ph < mh * 0.9)
-                    south = south - (north - south) * ph / (double) (mh - ph);
-            }
+            // Feature Layer's and IPAWS's way: the whole map and a 15% margin; ATAK
+            // keeps the framed box clear of the open pane itself. A correction for the
+            // pane's width here moved the map out and south (s10-dev-3, 2026-11-13).
+            final double padLat = Math.max(0.002, (north - south) * 0.15);
+            final double padLon = Math.max(0.002, (east - west) * 0.15);
             com.atakmap.android.util.ATAKUtilities.scaleToFit(mapView, new GeoPoint[] {
-                    new GeoPoint(Math.max(-90, south), Math.max(-180, west)),
-                    new GeoPoint(Math.min(90, north), Math.min(180, east)) }, 0.1d, mw, mh);
+                    new GeoPoint(Math.max(-90, south - padLat), Math.max(-180, west - padLon)),
+                    new GeoPoint(Math.min(90, north + padLat), Math.min(180, east + padLon)) }, 0d,
+                    mapView.getWidth(), mapView.getHeight());
         } catch (RuntimeException e) {
             Log.w(TAG, "could not go to the area", e);
         }
     }
+
 
     private static void setState(Button b, String thing, boolean on) {
         b.setText(thing + (on ? " ON" : " OFF"));

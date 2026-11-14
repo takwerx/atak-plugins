@@ -19,7 +19,7 @@ import java.util.Map;
 /**
  * Places that matter for people who need help (PLAN decision 9; operator,
  * 2026-11-13: "a toggle for vulnerable folks"): hospitals, schools, nursing and care
- * homes, dialysis, shelters. Each category is a switch on the report page that puts
+ * homes, dialysis, shelters, airports and heliports. Each category is a switch on the report page that puts
  * its places on the map as a read-only feature layer. Sources per
  * NOTES-sitrep-poi-sources.md. Hospitals and shelters count within Nearby too: the
  * nearest ER or shelter is often outside the area.
@@ -33,18 +33,21 @@ public final class Places extends Section {
             { "care", "Nursing and care homes", "N", "#7B1FA2" },
             { "dialysis", "Dialysis", "D", "#1565C0" },
             { "shelter", "Shelters", "+", "#2E7D32" },
+            { "airport", "Airports", "A", "#263238" },
+            { "heliport", "Heliports", "H", "#000000" },
     };
 
     static final String HOSPITALS = "https://mapdepot.takwerx.org/iwi/hospitals/hospitals.json.gz";
     static final String SCHOOLS = "https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/23";
     static final String CDPH = "https://services5.arcgis.com/FlidZxdI0LGC9vAw/arcgis/rest/services/CDPH_LC_Facilities_Data/FeatureServer/0";
     static final String NSS = "https://gis.fema.gov/arcgis/rest/services/NSS/FEMA_NSS/FeatureServer/5";
+    static final String AVIATION = "https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_Aviation_Facilities/FeatureServer/0";
     static final String NSS_OPEN = "https://gis.fema.gov/arcgis/rest/services/NSS/OpenShelters/FeatureServer/0";
 
     public Places() {
         super("places", "Places", false,
                 "Hospitals: takwerx IWI pack (CMS, HHS, HIFLD, state lists, FAA). Schools: USGS National Map. "
-                        + "Care homes and dialysis: California CDPH licensed facilities. Shelters: FEMA National Shelter System.");
+                        + "Care homes and dialysis: California CDPH licensed facilities. Shelters: FEMA National Shelter System. Airports and heliports: BTS NTAD Aviation Facilities (FAA data).");
     }
 
     @Override
@@ -163,6 +166,36 @@ public final class Places extends Section {
         } catch (Exception e) {
             failures++;
             missing.add("shelters");
+        }
+        // Airports and heliports: BTS NTAD Aviation Facilities (the FAA's current
+        // cycle, never the FAA services6 quota). Closed sites are left out.
+        try {
+            for (JSONObject a : Esri.points(AVIATION, "ARPT_STATUS='O'", area,
+                    "ARPT_ID,ARPT_NAME,SITE_TYPE_CODE,CITY,STATE_CODE,ELEV,FACILITY_USE_CODE,OWNERSHIP_TYPE_CODE,"
+                            + "TWR_TYPE_CODE,FUEL_TYPES", nearbyMiles)) {
+                final String type = a.optString("SITE_TYPE_CODE", "");
+                final String cat = "H".equals(type) ? "heliport" : "airport";
+                final double d = area.distanceMeters(a.optDouble("_lat"), a.optDouble("_lon"));
+                final List<String> info = new ArrayList<>();
+                final String id = a.optString("ARPT_ID", "").trim();
+                info.add(("A".equals(type) ? "Airport" : "S".equals(type) ? "Seaplane base"
+                        : "G".equals(type) ? "Gliderport" : "H".equals(type) ? "Heliport" : "Landing site")
+                        + (id.isEmpty() ? "" : " " + id) + ", " + ("PU".equals(a.optString("FACILITY_USE_CODE")) ? "public use" : "private use")
+                        + ("MA".equals(a.optString("OWNERSHIP_TYPE_CODE")) || "MN".equals(a.optString("OWNERSHIP_TYPE_CODE"))
+                        || "MR".equals(a.optString("OWNERSHIP_TYPE_CODE")) ? ", military" : "") + ".");
+                if (a.has("ELEV") && !a.isNull("ELEV"))
+                    info.add("Elevation " + Math.round(a.optDouble("ELEV")) + " ft MSL.");
+                final String twr = a.optString("TWR_TYPE_CODE", "");
+                info.add(twr.startsWith("ATCT") ? "Control tower." : "No control tower.");
+                final String fuel = a.optString("FUEL_TYPES", "").trim();
+                if (!fuel.isEmpty() && !"null".equals(fuel))
+                    info.add("Fuel: " + fuel + ".");
+                info.add(join(capital(a.optString("CITY", "")), a.optString("STATE_CODE", "")));
+                found.get(cat).add(point(cat, (id.isEmpty() ? "" : id + " ") + capital(a.optString("ARPT_NAME")),
+                        a.optDouble("_lat"), a.optDouble("_lon"), d, area, info));
+            }
+        } catch (Exception e) {
+            missing.add("airports");
         }
         if (failures >= 3 && missing.contains("hospitals") && missing.contains("schools") && missing.contains("shelters"))
             throw new java.io.IOException("no place source answered");

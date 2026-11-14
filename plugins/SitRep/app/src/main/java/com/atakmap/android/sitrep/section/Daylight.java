@@ -22,6 +22,11 @@ public final class Daylight extends Section {
 
     @Override
     public Result fetch(Area area) {
+        return add(area, null);
+    }
+
+    /** Sun and moon lines, added to {@code into} (a new Result when null). */
+    static Result add(Area area, Result into) {
         final double lat = (area.south + area.north) / 2, lon = (area.west + area.east) / 2;
         final Calendar today = Calendar.getInstance();
         final long civilDawn = event(today, lat, lon, 96, true), rise = event(today, lat, lon, 90.833, true);
@@ -29,11 +34,9 @@ public final class Daylight extends Section {
         final SimpleDateFormat hm = new SimpleDateFormat("HH:mm", Locale.US);
         final String zone = TimeZone.getDefault().getDisplayName(TimeZone.getDefault().inDaylightTime(new Date()),
                 TimeZone.SHORT, Locale.US);
-        final Result r;
-        if (rise < 0 || set < 0)
-            r = new Result("No sunrise or sunset today here", null);
-        else
-            r = new Result("Sunrise " + hm.format(new Date(rise)) + ", sunset " + hm.format(new Date(set)), null);
+        final Result r = into != null ? into
+                : new Result(rise < 0 || set < 0 ? "No sunrise or sunset today here"
+                        : "Sunrise " + hm.format(new Date(rise)) + ", sunset " + hm.format(new Date(set)), null);
         r.line(GROUP + "Sun, " + new SimpleDateFormat("EEE MMM d", Locale.US).format(today.getTime()) + " (" + zone + ")");
         if (civilDawn > 0)
             r.line("  First light (civil twilight) " + hm.format(new Date(civilDawn)) + ".");

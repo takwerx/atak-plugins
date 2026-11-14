@@ -201,6 +201,50 @@ final class PlaceIcons {
                 c.drawCircle(cx, dy, dr, white);
                 break;
             }
+            case "airport": {
+                c.drawRoundRect(box, r, r, white);
+                fill.setColor(0xFF263238);
+                c.drawRoundRect(inset(box, s * 0.07f), r * 0.8f, r * 0.8f, fill);
+                // An airplane from above, nose up: fuselage, wings, tail.
+                final Path plane = new Path();
+                final float u = s * 0.30f;
+                plane.moveTo(cx, cy - u);
+                plane.lineTo(cx + u * 0.12f, cy - u * 0.75f);
+                plane.lineTo(cx + u * 0.12f, cy - u * 0.15f);
+                plane.lineTo(cx + u, cy + u * 0.20f);
+                plane.lineTo(cx + u, cy + u * 0.35f);
+                plane.lineTo(cx + u * 0.12f, cy + u * 0.15f);
+                plane.lineTo(cx + u * 0.10f, cy + u * 0.70f);
+                plane.lineTo(cx + u * 0.38f, cy + u * 0.90f);
+                plane.lineTo(cx + u * 0.38f, cy + u);
+                plane.lineTo(cx, cy + u * 0.90f);
+                plane.lineTo(cx - u * 0.38f, cy + u);
+                plane.lineTo(cx - u * 0.38f, cy + u * 0.90f);
+                plane.lineTo(cx - u * 0.10f, cy + u * 0.70f);
+                plane.lineTo(cx - u * 0.12f, cy + u * 0.15f);
+                plane.lineTo(cx - u, cy + u * 0.35f);
+                plane.lineTo(cx - u, cy + u * 0.20f);
+                plane.lineTo(cx - u * 0.12f, cy - u * 0.15f);
+                plane.lineTo(cx - u * 0.12f, cy - u * 0.75f);
+                plane.close();
+                c.drawPath(plane, white);
+                break;
+            }
+            case "heliport": {
+                c.drawCircle(cx, cy, h, white);
+                fill.setColor(0xFF111111);
+                c.drawCircle(cx, cy, h - s * 0.06f, fill);
+                final Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
+                ring.setStyle(Paint.Style.STROKE);
+                ring.setStrokeWidth(s * 0.06f);
+                ring.setColor(0xFFFFFFFF);
+                c.drawCircle(cx, cy, h - s * 0.16f, ring);
+                final float bar = s * 0.09f, top = cy - s * 0.20f, bot = cy + s * 0.20f;
+                c.drawRect(cx - s * 0.16f, top, cx - s * 0.16f + bar, bot, white);
+                c.drawRect(cx + s * 0.16f - bar, top, cx + s * 0.16f, bot, white);
+                c.drawRect(cx - s * 0.16f, cy - bar / 2, cx + s * 0.16f, cy + bar / 2, white);
+                break;
+            }
             default: { // shelter
                 c.drawRoundRect(box, r, r, white);
                 fill.setColor(0xFF2E7D32);
