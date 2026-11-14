@@ -209,12 +209,42 @@ public final class Report {
                     if (t != null)
                         ci.put(t);
                 }
+                final JSONArray g = cleanPaths(p.optJSONArray("g"));
+                if (g != null)
+                    q.put("g", g);
                 out.put(q.put("i", ci));
             } catch (JSONException e) {
                 // skip it
             }
         }
         return out;
+    }
+
+    /** A saved line's paths of [lon, lat], every number checked; at most 4,000 vertices. */
+    private static JSONArray cleanPaths(JSONArray in) {
+        if (in == null)
+            return null;
+        final JSONArray out = new JSONArray();
+        int vertices = 0;
+        for (int i = 0; i < in.length() && i < 200; i++) {
+            final JSONArray path = in.optJSONArray(i);
+            final JSONArray cp = new JSONArray();
+            for (int k = 0; path != null && k < path.length() && vertices < 4000; k++) {
+                final JSONArray v = path.optJSONArray(k);
+                final double lon = v == null ? Double.NaN : v.optDouble(0), lat = v == null ? Double.NaN : v.optDouble(1);
+                if (!(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180))
+                    continue;
+                try {
+                    cp.put(new JSONArray().put(lon).put(lat));
+                } catch (JSONException e) {
+                    continue;
+                }
+                vertices++;
+            }
+            if (cp.length() >= 2)
+                out.put(cp);
+        }
+        return out.length() == 0 ? null : out;
     }
 
     /** A name as typed: one line, trimmed, at most 60 characters; null when blank. */

@@ -50,6 +50,10 @@ public final class Places extends Section {
             { "battery", "Battery storage (BESS)", "B", "#00897B" },
             { "nuclear", "Nuclear plants", "N", "#FBC02D" },
             { "dam", "Dams", "W", "#0277BD" },
+            { "bridge", "Bridges", "B", "#546E7A" },
+            { "crossing", "Railroad crossings", "X", "#212121" },
+            { "rail", "Rail lines", "-", "#212121" },
+            { "transmission", "Transmission lines", "-", "#FFAB00" },
             { "hazmat", "Chemical facilities (RMP)", "!", "#F57C00" },
     };
 
@@ -67,6 +71,12 @@ public final class Places extends Section {
     static final String PACK = "https://mapdepot.takwerx.org/sitrep/places/";
     /** Most places kept per category, nearest first, so fuel cannot crowd out the rest. */
     static final int PER_CATEGORY = 500;
+    static final String NTAD = "https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/";
+    static final String CEC_LINES = "https://services3.arcgis.com/bWPjFyq029ChCGur/arcgis/rest/services/Transmission_Line/FeatureServer/2";
+    /** Categories drawn as lines, not icons. */
+    public static boolean isLine(String category) {
+        return "rail".equals(category) || "transmission".equals(category);
+    }
     static final String NSS_OPEN = "https://gis.fema.gov/arcgis/rest/services/NSS/OpenShelters/FeatureServer/0";
 
     public Places() {
@@ -93,9 +103,18 @@ public final class Places extends Section {
         final List<String> missing = new ArrayList<>();
         int failures = 0;
 
-        // Hospitals: our pack, filtered here.
+        // Hospitals: our pack, filtered here. Within Nearby, plus the nearest trauma
+        // center, Level I, pediatric trauma and burn center however far (IWI's rule):
+        // a Level I 8.8 mi out of Corona was left off at a 5 mi Nearby (2026-11-13).
         try {
             final JSONArray all = new JSONObject(Http.getGzip(HOSPITALS)).optJSONArray("hospitals");
+            final String[] needs = { "trauma", "level1", "ped", "burn" };
+            final String[] needWords = { "Nearest trauma center", "Nearest Level I trauma center",
+                    "Nearest pediatric trauma center", "Nearest burn center" };
+            final JSONObject[] nearest = new JSONObject[needs.length];
+            final double[] nearestD = new double[needs.length];
+            java.util.Arrays.fill(nearestD, Double.MAX_VALUE);
+            final List<JSONObject> within = new ArrayList<>();
             for (int i = 0; all != null && i < all.length(); i++) {
                 final JSONObject h = all.optJSONObject(i);
                 if (h == null)
@@ -103,12 +122,41 @@ public final class Places extends Section {
                 final double lat = h.optDouble("lat", Double.NaN), lon = h.optDouble("lon", Double.NaN);
                 if (!(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180))
                     continue;
-                if (lat < area.south - 1 || lat > area.north + 1 || lon < area.west - 1.2 || lon > area.east + 1.2)
+                // A coarse box first: the nearest Level I can be a few hundred miles out.
+                if (lat < area.south - 5 || lat > area.north + 5 || lon < area.west - 6 || lon > area.east + 6)
                     continue;
                 final double d = area.distanceMeters(lat, lon);
-                if (d > reach)
+                h.put("_d", d);
+                if (d <= reach)
+                    within.add(h);
+                final boolean[] has = { h.optInt("trauma", 0) > 0, h.optInt("trauma", 0) == 1,
+                        h.optInt("ped", 0) > 0, h.has("burn") };
+                for (int k = 0; k < needs.length; k++)
+                    if (has[k] && d < nearestD[k]) {
+                        nearestD[k] = d;
+                        nearest[k] = h;
+                    }
+            }
+            final java.util.Map<String, List<String>> marks = new java.util.HashMap<>();
+            for (int k = 0; k < needs.length; k++) {
+                if (nearest[k] == null)
                     continue;
+                final String id = nearest[k].optString("id", nearest[k].optString("name"));
+                List<String> m = marks.get(id);
+                if (m == null) {
+                    m = new ArrayList<>();
+                    marks.put(id, m);
+                    if (!within.contains(nearest[k]))
+                        within.add(nearest[k]);
+                }
+                m.add(needWords[k]);
+            }
+            for (JSONObject h : within) {
+                final double d = h.optDouble("_d", 0);
                 final List<String> info = new ArrayList<>();
+                final List<String> m = marks.get(h.optString("id", h.optString("name")));
+                if (m != null)
+                    info.add(android.text.TextUtils.join("; ", m) + ".");
                 info.add(h.optString("city", "") + ", " + h.optString("state", ""));
                 info.add("yes".equals(h.optString("er")) ? "Emergency room." : "No emergency room listed.");
                 if (h.optInt("trauma", 0) > 0)
@@ -119,7 +167,8 @@ public final class Places extends Section {
                     info.add("Burn center.");
                 if (h.optJSONObject("pad") != null)
                     info.add("Helipad " + h.optJSONObject("pad").optString("id", "") + ".");
-                found.get("hospital").add(point("hospital", h.optString("name"), lat, lon, d, area, info));
+                found.get("hospital").add(point("hospital", h.optString("name"), h.optDouble("lat"),
+                        h.optDouble("lon"), d, area, info));
             }
         } catch (Exception e) {
             failures++;
@@ -228,6 +277,7 @@ public final class Places extends Section {
         }
         infrastructure(area, nearbyMiles, reach, found, missing);
         pack(area, reach, found, missing);
+        transport(area, found, missing);
         if (failures >= 3 && missing.contains("hospitals") && missing.contains("schools") && missing.contains("shelters"))
             throw new java.io.IOException("no place source answered");
 
@@ -450,6 +500,91 @@ public final class Places extends Section {
         } catch (Exception e) {
             missing.add("animal shelters, fairgrounds and stores");
         }
+    }
+
+    /**
+     * Bridges, railroad crossings and rail lines (BTS NTAD, FRA), and California's
+     * transmission lines (CEC): what no other takwerx plugin draws (decision 16).
+     * Inside the area only.
+     */
+    private static void transport(Area area, Map<String, List<JSONObject>> found, List<String> missing) {
+        try {
+            for (JSONObject a : Esri.points(NTAD + "NTAD_National_Bridge_Inventory/FeatureServer/0", "1=1", area,
+                    "FACILITY_CARRIED_007,FEATURES_DESC_006A,YEAR_BUILT_027,ADT_029,BRIDGE_CONDITION,"
+                            + "OPEN_CLOSED_POSTED_041,VERT_CLR_OVER_MT_053,OPERATING_RATING_064,STRUCTURE_NUMBER_008", 0)) {
+                final List<String> info = new ArrayList<>();
+                final String cond = a.optString("BRIDGE_CONDITION", "");
+                info.add("Condition: " + ("G".equals(cond) ? "good" : "F".equals(cond) ? "fair" : "P".equals(cond) ? "poor" : "not rated") + ".");
+                final String ocp = a.optString("OPEN_CLOSED_POSTED_041", "");
+                info.add("K".equals(ocp) ? "CLOSED." : "B".equals(ocp) || "P".equals(ocp) || "R".equals(ocp) ? "Load posted." : "Open, no restriction.");
+                final double clr = a.optDouble("VERT_CLR_OVER_MT_053", 0);
+                if (clr > 0 && clr < 99)
+                    info.add(String.format(Locale.US, "Clearance over the deck %.1f ft.", clr * 3.28084));
+                final double tons = a.optDouble("OPERATING_RATING_064", 0);
+                if (tons > 0 && tons < 99)
+                    info.add(String.format(Locale.US, "Operating rating %.0f metric tons.", tons));
+                if (a.optInt("YEAR_BUILT_027", 0) > 1700)
+                    info.add("Built " + a.optInt("YEAR_BUILT_027") + ".");
+                if (a.optInt("ADT_029", 0) > 0)
+                    info.add(String.format(Locale.US, "%,d vehicles a day.", a.optInt("ADT_029")));
+                info.add("NBI " + a.optString("STRUCTURE_NUMBER_008", "").trim() + ".");
+                final String name = capital(a.optString("FACILITY_CARRIED_007", "").replace("'", "")) + " over "
+                        + capital(a.optString("FEATURES_DESC_006A", "").replace("'", ""));
+                found.get("bridge").add(point("bridge", name, a.optDouble("_lat"), a.optDouble("_lon"), 0, area, info));
+            }
+        } catch (Exception e) {
+            missing.add("bridges");
+        }
+        try {
+            for (JSONObject a : Esri.points(NTAD + "NTAD_Railroad_Grade_Crossings/FeatureServer/0", "1=1", area,
+                    "CrossingID,RailroadCode,STREET,CrossingType,CrossingPosition,SignsOrSignals,EmergencyTelephoneNumber,CITYNAME", 0)) {
+                final List<String> info = new ArrayList<>();
+                info.add(a.optString("CrossingType", "") + " crossing, " + a.optString("CrossingPosition", "").toLowerCase(Locale.US) + ".");
+                info.add("Railroad " + a.optString("RailroadCode", "") + ".");
+                final String phone = a.optString("EmergencyTelephoneNumber", "").replaceAll("[^0-9]", "");
+                if (phone.length() == 10)
+                    info.add("Railroad emergency (" + phone.substring(0, 3) + ") " + phone.substring(3, 6) + "-" + phone.substring(6) + ".");
+                info.add("Crossing " + a.optString("CrossingID", "") + ", " + capital(a.optString("CITYNAME", "")) + ".");
+                found.get("crossing").add(point("crossing", capital(a.optString("STREET", "Crossing")) + " ("
+                        + a.optString("RailroadCode", "") + ")", a.optDouble("_lat"), a.optDouble("_lon"), 0, area, info));
+            }
+        } catch (Exception e) {
+            missing.add("railroad crossings");
+        }
+        try {
+            for (JSONObject a : Esri.lines(NTAD + "NTAD_North_American_Rail_Network_Lines/FeatureServer/0", "1=1", area,
+                    "RROWNER1,RROWNER2,TRACKS,NET")) {
+                final List<String> info = new ArrayList<>();
+                info.add("Railroad " + a.optString("RROWNER1", "") + (a.optString("RROWNER2", "").trim().isEmpty() ? ""
+                        : ", " + a.optString("RROWNER2")) + ".");
+                if (a.optInt("TRACKS", 0) > 1)
+                    info.add(a.optInt("TRACKS") + " tracks.");
+                found.get("rail").add(line("rail", "Rail, " + a.optString("RROWNER1", ""), a.optJSONArray("_paths"), info));
+            }
+        } catch (Exception e) {
+            missing.add("rail lines");
+        }
+        if (area.south < 42.1 && area.north > 32.4 && area.west < -114 && area.east > -124.5)
+            try {
+                for (JSONObject a : Esri.lines(CEC_LINES, "1=1", area, "Name,kV,Owner,Status,Type,Circuit")) {
+                    final List<String> info = new ArrayList<>();
+                    info.add(a.optString("kV", "") + " kV, " + ("UG".equals(a.optString("Type")) ? "underground"
+                            : "UW".equals(a.optString("Type")) ? "under water" : "overhead") + ".");
+                    info.add("Owner " + a.optString("Owner", "") + "; " + a.optString("Status", "").toLowerCase(Locale.US) + ".");
+                    found.get("transmission").add(line("transmission", a.optString("Name", a.optString("kV", "") + " kV"),
+                            a.optJSONArray("_paths"), info));
+                }
+            } catch (Exception e) {
+                missing.add("transmission lines");
+            }
+    }
+
+    /** A line place: its first vertex for the list, its paths for the map. */
+    private static JSONObject line(String c, String name, JSONArray paths, List<String> info) throws Exception {
+        final JSONArray first = paths.optJSONArray(0);
+        final JSONArray v = first == null ? null : first.optJSONArray(first.length() / 2);
+        final JSONObject p = point(c, name, v == null ? 0 : v.optDouble(1), v == null ? 0 : v.optDouble(0), 0, null, info);
+        return p.put("g", paths);
     }
 
     private static int floor(double v, int step) {

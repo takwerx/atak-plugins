@@ -144,6 +144,35 @@ public final class Esri {
         return out;
     }
 
+    /**
+     * Line features inside the area: each the attributes plus {@code _paths}, a
+     * JSONArray of paths of [lon, lat], thinned by the server.
+     */
+    public static List<JSONObject> lines(String layer, String where, Area area, String outFields)
+            throws IOException {
+        final String form = "f=json&returnGeometry=true&outSR=4326&maxAllowableOffset=0.0002"
+                + "&where=" + enc(where == null ? "1=1" : where)
+                + "&outFields=" + enc(outFields)
+                + area.esriQueryForm();
+        final JSONArray feats = features(Http.post(layer + "/query", form));
+        final List<JSONObject> out = new ArrayList<>(feats.length());
+        for (int i = 0; i < feats.length(); i++) {
+            final JSONObject f = feats.optJSONObject(i);
+            final JSONObject a = f == null ? null : f.optJSONObject("attributes");
+            final JSONObject g = f == null ? null : f.optJSONObject("geometry");
+            final JSONArray paths = g == null ? null : g.optJSONArray("paths");
+            if (a == null || paths == null || paths.length() == 0)
+                continue;
+            try {
+                a.put("_paths", paths);
+            } catch (org.json.JSONException e) {
+                continue;
+            }
+            out.add(a);
+        }
+        return out;
+    }
+
     private static JSONArray features(String body) throws IOException {
         final JSONArray a = parse(body).optJSONArray("features");
         if (a == null)

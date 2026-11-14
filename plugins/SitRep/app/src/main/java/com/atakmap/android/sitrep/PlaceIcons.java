@@ -26,7 +26,7 @@ final class PlaceIcons {
 
     private static final String TAG = "SitRep.PlaceIcons";
     /** Bump when the drawing changes: a cached file never redraws. */
-    private static final int VERSION = 8;
+    private static final int VERSION = 9;
     private static final float SIZE_DP = 30f;
 
     /** What the style needs: the file, its size and the offset that puts the glyph on the point. */
@@ -407,6 +407,32 @@ final class PlaceIcons {
                 hp.lineTo(cx + s * 0.28f, cy + s * 0.18f);
                 hp.lineTo(cx + s * 0.28f, cy - s * 0.20f);
                 c.drawPath(hp, hose);
+                break;
+            }
+            case "bridge": {
+                c.drawRoundRect(box, r, r, white);
+                fill.setColor(0xFF546E7A);
+                c.drawRoundRect(inset(box, s * 0.07f), r * 0.8f, r * 0.8f, fill);
+                // An arch bridge: deck, arch, piers.
+                c.drawRect(cx - s * 0.32f, cy - s * 0.10f, cx + s * 0.32f, cy - s * 0.02f, white);
+                final Paint arch = new Paint(Paint.ANTI_ALIAS_FLAG);
+                arch.setStyle(Paint.Style.STROKE);
+                arch.setStrokeWidth(s * 0.07f);
+                arch.setColor(0xFFFFFFFF);
+                c.drawArc(new RectF(cx - s * 0.26f, cy - s * 0.02f, cx + s * 0.26f, cy + s * 0.42f), 180, 180, false, arch);
+                c.drawRect(cx - s * 0.30f, cy - s * 0.02f, cx - s * 0.24f, cy + s * 0.26f, white);
+                c.drawRect(cx + s * 0.24f, cy - s * 0.02f, cx + s * 0.30f, cy + s * 0.26f, white);
+                break;
+            }
+            case "crossing": {
+                // A railroad crossbuck: white X with black edges, on a black disc.
+                c.drawCircle(cx, cy, h, white);
+                c.drawCircle(cx, cy, h - s * 0.05f, black);
+                final Paint bar = new Paint(Paint.ANTI_ALIAS_FLAG);
+                bar.setStrokeWidth(s * 0.13f);
+                bar.setColor(0xFFFFFFFF);
+                c.drawLine(cx - s * 0.28f, cy - s * 0.28f, cx + s * 0.28f, cy + s * 0.28f, bar);
+                c.drawLine(cx - s * 0.28f, cy + s * 0.28f, cx + s * 0.28f, cy - s * 0.28f, bar);
                 break;
             }
             case "fire": {

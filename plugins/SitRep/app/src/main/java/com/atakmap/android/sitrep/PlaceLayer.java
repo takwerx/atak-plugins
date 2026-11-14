@@ -188,6 +188,31 @@ public final class PlaceLayer {
                     for (int k = 0; info != null && k < info.length(); k++)
                         d.append(k == 0 ? "" : "\n").append(info.optString(k));
                     attrs.setAttribute("Details", d.toString());
+                    if (Places.isLine(c[0]) && p.optJSONArray("g") != null) {
+                        // Rail: a dark line on a white edge so it reads on imagery;
+                        // transmission: amber. No icon and no label, details on tap.
+                        final com.atakmap.map.layer.feature.style.Style ls = "rail".equals(c[0])
+                                ? new com.atakmap.map.layer.feature.style.CompositeStyle(new com.atakmap.map.layer.feature.style.Style[] {
+                                        new com.atakmap.map.layer.feature.style.BasicStrokeStyle(0xFFFFFFFF, 5f),
+                                        new com.atakmap.map.layer.feature.style.BasicStrokeStyle(0xFF212121, 2.5f) })
+                                : new com.atakmap.map.layer.feature.style.BasicStrokeStyle(0xFFFFAB00, 3f);
+                        final JSONArray paths = p.optJSONArray("g");
+                        for (int k = 0; k < paths.length(); k++) {
+                            final JSONArray path = paths.optJSONArray(k);
+                            if (path == null || path.length() < 2)
+                                continue;
+                            final com.atakmap.map.layer.feature.geometry.LineString lsg =
+                                    new com.atakmap.map.layer.feature.geometry.LineString(2);
+                            for (int v = 0; v < path.length(); v++) {
+                                final JSONArray xy = path.optJSONArray(v);
+                                if (xy != null)
+                                    lsg.addPoint(xy.optDouble(0), xy.optDouble(1));
+                            }
+                            final long lfid = store.insertFeature(new Feature(set, name, lsg, ls, attrs));
+                            details.put(lfid, new String[] { name, c[1] + "\n" + d });
+                        }
+                        continue;
+                    }
                     final PlaceIcons.Composed ic = icons.get(c[0], name);
                     if (ic == null)
                         continue;
