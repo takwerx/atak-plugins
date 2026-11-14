@@ -80,7 +80,9 @@ public final class Places extends Section {
     static final String NSS_OPEN = "https://gis.fema.gov/arcgis/rest/services/NSS/OpenShelters/FeatureServer/0";
 
     public Places() {
-        super("places", "Places", false,
+        // Live: Refresh updates it, so a fix to a source or our pack reaches saved
+        // reports (the Corona Animal Shelter duplicate, 2026-11-13).
+        super("places", "Places", true,
                 "Hospitals: takwerx IWI pack (CMS, HHS, HIFLD, state lists, FAA). Schools: USGS National Map. "
                         + "Care homes and dialysis: California CDPH licensed facilities. Shelters: FEMA National Shelter System. Airports and heliports: BTS NTAD Aviation Facilities (FAA data). "
                         + "Fire and police: USGS National Map. Power plants: CEC (California), EPA (elsewhere). "
