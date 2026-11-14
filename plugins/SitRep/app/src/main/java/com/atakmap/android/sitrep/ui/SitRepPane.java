@@ -718,6 +718,13 @@ public final class SitRepPane {
         goTo(r, null);
     }
 
+    /** Puts a report's area in view; for a report just made. */
+    public void goToReport(String id) {
+        final Report r = manager.find(id);
+        if (r != null)
+            goTo(r);
+    }
+
     /** Fits the map to one place: a point with about 400 m around it, a line whole. */
     private void goToPlace(org.json.JSONObject p) {
         try {

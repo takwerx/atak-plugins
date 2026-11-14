@@ -84,8 +84,19 @@ public class SitRep implements IPlugin {
             }
 
             @Override
-            public void reportStarted(Report r) {
+            public void reportStarted(final Report r) {
                 showPane(r.id);
+                // A new area goes in view as it loads, whichever way it was made
+                // (operator, 2026-11-13: searched a city, the map stayed put). After
+                // the pane has opened, so the fit leaves the pane's side clear.
+                if (mapView != null)
+                    mapView.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (paneUi != null)
+                                paneUi.goToReport(r.id);
+                        }
+                    }, 400);
             }
         });
         manager.start();
