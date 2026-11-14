@@ -238,6 +238,7 @@ public final class SitRepPane {
         adapter.notifyDataSetChanged();
         if (nearbyFold != null)
             nearbyFold.label("Nearby", "within " + manager.nearbyMiles() + " mi");
+        paintGate();
         if (openId != null) {
             final Report r = manager.find(openId);
             if (r == null)
@@ -618,11 +619,87 @@ public final class SitRepPane {
         nearbyFold.body.addView(body("Shelters, hospitals, history, fires and dams outside the area itself are counted within this distance of it.", 13));
         nearbyFold.label("Nearby", "within " + manager.nearbyMiles() + " mi");
 
+        buildGate();
+
         final Fold key = new Fold(settingsContainer, "sitrep.fold.key");
         key.label("Map key", null);
         final TextView line = body("■  A saved report's area. Tap it to open the report.", 14);
         line.setTextColor(CYAN);
         key.body.addView(line);
+    }
+
+    private Fold gateFold;
+    private TextView gateNow;
+    private final List<Button> gateTiles = new ArrayList<>();
+    private double[] gateValues;
+
+    /**
+     * One zoom gate for every place on the map (operator, 2026-11-13): stored and
+     * compared as the distance ATAK's scale bar reads (plugin-ui skill, section 3).
+     */
+    private void buildGate() {
+        gateFold = new Fold(settingsContainer, "sitrep.fold.gate");
+        final boolean metric = com.atakmap.android.sitrep.Units.type() == com.atakmap.coremap.conversions.Span.METRIC;
+        final double unit = metric ? 1_000d : 1_609.344;
+        gateValues = new double[] { 0.25 * unit, 1 * unit, 5 * unit, 15 * unit, 50 * unit, -1 };
+        final String[] names = metric ? new String[] { "0.25 km", "1 km", "5 km", "15 km", "50 km", "Always" }
+                : new String[] { "0.25 mi", "1 mi", "5 mi", "15 mi", "50 mi", "Always" };
+        LinearLayout row = null;
+        for (int i = 0; i < gateValues.length; i++) {
+            if (i % 3 == 0) {
+                row = new LinearLayout(plugin);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                if (i > 0)
+                    row.setPadding(0, dp(4), 0, 0);
+                gateFold.body.addView(row);
+            }
+            final View v = PluginLayoutInflater.inflate(plugin, R.layout.action_button, null);
+            final Button b = v.findViewById(R.id.action);
+            b.setText(names[i]);
+            final double value = gateValues[i];
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    manager.setPlacesGate(value);
+                    paintGate();
+                }
+            });
+            gateTiles.add(b);
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+            if (row.getChildCount() > 0)
+                lp.leftMargin = dp(4);
+            row.addView(v, lp);
+        }
+        final View uv = PluginLayoutInflater.inflate(plugin, R.layout.action_button, null);
+        final Button use = uv.findViewById(R.id.action);
+        use.setText("Use this zoom");
+        use.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                manager.setPlacesGate(com.atakmap.android.sitrep.ScaleBar.meters(mapView));
+                paintGate();
+            }
+        });
+        final LinearLayout.LayoutParams ulp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        ulp.topMargin = dp(4);
+        gateFold.body.addView(uv, ulp);
+        gateNow = body("", 13);
+        gateFold.body.addView(gateNow);
+        gateFold.body.addView(body("Every place category draws only when the scale bar reads this or less. The lists in the report are not changed.", 13));
+        paintGate();
+    }
+
+    private void paintGate() {
+        if (gateFold == null)
+            return;
+        final double gate = manager.placesGate();
+        gateFold.label("Places show at", gate > 0 ? com.atakmap.android.sitrep.ScaleBar.describe(gate) + " or closer" : "always");
+        for (int i = 0; i < gateTiles.size(); i++)
+            gateTiles.get(i).setTextColor(Math.abs(gateValues[i] - gate) < 0.5
+                    ? plugin.getResources().getColor(R.color.state_on) : 0xFFFFFFFF);
+        gateNow.setText("Scale bar now " + com.atakmap.android.sitrep.ScaleBar.text(mapView)
+                + (manager.placesGated() ? ": places hidden." : ": places shown."));
     }
 
     private void paintTiles(List<Button> tiles) {

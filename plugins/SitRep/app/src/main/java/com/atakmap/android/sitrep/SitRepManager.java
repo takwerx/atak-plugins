@@ -45,6 +45,9 @@ public final class SitRepManager {
     private static final String TAG = "SitRep";
     private static final String PREF_AREAS = "sitrep.areasVisible";
     public static final String PREF_NEARBY = "sitrep.nearbyMi";
+    /** The places zoom gate: the scale bar's reading in meters, -1 for Always. */
+    public static final String PREF_GATE = "sitrep.placesGateBarM";
+    public static final double GATE_DEFAULT_M = 8_046.72;   // 5 mi
     /** The widest area a report is made for: past this the servers time out and the counts stop meaning much. */
     /** Larger than any county a crew would ask about (PLAN decision 12); a state is refused. */
     static final double MAX_SPAN_M = 700_000;
@@ -92,6 +95,8 @@ public final class SitRepManager {
     /** Reads the saved reports on a worker; nothing slow on main at plugin start. */
     public void start() {
         places.start();
+        mapView.addOnMapMovedListener(moved);
+        main.post(gateTick);
         disk.execute(new Runnable() {
             @Override
             public void run() {
@@ -123,6 +128,8 @@ public final class SitRepManager {
 
     public void stop() {
         stopped = true;
+        mapView.removeOnMapMovedListener(moved);
+        main.removeCallbacks(gateTick);
         pick.cancel();
         places.stop();
         if (picker != null) {
@@ -168,6 +175,52 @@ public final class SitRepManager {
         changed();
     }
 
+    /** The places gate as the scale bar reads, meters; -1 is Always. */
+    public double placesGate() {
+        return Double.longBitsToDouble(prefs.getLong(PREF_GATE, Double.doubleToLongBits(GATE_DEFAULT_M)));
+    }
+
+    public void setPlacesGate(double barMeters) {
+        prefs.edit().putLong(PREF_GATE, Double.doubleToLongBits(barMeters)).apply();
+        gateTick.run();
+        changed();
+    }
+
+    /** True while the map is zoomed out past the places gate and the places are hidden. */
+    public boolean placesGated() {
+        return gated;
+    }
+
+    private boolean gated;
+
+    /**
+     * onMapMoved runs on the GL thread, every frame of a pinch: it only posts, and
+     * the posts are coalesced, so the gate is checked once the map has settled.
+     */
+    private final com.atakmap.map.AtakMapView.OnMapMovedListener moved =
+            new com.atakmap.map.AtakMapView.OnMapMovedListener() {
+                @Override
+                public void onMapMoved(com.atakmap.map.AtakMapView view, boolean animate) {
+                    main.removeCallbacks(gateTick);
+                    main.postDelayed(gateTick, 300);
+                }
+            };
+
+    private final Runnable gateTick = new Runnable() {
+        @Override
+        public void run() {
+            if (stopped)
+                return;
+            final double gate = placesGate();
+            final boolean past = gate > 0 && ScaleBar.meters(mapView) > gate * 1.02;
+            places.setHidden(past);
+            if (past != gated) {
+                gated = past;
+                changed();
+            }
+        }
+    };
+
     public int nearbyMiles() {
         return prefs.getInt(PREF_NEARBY, 5);
     }
@@ -204,6 +257,11 @@ public final class SitRepManager {
             return failed + (failed == 1 ? " section" : " sections") + " not available"
                     + (offline ? ": no network." : ". Tap the report, then Refresh.");
         }
+        if (gated)
+            for (Report r : reports)
+                if (!r.placesOn.isEmpty())
+                    return "Places hidden: zoom in until the scale bar reads "
+                            + ScaleBar.describe(placesGate()) + " or less.";
         return reports.size() + (reports.size() == 1 ? " report" : " reports")
                 + " saved. Tap one to read it.";
     }

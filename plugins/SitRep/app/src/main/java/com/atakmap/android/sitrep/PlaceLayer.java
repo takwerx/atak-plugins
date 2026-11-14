@@ -61,6 +61,8 @@ public final class PlaceLayer {
     /** Feature id to {title, details}: the hit test's copy carries no attributes. */
     private final Map<Long, String[]> details = new ConcurrentHashMap<>();
     private volatile boolean stopped;
+    /** Zoomed out past the places gate: the layer is off, the store is kept. */
+    private boolean hidden;
 
     public PlaceLayer(MapView mapView) {
         this.mapView = mapView;
@@ -130,6 +132,7 @@ public final class PlaceLayer {
             if (!added)
                 Log.w(TAG, "Overlay Manager did not take the places overlay");
             mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
+            layer.setVisible(!hidden);
         } catch (Throwable t) {
             Log.w(TAG, "could not put the places on the map: " + t);
         }
@@ -232,6 +235,13 @@ public final class PlaceLayer {
         } catch (Throwable t) {
             Log.w(TAG, "could not write the places: " + t);
         }
+    }
+
+    /** Hides or shows every place at once, for the zoom gate. Main thread. */
+    public void setHidden(boolean h) {
+        hidden = h;
+        if (layer != null && !stopped && layer.isVisible() == h)
+            layer.setVisible(!h);
     }
 
     /** Takes the layer off the map. The store is left open: disposing one aborts ATAK. */
