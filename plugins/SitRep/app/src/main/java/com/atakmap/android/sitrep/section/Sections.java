@@ -24,6 +24,7 @@ public final class Sections {
         s.add(new Declarations());
         s.add(new Terrain());
         s.add(new Daylight());
+        s.add(new People());
         s.add(new Structures());
         ALL = Collections.unmodifiableList(s);
     }
