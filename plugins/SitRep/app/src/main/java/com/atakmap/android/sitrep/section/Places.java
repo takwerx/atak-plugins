@@ -52,7 +52,7 @@ public final class Places extends Section {
             { "dam", "Dams", "W", "#0277BD" },
             { "bridge", "Bridges", "B", "#546E7A" },
             { "crossing", "Railroad crossings", "X", "#212121" },
-            { "rail", "Rail lines", "-", "#212121" },
+            { "rail", "Rail lines", "-", "#00E676" },
             { "transmission", "Transmission lines", "-", "#FFAB00" },
             { "hazmat", "Chemical facilities (RMP)", "!", "#F57C00" },
     };
@@ -72,7 +72,8 @@ public final class Places extends Section {
     /** Most places kept per category, nearest first, so fuel cannot crowd out the rest. */
     static final int PER_CATEGORY = 500;
     static final String NTAD = "https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/";
-    static final String CEC_LINES = "https://services3.arcgis.com/bWPjFyq029ChCGur/arcgis/rest/services/Transmission_Line/FeatureServer/2";
+    static final String POWER = "https://mapdepot.takwerx.org/sitrep/power/";
+    private static final int MAX_POWER_PATHS = 3_000;
     /** Categories drawn as lines, not icons. */
     public static boolean isLine(String category) {
         return "rail".equals(category) || "transmission".equals(category);
@@ -88,7 +89,8 @@ public final class Places extends Section {
                         + "Fire and police: USGS National Map. Power plants: CEC (California), EPA (elsewhere). "
                         + "Nuclear: FEMA/NRC. Dams: USACE National Inventory of Dams. Chemical: EPA RMP. "
                         + "Animal shelters, fairgrounds, equestrian centers, pharmacies, groceries, fuel and urgent care: "
-                        + "Overture Maps Foundation places (CDLA-Permissive-2.0; Foursquare rows Apache-2.0).");
+                        + "Overture Maps Foundation places (CDLA-Permissive-2.0; Foursquare rows Apache-2.0). "
+                        + "Transmission lines: (c) OpenStreetMap contributors (ODbL), via Overture Maps.");
     }
 
     @Override
@@ -397,16 +399,28 @@ public final class Places extends Section {
         // Nuclear plants within 50 mi, the ingestion planning zone; 10 mi is the
         // plume exposure zone.
         try {
+            // FEMA lists each reactor; one entry per plant, a line per reactor
+            // (Diablo Canyon 1 and 2 were two map points, 2026-11-13).
+            final Map<String, JSONObject> plants = new java.util.LinkedHashMap<>();
+            final Map<String, List<String>> reactors = new java.util.HashMap<>();
             for (JSONObject a : Esri.points(NUCLEAR, "1=1", area,
                     "power_plant,reactor_name,status,power,location,owner_operator", 50)) {
-                final double d = area.distanceMeters(a.optDouble("_lat"), a.optDouble("_lon"));
-                final List<String> info = new ArrayList<>();
-                info.add(a.optString("reactor_name", "") + ": " + a.optString("status", "") + ", "
+                final String plant = a.optString("power_plant", "Nuclear plant");
+                if (!plants.containsKey(plant)) {
+                    plants.put(plant, a);
+                    reactors.put(plant, new ArrayList<String>());
+                }
+                reactors.get(plant).add(a.optString("reactor_name", "") + ": " + a.optString("status", "") + ", "
                         + a.optInt("power", 0) + "% power.");
+            }
+            for (Map.Entry<String, JSONObject> e : plants.entrySet()) {
+                final JSONObject a = e.getValue();
+                final double d = area.distanceMeters(a.optDouble("_lat"), a.optDouble("_lon"));
+                final List<String> info = new ArrayList<>(reactors.get(e.getKey()));
                 info.add(d <= 16_093 ? "The area is inside its 10-mile emergency planning zone."
                         : "The area is inside its 50-mile ingestion planning zone.");
                 info.add("Operator: " + a.optString("owner_operator", "") + ".");
-                found.get("nuclear").add(point("nuclear", a.optString("power_plant"), a.optDouble("_lat"),
+                found.get("nuclear").add(point("nuclear", e.getKey(), a.optDouble("_lat"),
                         a.optDouble("_lon"), d, area, info));
             }
         } catch (Exception e) {
@@ -506,7 +520,7 @@ public final class Places extends Section {
 
     /**
      * Bridges, railroad crossings and rail lines (BTS NTAD, FRA), and California's
-     * transmission lines (CEC): what no other takwerx plugin draws (decision 16).
+     * power lines (OpenStreetMap pack): what no other takwerx plugin draws (decision 16).
      * Inside the area only.
      */
     private static void transport(Area area, Map<String, List<JSONObject>> found, List<String> missing) {
@@ -566,19 +580,93 @@ public final class Places extends Section {
         } catch (Exception e) {
             missing.add("rail lines");
         }
-        if (area.south < 42.1 && area.north > 32.4 && area.west < -114 && area.east > -124.5)
-            try {
-                for (JSONObject a : Esri.lines(CEC_LINES, "1=1", area, "Name,kV,Owner,Status,Type,Circuit")) {
-                    final List<String> info = new ArrayList<>();
-                    info.add(a.optString("kV", "") + " kV, " + ("UG".equals(a.optString("Type")) ? "underground"
-                            : "UW".equals(a.optString("Type")) ? "under water" : "overhead") + ".");
-                    info.add("Owner " + a.optString("Owner", "") + "; " + a.optString("Status", "").toLowerCase(Locale.US) + ".");
-                    found.get("transmission").add(line("transmission", a.optString("Name", a.optString("kV", "") + " kV"),
-                            a.optJSONArray("_paths"), info));
+        try {
+            power(area, found);
+        } catch (Exception e) {
+            missing.add("transmission lines");
+        }
+    }
+
+    /**
+     * Transmission and sub-transmission lines from our pack of OpenStreetMap power
+     * lines (tools/build_power_pack.py, via Overture), inside the area. The CEC layer
+     * drew Corona's Ontario Ave 66 kV line on the wrong streets (2026-11-13). Lines of
+     * one voltage and operator are one entry with many paths.
+     */
+    private static void power(Area area, Map<String, List<JSONObject>> found) throws Exception {
+        final JSONObject manifest = new JSONObject(Http.get(POWER + "power.json"));
+        final JSONObject tiles = manifest.optJSONObject("tiles");
+        final int step = Math.max(1, Math.min(10, manifest.optInt("tile_degrees", 1)));
+        if (tiles == null)
+            throw new java.io.IOException("no tiles in the power manifest");
+        final java.util.Set<String> seen = new java.util.HashSet<>();
+        final Map<String, JSONArray> groups = new java.util.LinkedHashMap<>();
+        final Map<String, String[]> heads = new java.util.HashMap<>();
+        int paths = 0;
+        for (int lat = floor(area.south, step); lat <= floor(area.north, step); lat += step)
+            for (int lon = floor(area.west, step); lon <= floor(area.east, step); lon += step) {
+                final String key = lat + "_" + lon;
+                if (!tiles.has(key))
+                    continue;
+                final JSONArray rows = new JSONArray(Http.getGzip(POWER + "tiles/" + key + ".json.gz"));
+                for (int i = 0; i < rows.length() && paths < MAX_POWER_PATHS; i++) {
+                    final JSONArray x = rows.optJSONArray(i);
+                    final JSONArray c = x == null ? null : x.optJSONArray(4);
+                    if (c == null || c.length() < 4 || c.length() > 20_000)
+                        continue;
+                    // A line is in every tile it touches; a path once.
+                    if (!seen.add(x.optString(0) + "/" + c.optDouble(0) + "," + c.optDouble(1)))
+                        continue;
+                    boolean in = false;
+                    final JSONArray path = new JSONArray();
+                    for (int k = 0; k + 1 < c.length(); k += 2) {
+                        final double lo = c.optDouble(k), la = c.optDouble(k + 1);
+                        if (!(Math.abs(la) <= 90) || !(Math.abs(lo) <= 180))
+                            continue;
+                        if (!in && la >= area.south && la <= area.north && lo >= area.west && lo <= area.east
+                                && area.contains(la, lo))
+                            in = true;
+                        path.put(new JSONArray().put(lo).put(la));
+                    }
+                    if (!in || path.length() < 2)
+                        continue;
+                    final String kv = x.optString(1, ""), op = x.optString(2, "").trim();
+                    final String g = kv + "|" + op;
+                    JSONArray list = groups.get(g);
+                    if (list == null) {
+                        list = new JSONArray();
+                        groups.put(g, list);
+                        heads.put(g, new String[] { kv, op });
+                    }
+                    list.put(path);
+                    paths++;
                 }
-            } catch (Exception e) {
-                missing.add("transmission lines");
             }
+        for (Map.Entry<String, JSONArray> e : groups.entrySet()) {
+            final String kv = heads.get(e.getKey())[0], op = heads.get(e.getKey())[1];
+            final String name = (kv.isEmpty() ? "Power line" : kv + " kV line") + (op.isEmpty() ? "" : ", " + op);
+            final List<String> info = new ArrayList<>();
+            info.add(kv.isEmpty() ? "Voltage not recorded." : kv + " kV.");
+            info.add(op.isEmpty() ? "Operator not recorded." : "Operator " + op + ".");
+            info.add("From OpenStreetMap; check the towers on the ground.");
+            // Report.cleanPaths keeps 200 paths and 4,000 points per entry when a saved
+            // report loads, so a big group goes in parts under both.
+            JSONArray part = new JSONArray();
+            int pts = 0;
+            for (int i = 0; i < e.getValue().length(); i++) {
+                final JSONArray path = e.getValue().optJSONArray(i);
+                final int n = Math.min(path.length(), 3_500);
+                if (part.length() > 0 && (part.length() >= 180 || pts + n > 3_800)) {
+                    found.get("transmission").add(line("transmission", name, part, info));
+                    part = new JSONArray();
+                    pts = 0;
+                }
+                part.put(path);
+                pts += n;
+            }
+            if (part.length() > 0)
+                found.get("transmission").add(line("transmission", name, part, info));
+        }
     }
 
     /** A line place: its first vertex for the list, its paths for the map. */

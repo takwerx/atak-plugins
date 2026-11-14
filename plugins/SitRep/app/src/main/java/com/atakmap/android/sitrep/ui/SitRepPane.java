@@ -641,6 +641,36 @@ public final class SitRepPane {
         goTo(r, null);
     }
 
+    /** Fits the map to one place: a point with about 400 m around it, a line whole. */
+    private void goToPlace(org.json.JSONObject p) {
+        try {
+            double south = p.optDouble("lat"), north = south, west = p.optDouble("lon"), east = west;
+            final org.json.JSONArray g = p.optJSONArray("g");
+            for (int k = 0; g != null && k < g.length(); k++) {
+                final org.json.JSONArray path = g.optJSONArray(k);
+                for (int v = 0; path != null && v < path.length(); v++) {
+                    final org.json.JSONArray xy = path.optJSONArray(v);
+                    if (xy == null)
+                        continue;
+                    south = Math.min(south, xy.optDouble(1, south));
+                    north = Math.max(north, xy.optDouble(1, north));
+                    west = Math.min(west, xy.optDouble(0, west));
+                    east = Math.max(east, xy.optDouble(0, east));
+                }
+            }
+            if (!(Math.abs(south) <= 90) || !(Math.abs(north) <= 90) || !(Math.abs(west) <= 180) || !(Math.abs(east) <= 180))
+                return;
+            final double padLat = Math.max(0.004, (north - south) * 0.15);
+            final double padLon = Math.max(0.004, (east - west) * 0.15);
+            com.atakmap.android.util.ATAKUtilities.scaleToFit(mapView, new GeoPoint[] {
+                    new GeoPoint(Math.max(-90, south - padLat), Math.max(-180, west - padLon)),
+                    new GeoPoint(Math.min(90, north + padLat), Math.min(180, east + padLon)) }, 0d,
+                    mapView.getWidth(), mapView.getHeight());
+        } catch (RuntimeException e) {
+            Log.w(TAG, "could not go to the place", e);
+        }
+    }
+
     /**
      * Fits the map to the area and, when a category is given, every place of that
      * category the report found: the nearest hospital or shelter is often outside the
@@ -736,7 +766,20 @@ public final class SitRepPane {
                 final org.json.JSONArray info = p.optJSONArray("i");
                 if (info != null && info.length() > 0 && info.optString(info.length() - 1).endsWith("of the area."))
                     where = ", " + info.optString(info.length() - 1).replace(" of the area.", "");
-                fold.body.addView(body(p.optString("n") + where, 14));
+                final TextView row = body(p.optString("n") + where, 14);
+                row.setPadding(0, dp(6), 0, dp(6));
+                final org.json.JSONObject place = p;
+                row.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        // A tap on a listed place takes the map there, with its
+                        // category switched on so it is drawn (operator, 2026-11-13).
+                        if (!r.placesOn.contains(c[0]))
+                            manager.setPlaceOn(r, c[0], true);
+                        goToPlace(place);
+                    }
+                });
+                fold.body.addView(row);
             }
             fold.show();
         }

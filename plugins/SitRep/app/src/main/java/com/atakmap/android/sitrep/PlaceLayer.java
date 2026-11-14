@@ -189,12 +189,12 @@ public final class PlaceLayer {
                         d.append(k == 0 ? "" : "\n").append(info.optString(k));
                     attrs.setAttribute("Details", d.toString());
                     if (Places.isLine(c[0]) && p.optJSONArray("g") != null) {
-                        // Rail: a dark line on a white edge so it reads on imagery;
+                        // Rail: bright green on a dark edge so it reads on imagery;
                         // transmission: amber. No icon and no label, details on tap.
                         final com.atakmap.map.layer.feature.style.Style ls = "rail".equals(c[0])
                                 ? new com.atakmap.map.layer.feature.style.CompositeStyle(new com.atakmap.map.layer.feature.style.Style[] {
-                                        new com.atakmap.map.layer.feature.style.BasicStrokeStyle(0xFFFFFFFF, 5f),
-                                        new com.atakmap.map.layer.feature.style.BasicStrokeStyle(0xFF212121, 2.5f) })
+                                        new com.atakmap.map.layer.feature.style.BasicStrokeStyle(0xFF102010, 6f),
+                                        new com.atakmap.map.layer.feature.style.BasicStrokeStyle(0xFF00E676, 3.5f) })
                                 : new com.atakmap.map.layer.feature.style.BasicStrokeStyle(0xFFFFAB00, 3f);
                         final JSONArray paths = p.optJSONArray("g");
                         for (int k = 0; k < paths.length(); k++) {

@@ -6,9 +6,9 @@
     <string name="app_desc">Sit Rep</string>
 
     <string name="draw_area">New area</string>
-    <string name="new_draw">Draw on the map</string>
-    <string name="new_name">Type a name</string>
-    <string name="new_here">County or city here</string>
+    <string name="new_draw">Draw an area</string>
+    <string name="new_name">Search</string>
+    <string name="new_here">Tap on map</string>
     <string name="new_shape">Use a shape</string>
     <string name="settings">Settings</string>
     <string name="back">Back</string>

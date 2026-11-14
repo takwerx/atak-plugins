@@ -20,13 +20,13 @@
             android:text="@string/new_draw" />
 
         <Button
-            android:id="@+id/new_name"
+            android:id="@+id/new_shape"
             style="@style/TakwerxButton"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="64dp"
             android:layout_marginLeft="8dp"
-            android:text="@string/new_name" />
+            android:text="@string/new_shape" />
     </LinearLayout>
 
     <LinearLayout
@@ -36,20 +36,20 @@
         android:layout_marginTop="8dp">
 
         <Button
+            android:id="@+id/new_name"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="64dp"
+            android:text="@string/new_name" />
+
+        <Button
             android:id="@+id/new_here"
             style="@style/TakwerxButton"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="64dp"
-            android:text="@string/new_here" />
-
-        <Button
-            android:id="@+id/new_shape"
-            style="@style/TakwerxButton"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="64dp"
             android:layout_marginLeft="8dp"
-            android:text="@string/new_shape" />
+            android:text="@string/new_here" />
     </LinearLayout>
 </LinearLayout>

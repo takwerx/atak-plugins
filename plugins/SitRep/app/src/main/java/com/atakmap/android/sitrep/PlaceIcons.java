@@ -26,7 +26,7 @@ final class PlaceIcons {
 
     private static final String TAG = "SitRep.PlaceIcons";
     /** Bump when the drawing changes: a cached file never redraws. */
-    private static final int VERSION = 9;
+    private static final int VERSION = 10;
     private static final float SIZE_DP = 30f;
 
     /** What the style needs: the file, its size and the offset that puts the glyph on the point. */
@@ -133,18 +133,18 @@ final class PlaceIcons {
         if (name == null || name.trim().isEmpty())
             return new String[0];
         final String n = name.trim().replaceAll("\\s+", " ");
-        // Police and sheriff first: "Riverside County Sheriff's Department - Southwest
-        // Station" breaks at the dash. Checked before Station, which otherwise put the
-        // whole first part on line one, cut, and the word "Station" alone on line two.
-        final int dash = n.indexOf(" - ");
-        if (dash > 2)
-            return new String[] { clip(n.substring(0, dash)), clip(n.substring(dash + 3)) };
-        // Fire: "Rialto Fire Department Station 201" breaks before Station, only when
-        // the station has a number or a name after the word.
+        // Fire first: "Riverside County Fire Department Station 47 - Norco" breaks
+        // before Station, so the number is on line two; only when the station has a
+        // number or a name after the word. A dash left at the end of line one goes.
         final java.util.regex.Matcher m = java.util.regex.Pattern
                 .compile("^(.{3,}?)\\s+((?:Fire\\s+)?Station\\s+\\S.*)$", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(n);
         if (m.matches() && m.group(1).length() <= 40)
-            return new String[] { clip(m.group(1)), clip(m.group(2)) };
+            return new String[] { clip(m.group(1).replaceAll("\\s*-$", "")), clip(m.group(2)) };
+        // Police and sheriff: "Riverside County Sheriff's Department - Southwest
+        // Station" breaks at the dash (no name after Station, so the rule above passes).
+        final int dash = n.indexOf(" - ");
+        if (dash > 2)
+            return new String[] { clip(n.substring(0, dash)), clip(n.substring(dash + 3)) };
         final java.util.regex.Matcher dept = java.util.regex.Pattern
                 .compile("^(.*?\\b(?:Department|Dept\\.?|Office|Agency))\\s+(\\S.*)$").matcher(n);
         if (dept.matches() && n.length() > 28)
