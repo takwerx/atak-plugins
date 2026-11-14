@@ -585,6 +585,19 @@ final class PlaceIcons {
                 }
                 break;
             }
+            case "lessons": {
+                // A firefighter fatality or entrapment review: dark red disc, white "!".
+                c.drawCircle(cx, cy, h, white);
+                fill.setColor(0xFFB71C1C);
+                c.drawCircle(cx, cy, h - s * 0.06f, fill);
+                final Paint t = new Paint(Paint.ANTI_ALIAS_FLAG);
+                t.setColor(0xFFFFFFFF);
+                t.setFakeBoldText(true);
+                t.setTextAlign(Paint.Align.CENTER);
+                t.setTextSize(s * 0.62f);
+                c.drawText("!", cx, cy + s * 0.22f, t);
+                break;
+            }
             case "hazmat": {
                 // An orange diamond with a black exclamation mark.
                 final Path dia = new Path();

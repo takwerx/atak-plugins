@@ -170,9 +170,10 @@ public final class PlaceLayer {
         for (Report r : reports) {
             if (r.placesOn.isEmpty() || !r.onMap)
                 continue;
-            // Places, and the 911 calls section's calls (category "calls").
+            // Places, the 911 calls section's calls (category "calls") and History's
+            // fatality and entrapment reviews (category "lessons").
             final JSONArray pts = new JSONArray();
-            for (String key : new String[] { "places", "calls" }) {
+            for (String key : new String[] { "places", "calls", "history" }) {
                 final Report.Answer a = r.answer(key);
                 for (int i = 0; a != null && a.points != null && i < a.points.length(); i++)
                     pts.put(a.points.opt(i));

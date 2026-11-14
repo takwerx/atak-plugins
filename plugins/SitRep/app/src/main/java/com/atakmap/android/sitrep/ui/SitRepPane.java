@@ -293,6 +293,15 @@ public final class SitRepPane {
                 if (p != null && key.equals(com.atakmap.android.sitrep.PlaceLayer.placeKey(p)))
                     folds.put(reportId + "|sitrep.fold.calls." + p.optString("ag", "Calls").toLowerCase(java.util.Locale.US), true);
             }
+        } else if ("lessons".equals(category)) {
+            // A fatality or entrapment review: History and its group.
+            folds.put(reportId + "|sitrep.fold.history", true);
+            final Report r = manager.find(reportId);
+            final Report.Answer a = r == null ? null : r.answer("history");
+            for (int i = 0; a != null && i < a.lines.size(); i++)
+                if (a.lines.get(i).startsWith(Section.GROUP + "Fatalities"))
+                    folds.put(reportId + "|sitrep.fold.history."
+                            + groupName(a.lines.get(i)).toLowerCase(java.util.Locale.US), true);
         } else {
             folds.put(reportId + "|sitrep.fold.places", true);
             folds.put(reportId + "|sitrep.fold.places." + category, true);
@@ -376,6 +385,27 @@ public final class SitRepPane {
                     if (!line.startsWith(Section.GROUP) && !line.startsWith("  "))
                         notes.add(line);
                 addLines(f.body, s.key, notes);
+            } else if ("history".equals(s.key) && a.points != null) {
+                // The fatality and entrapment group holds rows that go to the place,
+                // not plain lines.
+                final List<String> kept = new ArrayList<>();
+                String lessonsGroup = null;
+                boolean inLessons = false;
+                for (String line : a.lines) {
+                    if (line.startsWith(Section.GROUP)) {
+                        inLessons = line.startsWith(Section.GROUP + "Fatalities");
+                        if (inLessons)
+                            lessonsGroup = groupName(line);
+                    } else if (!line.startsWith("  "))
+                        inLessons = false;
+                    else if (inLessons)
+                        continue;
+                    kept.add(line);
+                }
+                final java.util.Map<String, Fold> groups = addLines(f.body, s.key, kept);
+                final Fold lessons = lessonsGroup == null ? null : groups.get(lessonsGroup);
+                if (lessons != null)
+                    lessonRows(lessons.body, r, a.points);
             } else
                 addLines(f.body, s.key, a.lines);
             if (a.state == Report.State.OK && a.lastTryFailed)
@@ -407,21 +437,101 @@ public final class SitRepPane {
      * Detail lines under a section. A group line ({@link Section#GROUP}) becomes its
      * own drop-down, closed until tapped, holding the indented lines after it.
      */
-    private void addLines(LinearLayout into, String sectionKey, List<String> lines) {
+    private java.util.Map<String, Fold> addLines(LinearLayout into, String sectionKey, List<String> lines) {
+        final java.util.Map<String, Fold> groups = new java.util.HashMap<>();
         Fold group = null;
         for (String line : lines) {
             if (line.startsWith(Section.GROUP)) {
                 final String text = line.substring(Section.GROUP.length());
-                final int colon = text.indexOf(':');
-                final String name = colon > 0 ? text.substring(0, colon) : text;
+                final String name = groupName(line);
                 group = new Fold(into, "sitrep.fold." + sectionKey + "." + name.toLowerCase(Locale.US));
                 group.head.setText(text);
                 group.show();
+                groups.put(name, group);
             } else if (group != null && line.startsWith("  ")) {
                 group.body.addView(lineView(line.trim()));
             } else {
                 group = null;
                 into.addView(lineView(line));
+            }
+        }
+        return groups;
+    }
+
+    /** A group line's name: its text before the colon. */
+    private static String groupName(String line) {
+        final String text = line.substring(Section.GROUP.length());
+        final int colon = text.indexOf(':');
+        return colon > 0 ? text.substring(0, colon) : text;
+    }
+
+    /**
+     * History's fatality and entrapment reviews: a map switch, then one row each. A
+     * tap puts them on the map, marks the row, takes the map there, and opens a line
+     * under it to the review on lessons.wildfire.gov; a second tap closes it
+     * (operator, 2026-11-14).
+     */
+    private void lessonRows(LinearLayout into, final Report r, org.json.JSONArray points) {
+        final Button map = (Button) PluginLayoutInflater.inflate(plugin, R.layout.open_button, null);
+        setState(map, "On map", r.placesOn.contains("lessons"));
+        map.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                manager.setPlaceOn(r, "lessons", !r.placesOn.contains("lessons"));
+            }
+        });
+        into.addView(map);
+        for (int i = 0; i < points.length(); i++) {
+            final org.json.JSONObject p = points.optJSONObject(i);
+            if (p == null || !"lessons".equals(p.optString("c")))
+                continue;
+            final boolean focus = focusKey != null
+                    && focusKey.equals(com.atakmap.android.sitrep.PlaceLayer.placeKey(p));
+            final org.json.JSONArray info = p.optJSONArray("i");
+            final String where = info != null && info.length() > 0 ? ", " + info.optString(0) : "";
+            final TextView row = body(p.optString("n") + where, 14);
+            row.setPadding(0, dp(6), 0, dp(6));
+            if (focus) {
+                row.setTextColor(CATEGORY);
+                row.setBackgroundColor(0x2200E5FF);
+                focusRow = row;
+            }
+            row.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (focus) {
+                        focusKey = null;
+                        refresh();
+                        return;
+                    }
+                    focusKey = com.atakmap.android.sitrep.PlaceLayer.placeKey(p);
+                    if (!r.placesOn.contains("lessons"))
+                        manager.setPlaceOn(r, "lessons", true);
+                    refresh();
+                    goToPlace(p);
+                }
+            });
+            into.addView(row);
+            if (!focus)
+                continue;
+            for (int k = 1; info != null && k < info.length(); k++) {
+                final TextView t = body(info.optString(k), 13);
+                t.setPadding(dp(16), 0, 0, dp(2));
+                into.addView(t);
+            }
+            final String url = p.optString("u", "");
+            if (url.startsWith(com.atakmap.android.sitrep.section.History.LESSONS)) {
+                final TextView open = body("Open Lessons Learned report", 14);
+                open.setTextColor(CATEGORY);
+                open.setPaintFlags(open.getPaintFlags() | android.graphics.Paint.UNDERLINE_TEXT_FLAG);
+                open.setPadding(dp(16), dp(4), 0, dp(8));
+                open.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        openPage(url);
+                    }
+                });
+                into.addView(open);
             }
         }
     }

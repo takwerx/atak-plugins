@@ -37,7 +37,7 @@ public final class History extends Section {
     static final String PERIMETERS = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/InterAgencyFirePerimeterHistory_All_Years_View/FeatureServer/0";
     static final String REVIEWS = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/HistomapPublicView/FeatureServer/0";
     /** Only report links on the Lessons Learned Center's own site are offered as links. */
-    static final String LESSONS = "https://lessons.wildfire.gov/";
+    public static final String LESSONS = "https://lessons.wildfire.gov/";
 
     /** How many fires the list shows, newest first; the largest is always named too. */
     private static final int LIST = 15;
@@ -104,6 +104,7 @@ public final class History extends Section {
         else {
             r.line(GROUP + "Fatalities and entrapments" + within + ": " + reviews.size()
                     + (deaths > 0 ? " (" + deaths + (deaths == 1 ? " death)" : " deaths)") : ""));
+            final JSONArray points = new JSONArray();
             for (JSONObject v : reviews) {
                 final String name = v.optString("LLIncidentName", "").trim().isEmpty()
                         ? v.optString("IncidentName", "Unnamed").trim() : v.optString("LLIncidentName").trim();
@@ -114,11 +115,25 @@ public final class History extends Section {
                 String shown = name.replaceAll("\\s+", " ");
                 if (!year.isEmpty() && shown.endsWith(" " + year))   // "Euclid Fire Entrapment 1981"
                     shown = shown.substring(0, shown.length() - year.length() - 1);
-                final String text = "  " + year + " " + shown + ", " + where;
+                final String title = (year.isEmpty() ? "" : year + " ") + shown;
+                r.line("  " + title + ", " + where);
+                // On the map as category "lessons", drawn by the places layer; the
+                // row in the report goes there and offers the review (operator,
+                // 2026-11-14).
+                final JSONArray info = new JSONArray().put(where);
+                final int dead = v.optInt("FatalityCount", 0), hurt = v.optInt("InjuryCount", 0);
+                info.put(dead + (dead == 1 ? " fatality, " : " fatalities, ") + hurt + (hurt == 1 ? " injury" : " injuries"));
+                final String trap = v.optString("EntrapmentType", "").trim();
+                if (!trap.isEmpty() && !"null".equals(trap))
+                    info.put("Entrapment: " + trap.replace('_', ' ').replace(",", ", ").toLowerCase(Locale.US));
+                final JSONObject pt = new JSONObject().put("c", "lessons").put("n", title)
+                        .put("lat", v.optDouble("_lat")).put("lon", v.optDouble("_lon")).put("i", info);
                 final String url = v.optString("Link1", "").trim();
-                r.line(url.startsWith(LESSONS) && url.indexOf(LINK) < 0 ? link(text, url) : text);
+                if (url.startsWith(LESSONS))
+                    pt.put("u", url);
+                points.put(pt);
             }
-            r.line("Tap a report to read it on lessons.wildfire.gov.");
+            r.points = points;
         }
         return r;
     }

@@ -219,6 +219,10 @@ public final class Report {
                 final long t = p.optLong("t", 0);
                 if (t > 0)
                     q.put("t", t);
+                // A History review's report page, on the Lessons Learned site only.
+                final String u = p.optString("u", "");
+                if (u.length() <= 300 && u.startsWith(com.atakmap.android.sitrep.section.History.LESSONS))
+                    q.put("u", u);
                 out.put(q.put("i", ci));
             } catch (JSONException e) {
                 // skip it

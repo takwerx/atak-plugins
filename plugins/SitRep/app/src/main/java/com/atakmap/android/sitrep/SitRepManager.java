@@ -557,7 +557,7 @@ public final class SitRepManager {
             r.answers.put(s.key, a);
         }
         save(r);
-        if ("places".equals(s.key) || "calls".equals(s.key))
+        if ("places".equals(s.key) || "calls".equals(s.key) || "history".equals(s.key))
             places.sync(reports);
         changed();
     }

@@ -58,6 +58,8 @@ public final class Places extends Section {
             { "hazmat", "Chemical facilities (RMP)", "!", "#F57C00" },
             // Filled by the 911 calls section, not by Places; drawn by the same layer.
             { "calls", "911 calls", "9", "#C62828" },
+            // Filled by the History section: firefighter fatality and entrapment reviews.
+            { "lessons", "Fatalities and entrapments", "!", "#B71C1C" },
     };
 
     static final String HOSPITALS = "https://mapdepot.takwerx.org/iwi/hospitals/hospitals.json.gz";
