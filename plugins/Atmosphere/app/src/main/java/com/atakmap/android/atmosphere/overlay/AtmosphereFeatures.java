@@ -377,6 +377,21 @@ final class AtmosphereFeatures {
     /** A rating's label as an exact-color pill; see {@link ZonePills#pill(String, int, int)}. */
     private ZonePills ratingPills;
 
+    /**
+     * Rhumb lines for this layer's features: the renderer then fills a polygon flat
+     * instead of cutting its edges along the earth's curve, which adds points to every
+     * edge. Turned on for the FEMA flood zones while their missing fills were chased
+     * (s10-dev-2, 2026-11-14); the cause turned out to be rings that touch themselves,
+     * on which earcut loops forever (FloodZones.repair), but flat fills were kept: at
+     * the few miles the zones are drawn at, a straight edge and a curved one are the
+     * same pixels, and fewer points is less for earcut to cut.
+     */
+    private volatile boolean rhumb;
+
+    void setRhumb(boolean value) {
+        rhumb = value;
+    }
+
     void setHitFilter(HitFilter f) {
         hitFilter = f;
     }
@@ -1139,6 +1154,9 @@ final class AtmosphereFeatures {
                                                 a.getStringAttribute("_ref"));
                                         item.setMetaString("atmosphereLayer", type);
                                     }
+                                    if (a.containsAttribute("_floodId"))
+                                        item.setMetaString("floodId",
+                                                a.getStringAttribute("_floodId"));
                                     if (a.containsAttribute("_zoneId")) {
                                         item.setMetaString("zoneId",
                                                 a.getStringAttribute("_zoneId"));
@@ -1181,6 +1199,7 @@ final class AtmosphereFeatures {
             case "sawti": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_sawti;
             case "psps": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_psps;
             case "flood": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_flood;
+            case "floodzones": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_floodzones;
             case "beach": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_beach;
             case "buoys": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_buoys;
             case "avalanche": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_avalanche;
@@ -1558,9 +1577,20 @@ final class AtmosphereFeatures {
                             }
                         }
                     }
-                    store.insertFeature(new Feature(fsid, d.name, d.geometry,
-                            centered == null ? d.style : withoutLabel(d.style),
-                            d.attrs, Feature.AltitudeMode.ClampToGround, 0d));
+                    final Style st = centered == null ? d.style : withoutLabel(d.style);
+                    if (rhumb) {
+                        final Feature.Traits traits = new Feature.Traits();
+                        traits.altitudeMode = Feature.AltitudeMode.ClampToGround;
+                        traits.extrude = 0d;
+                        traits.lineMode = Feature.LineMode.Rhumb;
+                        store.insertFeature(new Feature(fsid,
+                                FeatureDataStore2.FEATURE_ID_NONE, d.name, d.geometry, st,
+                                d.attrs, traits, FeatureDataStore2.TIMESTAMP_NONE,
+                                FeatureDataStore2.FEATURE_VERSION_NONE));
+                    } else {
+                        store.insertFeature(new Feature(fsid, d.name, d.geometry, st,
+                                d.attrs, Feature.AltitudeMode.ClampToGround, 0d));
+                    }
                 }
                 // One at a time. deleteFeatureSets(params) is a silent no-op on this
                 // store -- the file held sixty sets before and sixty after, every

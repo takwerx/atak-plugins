@@ -197,6 +197,14 @@
     <string name="flood_when_now">Now</string>
     <string name="flood_when_5day">Next 5 days</string>
     <string name="floodground_note">The National Weather Service calls this experimental: a river model\'s estimate of where water goes over the banks, not a survey, and it covers only part of the country. What you can see wins.</string>
+    <string name="floodzones_on">FEMA Flood Zones ON</string>
+    <string name="floodzones_off">FEMA Flood Zones OFF</string>
+    <string name="floodzones_what">FEMA\'s flood map. Not a forecast: it does not change with the weather.</string>
+    <string name="floodzones_gate_heading">Draw zones at this zoom or closer</string>
+    <string name="floodzones_allow_title">Show FEMA flood zones?</string>
+    <string name="floodzones_allow_text">Atmosphere will ask FEMA for the flood zones in the area the map shows and draw them on the map. The zones are kept on this device for a month, so they still draw with no network. The map\'s area is sent; your position is not.\n\nServer: hazards.fema.gov</string>
+    <string name="floodzones_note">Where FEMA has no digital flood map, nothing is drawn and the line above says so. An area with no zone drawn is not an area with no flood risk.</string>
+    <string name="credit_floodzones">Flood zones from the FEMA National Flood Hazard Layer (%1$s)</string>
     <string name="highflow_on">Streams Running High ON</string>
     <string name="highflow_off">Streams Running High OFF</string>
     <string name="highflow_allow_title">Show streams running high?</string>

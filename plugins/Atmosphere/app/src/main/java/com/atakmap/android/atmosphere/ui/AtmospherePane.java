@@ -54,6 +54,7 @@ import com.atakmap.android.atmosphere.overlay.BeachOverlay;
 import com.atakmap.android.atmosphere.overlay.SnotelOverlay;
 import com.atakmap.android.atmosphere.overlay.HighFlowOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodedGroundOverlay;
+import com.atakmap.android.atmosphere.overlay.FloodZoneOverlay;
 import com.atakmap.android.atmosphere.overlay.SatelliteOverlay;
 import com.atakmap.android.atmosphere.overlay.SnowOverlay;
 import com.atakmap.android.atmosphere.overlay.SstOverlay;
@@ -396,6 +397,16 @@ public final class AtmospherePane {
     private final LinearLayout floodgroundWhenRow;
     private FloodedGroundOverlay floodground;
     private boolean floodgroundOpen = true;
+    private static final String PREF_FLOODZONES_OPEN = "weather.floodzones.open";
+    private final LinearLayout floodzonesSettings;
+    private final ImageButton floodzonesExpand;
+    private final Button floodzonesToggle;
+    private final TextView floodzonesStatus;
+    private final LinearLayout floodzonesLegend;
+    private final LinearLayout floodzonesGateRow;
+    private final TextView floodzonesGateText;
+    private FloodZoneOverlay floodzones;
+    private boolean floodzonesOpen = true;
     private static final String PREF_SATELLITE_OPEN = "weather.satellite.open";
     private final LinearLayout satelliteSettings;
     private final ImageButton satelliteExpand;
@@ -979,6 +990,13 @@ public final class AtmospherePane {
         floodgroundStatus = find(R.id.floodground_status);
         floodgroundLegend = find(R.id.floodground_legend);
         floodgroundWhenRow = find(R.id.floodground_when_row);
+        floodzonesSettings = find(R.id.floodzones_settings);
+        floodzonesExpand = find(R.id.floodzones_expand);
+        floodzonesToggle = find(R.id.floodzones_toggle);
+        floodzonesStatus = find(R.id.floodzones_status);
+        floodzonesLegend = find(R.id.floodzones_legend);
+        floodzonesGateRow = find(R.id.floodzones_gate_row);
+        floodzonesGateText = find(R.id.floodzones_gate_text);
         satelliteSettings = find(R.id.satellite_settings);
         satelliteExpand = find(R.id.satellite_expand);
         satelliteToggle = find(R.id.satellite_toggle);
@@ -1169,6 +1187,15 @@ public final class AtmospherePane {
             public void onClick(View v) {
                 floodgroundOpen = !floodgroundOpen;
                 rememberFold(PREF_FLOODGROUND_OPEN, floodgroundOpen);
+                updateLayerControls();
+            }
+        });
+        floodzonesOpen = prefs == null || prefs.getBoolean(PREF_FLOODZONES_OPEN, true);
+        floodzonesExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                floodzonesOpen = !floodzonesOpen;
+                rememberFold(PREF_FLOODZONES_OPEN, floodzonesOpen);
                 updateLayerControls();
             }
         });
@@ -1625,6 +1652,8 @@ public final class AtmospherePane {
             highflow.refresh(false);
         if (floodground != null && floodground.isOn())
             floodground.refresh(false);
+        if (floodzones != null && floodzones.isOn())
+            floodzones.refresh();
         if (satellite != null && satellite.isOn())
             satellite.refresh(false);
         if (snow != null && snow.isOn())
@@ -2079,6 +2108,24 @@ public final class AtmospherePane {
         snotelLegend.removeAllViews();
         for (String[] row : SnotelOverlay.LEGEND)
             snotelLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        updateLayerControls();
+    }
+
+    /** FEMA's flood zones, owned by the plugin. The regulatory map, not a forecast. */
+    public void setFloodZones(FloodZoneOverlay overlay) {
+        floodzones = overlay;
+        if (floodzones == null)
+            return;
+        floodzones.setListener(new FloodZoneOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                floodzonesStatus.setText(status);
+                floodzonesStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        floodzonesLegend.removeAllViews();
+        for (String[] row : FloodZoneOverlay.LEGEND)
+            floodzonesLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
         updateLayerControls();
     }
 
@@ -2968,6 +3015,22 @@ public final class AtmospherePane {
                     updateLayerControls();
                 } else {
                     askToAllowFloodedGround();
+                }
+            }
+        });
+        floodzonesToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (floodzones == null)
+                    return;
+                if (floodzones.isOn()) {
+                    floodzones.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(FloodZoneOverlay.LAYER_ID)) {
+                    floodzones.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowFloodZones();
                 }
             }
         });
@@ -4586,6 +4649,10 @@ public final class AtmospherePane {
             floodground.setOn(on);
         else if (floodground != null && on)
             blocked++;
+        if (floodzones != null && (!on || allowed(FloodZoneOverlay.LAYER_ID)))
+            floodzones.setOn(on);
+        else if (floodzones != null && on)
+            blocked++;
         if (satellite != null && (!on || allowed(SatelliteOverlay.LAYER_ID)))
             satellite.setOn(on);
         else if (satellite != null && on)
@@ -4837,6 +4904,20 @@ public final class AtmospherePane {
                         fireZones.setLabelGate(gsd);
                     }
                 });
+    }
+
+    private void buildFloodZonesGateRow() {
+        gateRow(floodzonesGateRow, floodzonesGateText, "Flood zones", floodzones.gate(),
+                new Gate() {
+                    @Override
+                    public void set(double gsd) {
+                        floodzones.setGate(gsd);
+                    }
+                });
+        if (floodzones.tooWide())
+            floodzonesGateText.setText(floodzonesGateText.getText()
+                    + "  \u2014 hidden, the view is too wide; zones draw at "
+                    + floodzones.widestBar() + " or closer");
     }
 
     /** Feature Layer's ladder, as scale-bar readings in the operator's big unit. */
@@ -5525,6 +5606,27 @@ public final class AtmospherePane {
                                 egress.setLayerEnabled(FloodedGroundOverlay.LAYER_ID, true);
                                 if (floodground != null)
                                     floodground.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowFloodZones() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.floodzones_allow_title))
+                .setMessage(pluginContext.getString(R.string.floodzones_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(FloodZoneOverlay.LAYER_ID, true);
+                                if (floodzones != null)
+                                    floodzones.setOn(true);
                                 updateLayerControls();
                             }
                         })
@@ -6510,6 +6612,15 @@ public final class AtmospherePane {
         floodgroundExpand.setVisibility(floodgroundOn ? View.VISIBLE : View.GONE);
         floodgroundExpand.setRotation(floodgroundOpen ? 180f : 0f);
         floodgroundSettings.setVisibility(floodgroundOn && floodgroundOpen ? View.VISIBLE : View.GONE);
+        final boolean floodzonesOn = floodzones != null && floodzones.isOn();
+        floodzonesToggle.setText(floodzonesOn ? R.string.floodzones_on : R.string.floodzones_off);
+        floodzonesToggle.setTextColor(pluginContext.getResources().getColor(
+                floodzonesOn ? R.color.state_on : R.color.state_off));
+        floodzonesExpand.setVisibility(floodzonesOn ? View.VISIBLE : View.GONE);
+        floodzonesExpand.setRotation(floodzonesOpen ? 180f : 0f);
+        floodzonesSettings.setVisibility(floodzonesOn && floodzonesOpen ? View.VISIBLE : View.GONE);
+        if (floodzonesOn && stationLayer != null)
+            buildFloodZonesGateRow();
         final boolean satelliteOn = satellite != null && satellite.isOn();
         satelliteToggle.setText(satelliteOn ? R.string.satellite_on : R.string.satellite_off);
         satelliteToggle.setTextColor(pluginContext.getResources().getColor(
@@ -6839,6 +6950,11 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_floodground, FloodedGroundOverlay.HOST));
+        }
+        if (floodzones != null && floodzones.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_floodzones, FloodZoneOverlay.HOST));
         }
         if (satellite != null && satellite.isOn()) {
             if (out.length() > 0)
