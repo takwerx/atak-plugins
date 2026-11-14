@@ -119,8 +119,12 @@ public final class Places extends Section {
         // a Level I 8.8 mi out of Corona was left off at a 5 mi Nearby (2026-11-13).
         try {
             final JSONArray all = new JSONObject(Http.getGzip(HOSPITALS)).optJSONArray("hospitals");
-            final String[] needs = { "trauma", "level1", "ped", "burn" };
-            final String[] needWords = { "Nearest trauma center", "Nearest Level I trauma center",
+            // The nearest ER, then trauma care by level: the nearest of any level is
+            // often a Level IV, and the Level II a crew would fly to was left off
+            // (Kootenai Health for Bayview, ID, operator 2026-11-14).
+            final String[] needs = { "er", "trauma", "level2", "level1", "ped", "burn" };
+            final String[] needWords = { "Nearest emergency room", "Nearest trauma center",
+                    "Nearest Level II or higher trauma center", "Nearest Level I trauma center",
                     "Nearest pediatric trauma center", "Nearest burn center" };
             final JSONObject[] nearest = new JSONObject[needs.length];
             final double[] nearestD = new double[needs.length];
@@ -140,7 +144,8 @@ public final class Places extends Section {
                 h.put("_d", d);
                 if (d <= reach)
                     within.add(h);
-                final boolean[] has = { h.optInt("trauma", 0) > 0, h.optInt("trauma", 0) == 1,
+                final int level = h.optInt("trauma", 0);
+                final boolean[] has = { hasEr(h), level > 0, level == 1 || level == 2, level == 1,
                         h.optInt("ped", 0) > 0, h.has("burn") };
                 for (int k = 0; k < needs.length; k++)
                     if (has[k] && d < nearestD[k]) {
@@ -169,15 +174,18 @@ public final class Places extends Section {
                 if (m != null)
                     info.add(android.text.TextUtils.join("; ", m) + ".");
                 info.add(h.optString("city", "") + ", " + h.optString("state", ""));
-                info.add("yes".equals(h.optString("er")) ? "Emergency room." : "No emergency room listed.");
+                info.add(erWords(h));
                 if (h.optInt("trauma", 0) > 0)
                     info.add("Trauma level " + roman(h.optInt("trauma")) + ".");
                 if (h.optInt("ped", 0) > 0)
                     info.add("Pediatric trauma level " + roman(h.optInt("ped")) + ".");
                 if (h.has("burn"))
                     info.add("Burn center.");
-                if (h.optJSONObject("pad") != null)
-                    info.add("Helipad " + h.optJSONObject("pad").optString("id", "") + ".");
+                // A pad the FAA has not charted carries no id: "Helipad ." said nothing.
+                final JSONObject pad = h.optJSONObject("pad");
+                final String padId = pad == null ? "" : pad.optString("id", "").trim();
+                if (pad != null && pad.optBoolean("charted", false) && !padId.isEmpty())
+                    info.add("Helipad " + padId + ".");
                 found.get("hospital").add(point("hospital", h.optString("name"), h.optDouble("lat"),
                         h.optDouble("lon"), d, area, info));
             }
@@ -914,6 +922,31 @@ public final class Places extends Section {
             if (!w.isEmpty())
                 b.append(b.length() == 0 ? "" : " ").append(Character.toUpperCase(w.charAt(0))).append(w.substring(1));
         return b.toString();
+    }
+
+    /**
+     * The pack's ER field: {@code yes} from CMS and most states; California's HCAI
+     * levels {@code basic}, {@code comprehensive} and {@code standby}. Every
+     * California hospital read "no emergency room" while only {@code yes} counted.
+     */
+    static boolean hasEr(JSONObject h) {
+        final String er = h.optString("er", "").trim().toLowerCase(java.util.Locale.US);
+        return er.equals("yes") || er.equals("basic") || er.equals("comprehensive") || er.equals("standby");
+    }
+
+    static String erWords(JSONObject h) {
+        switch (h.optString("er", "").trim().toLowerCase(java.util.Locale.US)) {
+            case "yes":
+                return "Emergency room.";
+            case "basic":
+                return "Emergency room (basic).";
+            case "comprehensive":
+                return "Emergency room (comprehensive).";
+            case "standby":
+                return "Standby emergency room: a doctor on call, not on site.";
+            default:
+                return "No emergency room listed.";
+        }
     }
 
     private static String roman(int n) {
