@@ -35,6 +35,11 @@ public final class Report {
         public boolean lastTryFailed;
         /** ... and it did not answer because this device had no network. */
         public boolean lastTryOffline;
+        /**
+         * Places a section found, for the map: each {@code {c, n, lat, lon, i}}
+         * (category, name, position, detail lines). Null when it has none.
+         */
+        public JSONArray points;
 
         static Answer loading() {
             final Answer a = new Answer();
@@ -52,6 +57,8 @@ public final class Report {
             final JSONArray l = new JSONArray();
             for (String s : lines)
                 l.put(s);
+            if (points != null)
+                o.put("points", points);
             return o.put("lines", l);
         }
 
@@ -67,6 +74,7 @@ public final class Report {
             a.at = Math.max(0, o.optLong("at", 0));
             a.lastTryFailed = o.optBoolean("lastTryFailed", false);
             a.lastTryOffline = o.optBoolean("lastTryOffline", false);
+            a.points = cleanPoints(o.optJSONArray("points"));
             final JSONArray l = o.optJSONArray("lines");
             if (l != null)
                 for (int i = 0; i < l.length() && i < 200; i++) {
@@ -87,6 +95,8 @@ public final class Report {
     public String label;
     /** This report's own map switch; the Areas switch on the main screen is over all. */
     public boolean onMap = true;
+    /** Place categories switched on for the map (Hospitals, Schools ...). */
+    public final java.util.Set<String> placesOn = new java.util.LinkedHashSet<>();
     /** Section key to answer, in report order. */
     public final Map<String, Answer> answers = new LinkedHashMap<>();
 
@@ -132,6 +142,7 @@ public final class Report {
         if (label != null)
             o.put("label", label);
         o.put("onMap", onMap);
+        o.put("placesOn", new JSONArray(placesOn));
         final JSONObject s = new JSONObject();
         for (Map.Entry<String, Answer> e : answers.entrySet())
             s.put(e.getKey(), e.getValue().toJson());
@@ -150,6 +161,10 @@ public final class Report {
         r.place = text(o.optString("place", null), 80);
         r.label = cleanLabel(o.optString("label", null));
         r.onMap = o.optBoolean("onMap", true);
+        final JSONArray on = o.optJSONArray("placesOn");
+        for (int i = 0; on != null && i < on.length() && i < 20; i++)
+            if (on.optString(i, "").matches("[a-z]{1,20}"))
+                r.placesOn.add(on.optString(i));
         final JSONObject s = o.optJSONObject("sections");
         if (s != null) {
             final java.util.Iterator<String> keys = s.keys();
@@ -170,6 +185,36 @@ public final class Report {
 
     static Answer newLoading() {
         return Answer.loading();
+    }
+
+    /** Saved places, every field checked; at most 3,000. */
+    static JSONArray cleanPoints(JSONArray in) {
+        if (in == null)
+            return null;
+        final JSONArray out = new JSONArray();
+        for (int i = 0; i < in.length() && out.length() < 3000; i++) {
+            final JSONObject p = in.optJSONObject(i);
+            if (p == null)
+                continue;
+            final double lat = p.optDouble("lat", Double.NaN), lon = p.optDouble("lon", Double.NaN);
+            final String c = p.optString("c", "");
+            if (!(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180) || !c.matches("[a-z]{1,20}"))
+                continue;
+            try {
+                final JSONObject q = new JSONObject().put("c", c).put("lat", lat).put("lon", lon)
+                        .put("n", text(p.optString("n", ""), 100) == null ? "Unnamed" : text(p.optString("n", ""), 100));
+                final JSONArray info = p.optJSONArray("i"), ci = new JSONArray();
+                for (int k = 0; info != null && k < info.length() && k < 12; k++) {
+                    final String t = text(info.optString(k, null), 200);
+                    if (t != null)
+                        ci.put(t);
+                }
+                out.put(q.put("i", ci));
+            } catch (JSONException e) {
+                // skip it
+            }
+        }
+        return out;
     }
 
     /** A name as typed: one line, trimmed, at most 60 characters; null when blank. */

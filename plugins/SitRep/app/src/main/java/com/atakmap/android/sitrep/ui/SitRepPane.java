@@ -263,7 +263,17 @@ public final class SitRepPane {
             // Section heads are cyan, the category color of the plugin-ui standard, so
             // Alerts and Structures read as categories and the groups inside as white.
             f.head.setTextColor(a.state == Report.State.LOADING || manager.isRefreshing(r, s.key) ? WORKING : CATEGORY);
-            addLines(f.body, s.key, a.lines);
+            if ("places".equals(s.key) && a.points != null) {
+                placeSwitches(f.body, r, a.points);
+                // The category lists are in the switches' own drop-downs; only the
+                // notes (California only, a source that did not answer) stay as text.
+                final List<String> notes = new ArrayList<>();
+                for (String line : a.lines)
+                    if (!line.startsWith(Section.GROUP) && !line.startsWith("  "))
+                        notes.add(line);
+                addLines(f.body, s.key, notes);
+            } else
+                addLines(f.body, s.key, a.lines);
             if (a.state == Report.State.OK && a.lastTryFailed)
                 f.body.addView(body((a.lastTryOffline ? "No network" : "The last Refresh did not answer")
                         + ", showing what this device saved " + ago(a.at) + ".", 13));
@@ -628,8 +638,29 @@ public final class SitRepPane {
      * (FireCast's {@code fitVisible}).
      */
     private void goTo(Report r) {
+        goTo(r, null);
+    }
+
+    /**
+     * Fits the map to the area and, when a category is given, every place of that
+     * category the report found: the nearest hospital or shelter is often outside the
+     * area (operator, 2026-11-13: "it needs to zoom in on the city or area when i turn
+     * on hospitals").
+     */
+    private void goTo(Report r, String category) {
         try {
             double south = r.area.south, west = r.area.west, north = r.area.north, east = r.area.east;
+            final Report.Answer pa = category == null ? null : r.answer("places");
+            if (pa != null && pa.points != null)
+                for (int i = 0; i < pa.points.length(); i++) {
+                    final org.json.JSONObject p = pa.points.optJSONObject(i);
+                    if (p == null || !category.equals(p.optString("c")))
+                        continue;
+                    south = Math.min(south, p.optDouble("lat", south));
+                    north = Math.max(north, p.optDouble("lat", north));
+                    west = Math.min(west, p.optDouble("lon", west));
+                    east = Math.max(east, p.optDouble("lon", east));
+                }
             final int mw = mapView.getWidth(), mh = mapView.getHeight();
             if (root.isShown() && mw > 0 && mh > 0) {
                 final int pw = root.getWidth(), ph = root.getHeight();
@@ -662,6 +693,53 @@ public final class SitRepPane {
             return reg == null || reg.isPluginLoaded(pkg) || reg.isPluginLoaded(pkg + ".civ");
         } catch (Throwable t) {
             return true;
+        }
+    }
+
+    /**
+     * One row per place category the report found: a tap on the name switches it on
+     * or off on the map (green ON, red OFF, with its count), the arrow opens the list
+     * of its places (operator, 2026-11-13: one row, not a switch and a list apart).
+     */
+    private void placeSwitches(LinearLayout into, final Report r, org.json.JSONArray points) {
+        final java.util.Map<String, List<org.json.JSONObject>> byCat = new java.util.HashMap<>();
+        for (int i = 0; i < points.length(); i++) {
+            final org.json.JSONObject p = points.optJSONObject(i);
+            if (p == null)
+                continue;
+            List<org.json.JSONObject> l = byCat.get(p.optString("c"));
+            if (l == null) {
+                l = new ArrayList<>();
+                byCat.put(p.optString("c"), l);
+            }
+            l.add(p);
+        }
+        for (final String[] c : com.atakmap.android.sitrep.section.Places.CATEGORIES) {
+            final List<org.json.JSONObject> l = byCat.get(c[0]);
+            if (l == null)
+                continue;
+            final Fold fold = new Fold(into, "sitrep.fold.places." + c[0]);
+            setState(fold.head, c[1] + " (" + l.size() + ")", r.placesOn.contains(c[0]));
+            fold.head.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    // No zoom: the operator keeps the view they have (2026-11-13).
+                    manager.setPlaceOn(r, c[0], !r.placesOn.contains(c[0]));
+                }
+            });
+            int shown = 0;
+            for (org.json.JSONObject p : l) {
+                if (++shown > 40) {
+                    fold.body.addView(body("... and " + (l.size() - 40) + " more on the map.", 14));
+                    break;
+                }
+                String where = "";
+                final org.json.JSONArray info = p.optJSONArray("i");
+                if (info != null && info.length() > 0 && info.optString(info.length() - 1).endsWith("of the area."))
+                    where = ", " + info.optString(info.length() - 1).replace(" of the area.", "");
+                fold.body.addView(body(p.optString("n") + where, 14));
+            }
+            fold.show();
         }
     }
 

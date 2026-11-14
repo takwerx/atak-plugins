@@ -78,6 +78,8 @@ public abstract class Section {
          * state}): a different fact from "none found".
          */
         public boolean notPublishedHere;
+        /** Places for the map, as {@link com.atakmap.android.sitrep.Report.Answer#points}. */
+        public org.json.JSONArray points;
 
         public Result(String value, String summary) {
             this.value = value;

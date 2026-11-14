@@ -74,6 +74,7 @@ public final class SitRepManager {
 
     public SitRepManager(MapView mapView) {
         this.pick = new com.atakmap.android.sitrep.MapPick(mapView);
+        this.places = new PlaceLayer(mapView);
         this.mapView = mapView;
         this.prefs = mapView.getContext().getSharedPreferences("sitrep", Context.MODE_PRIVATE);
         this.root = FileSystemUtils.getItem("tools/sitrep");
@@ -90,6 +91,7 @@ public final class SitRepManager {
 
     /** Reads the saved reports on a worker; nothing slow on main at plugin start. */
     public void start() {
+        places.start();
         disk.execute(new Runnable() {
             @Override
             public void run() {
@@ -111,6 +113,7 @@ public final class SitRepManager {
                         reports.addAll(fromDisk);
                         loaded = true;
                         outlines.sync(reports, areasVisible());
+                        places.sync(reports);
                         changed();
                     }
                 });
@@ -121,6 +124,7 @@ public final class SitRepManager {
     public void stop() {
         stopped = true;
         pick.cancel();
+        places.stop();
         if (picker != null) {
             picker.dispose();
             picker = null;
@@ -304,6 +308,22 @@ public final class SitRepManager {
         });
     }
 
+    /** Places switched on for the map, every report's. */
+    public final PlaceLayer places;
+
+    /** One place category on or off on the map, for one report. */
+    public void setPlaceOn(Report r, String category, boolean on) {
+        if (!reports.contains(r))
+            return;
+        if (on)
+            r.placesOn.add(category);
+        else
+            r.placesOn.remove(category);
+        save(r);
+        places.sync(reports);
+        changed();
+    }
+
     /** The place pick and the shape pick share one map tap. */
     public final com.atakmap.android.sitrep.MapPick pick;
 
@@ -431,11 +451,14 @@ public final class SitRepManager {
                 a.value = got.value;
                 a.summary = got.summary;
                 a.lines.addAll(got.lines);
+                a.points = got.points;
                 a.at = System.currentTimeMillis();
             }
             r.answers.put(s.key, a);
         }
         save(r);
+        if ("places".equals(s.key))
+            places.sync(reports);
         changed();
     }
 
@@ -503,6 +526,7 @@ public final class SitRepManager {
         });
         saveIndex();
         outlines.sync(reports, areasVisible());
+        places.sync(reports);
         changed();
     }
 

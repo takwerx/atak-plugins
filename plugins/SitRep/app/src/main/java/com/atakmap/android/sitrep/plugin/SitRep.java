@@ -145,6 +145,20 @@ public class SitRep implements IPlugin {
         tapOpensReport = new com.atakmap.android.menu.MapMenuEventListener() {
             @Override
             public boolean onShowMenu(MapItem item) {
+                if (item != null && item.getMetaBoolean("sitrep_place", false)) {
+                    // A place from a report: its details, nothing to edit or send.
+                    final String title = item.getMetaString("title", "Place");
+                    final String details = item.getMetaString("sitrep_details", "");
+                    mapView.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            new android.app.AlertDialog.Builder(mapView.getContext())
+                                    .setTitle(title).setMessage(details)
+                                    .setPositiveButton("OK", null).show();
+                        }
+                    });
+                    return true;
+                }
                 final String id = AreaOutlines.reportOf(item);
                 if (id == null || manager == null || manager.find(id) == null)
                     return false;
