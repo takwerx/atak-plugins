@@ -187,12 +187,12 @@ public final class Report {
         return Answer.loading();
     }
 
-    /** Saved places, every field checked; at most 3,000. */
+    /** Saved places, every field checked; at most 12,000 (500 a category). */
     static JSONArray cleanPoints(JSONArray in) {
         if (in == null)
             return null;
         final JSONArray out = new JSONArray();
-        for (int i = 0; i < in.length() && out.length() < 3000; i++) {
+        for (int i = 0; i < in.length() && out.length() < 12_000; i++) {
             final JSONObject p = in.optJSONObject(i);
             if (p == null)
                 continue;

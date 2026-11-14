@@ -31,10 +31,17 @@ public final class Places extends Section {
     /** Category key, name on the switch, letter on the map icon, icon color. */
     public static final String[][] CATEGORIES = {
             { "hospital", "Hospitals", "H", "#D32F2F" },
+            { "urgent", "Urgent care", "U", "#D32F2F" },
             { "school", "Schools", "S", "#F9A825" },
             { "care", "Nursing and care homes", "N", "#7B1FA2" },
             { "dialysis", "Dialysis", "D", "#1565C0" },
             { "shelter", "Shelters", "+", "#2E7D32" },
+            { "animal", "Animal shelters", "A", "#6D4C41" },
+            { "fair", "Fairgrounds and rodeo", "F", "#AD1457" },
+            { "equestrian", "Equestrian centers", "E", "#5D4037" },
+            { "pharmacy", "Pharmacies", "R", "#2E7D32" },
+            { "grocery", "Groceries", "G", "#558B2F" },
+            { "fuel", "Fuel", "F", "#37474F" },
             { "airport", "Airports", "A", "#263238" },
             { "heliport", "Heliports", "H", "#000000" },
             { "fire", "Fire stations", "F", "#C62828" },
@@ -57,6 +64,9 @@ public final class Places extends Section {
     static final String NUCLEAR = "https://gis.fema.gov/arcgis/rest/services/Partner/Nuclear_Plant_Power_Reactor_Status/FeatureServer/0";
     static final String DAMS = "https://geospatial.sec.usace.army.mil/dls/rest/services/NID/National_Inventory_of_Dams_Public_Service/FeatureServer/0";
     static final String RMP = "https://services.arcgis.com/cJ9YHowT8TU7DUyn/arcgis/rest/services/FRS_INTERESTS_RMP/FeatureServer/0";
+    static final String PACK = "https://mapdepot.takwerx.org/sitrep/places/";
+    /** Most places kept per category, nearest first, so fuel cannot crowd out the rest. */
+    static final int PER_CATEGORY = 500;
     static final String NSS_OPEN = "https://gis.fema.gov/arcgis/rest/services/NSS/OpenShelters/FeatureServer/0";
 
     public Places() {
@@ -64,7 +74,9 @@ public final class Places extends Section {
                 "Hospitals: takwerx IWI pack (CMS, HHS, HIFLD, state lists, FAA). Schools: USGS National Map. "
                         + "Care homes and dialysis: California CDPH licensed facilities. Shelters: FEMA National Shelter System. Airports and heliports: BTS NTAD Aviation Facilities (FAA data). "
                         + "Fire and police: USGS National Map. Power plants: CEC (California), EPA (elsewhere). "
-                        + "Nuclear: FEMA/NRC. Dams: USACE National Inventory of Dams. Chemical: EPA RMP.");
+                        + "Nuclear: FEMA/NRC. Dams: USACE National Inventory of Dams. Chemical: EPA RMP. "
+                        + "Animal shelters, fairgrounds, equestrian centers, pharmacies, groceries, fuel and urgent care: "
+                        + "Overture Maps Foundation places (CDLA-Permissive-2.0; Foursquare rows Apache-2.0).");
     }
 
     @Override
@@ -215,6 +227,7 @@ public final class Places extends Section {
             missing.add("airports");
         }
         infrastructure(area, nearbyMiles, reach, found, missing);
+        pack(area, reach, found, missing);
         if (failures >= 3 && missing.contains("hospitals") && missing.contains("schools") && missing.contains("shelters"))
             throw new java.io.IOException("no place source answered");
 
@@ -229,13 +242,14 @@ public final class Places extends Section {
                     return Double.compare(a.optDouble("_d", 0), b.optDouble("_d", 0));
                 }
             });
+            while (l.size() > PER_CATEGORY)
+                l.remove(l.size() - 1);
             total += l.size();
             if (!l.isEmpty() && head.length() < 70)
                 head.append(head.length() == 0 ? "" : ", ").append(l.size()).append(' ')
                         .append(c[1].toLowerCase(Locale.US));
             for (JSONObject p : l)
-                if (points.length() < 3000)
-                    points.put(p);
+                points.put(p);
         }
         final Result r = new Result(total == 0 ? "None found" : head.toString(), null);
         r.points = points;
@@ -385,6 +399,61 @@ public final class Places extends Section {
         } catch (Exception e) {
             missing.add("chemical facilities");
         }
+    }
+
+    /**
+     * Animal shelters, fairgrounds and rodeo grounds, equestrian centers, pharmacies,
+     * groceries, fuel and urgent care: our pack from Overture Maps Places, in 2-degree
+     * tiles (tools/build_places_pack.py), within Nearby.
+     */
+    private static void pack(Area area, double reach, Map<String, List<JSONObject>> found, List<String> missing) {
+        try {
+            final JSONObject manifest = new JSONObject(Http.get(PACK + "places.json"));
+            final JSONObject tiles = manifest.optJSONObject("tiles");
+            final int step = Math.max(1, Math.min(10, manifest.optInt("tile_degrees", 2)));
+            if (tiles == null)
+                throw new java.io.IOException("no tiles in the places manifest");
+            final double padLat = reach / 111_320d, padLon = reach / (111_320d
+                    * Math.max(0.2, Math.cos(Math.toRadians((area.south + area.north) / 2))));
+            final int s0 = floor(area.south - padLat, step), s1 = floor(area.north + padLat, step);
+            final int w0 = floor(area.west - padLon, step), w1 = floor(area.east + padLon, step);
+            for (int lat = s0; lat <= s1; lat += step)
+                for (int lon = w0; lon <= w1; lon += step) {
+                    final String key = lat + "_" + lon;
+                    if (!tiles.has(key))
+                        continue;
+                    final JSONArray rows = new JSONArray(Http.getGzip(PACK + "tiles/" + key + ".json.gz"));
+                    for (int i = 0; i < rows.length(); i++) {
+                        final JSONArray x = rows.optJSONArray(i);
+                        if (x == null || x.length() < 8)
+                            continue;
+                        final String cat = x.optString(0, "");
+                        final List<JSONObject> into = found.get(cat);
+                        if (into == null)
+                            continue;
+                        final double plat = x.optDouble(2, Double.NaN), plon = x.optDouble(3, Double.NaN);
+                        if (!(Math.abs(plat) <= 90) || !(Math.abs(plon) <= 180))
+                            continue;
+                        final double d = area.distanceMeters(plat, plon);
+                        if (d > reach)
+                            continue;
+                        final List<String> info = new ArrayList<>();
+                        info.add(join(x.optString(4, ""), x.optString(5, ""), x.optString(6, "")));
+                        final String phone = x.optString(7, "").replaceAll("[^0-9]", "");
+                        if (phone.length() == 11 && phone.startsWith("1"))
+                            info.add(String.format("(%s) %s-%s", phone.substring(1, 4), phone.substring(4, 7), phone.substring(7)));
+                        else if (phone.length() == 10)
+                            info.add(String.format("(%s) %s-%s", phone.substring(0, 3), phone.substring(3, 6), phone.substring(6)));
+                        into.add(point(cat, x.optString(1, ""), plat, plon, d, area, info));
+                    }
+                }
+        } catch (Exception e) {
+            missing.add("animal shelters, fairgrounds and stores");
+        }
+    }
+
+    private static int floor(double v, int step) {
+        return (int) (Math.floor(v / step) * step);
     }
 
     /** CEC and EIA energy source codes in words. */
