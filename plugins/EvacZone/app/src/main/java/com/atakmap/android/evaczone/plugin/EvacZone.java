@@ -2,7 +2,9 @@ package com.atakmap.android.evaczone.plugin;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.BroadcastReceiver;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.graphics.Color;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
@@ -19,6 +21,8 @@ import com.atak.plugins.impl.PluginLayoutInflater;
 import com.atakmap.android.evaczone.Catalog;
 import com.atakmap.android.evaczone.ZoneLayer;
 import com.atakmap.android.evaczone.ZoneManager;
+import com.atakmap.android.ipc.AtakBroadcast;
+import com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoPoint;
@@ -54,11 +58,14 @@ public class EvacZone implements IPlugin {
     private static final String TAG = "EvacZone";
     /** Key for the plugin's entry in ATAK's Tool Preferences. */
     private static final String PREFS_KEY = "evaczonePreference";
+    /** System broadcast that opens the pane, so other plugins (Sit Rep) can open it. */
+    public static final String ACTION_SHOW = "com.atakmap.android.evaczone.SHOW";
 
     IServiceController serviceController;
     Context pluginContext;
     IHostUIService uiService;
     ToolbarItem toolbarItem;
+    private BroadcastReceiver showReceiver;
     Pane pane;
     View paneView;
     ZoneManager manager;
@@ -110,6 +117,31 @@ public class EvacZone implements IPlugin {
             manager.start();
         }
         registerPreferences();
+        registerShowReceiver();
+    }
+
+    /** Open the pane on ACTION_SHOW, the same way the toolbar button does. */
+    private void registerShowReceiver() {
+        if (showReceiver != null)
+            return;
+        showReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (mapView == null) {
+                    showPane();
+                    return;
+                }
+                mapView.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        showPane();
+                    }
+                });
+            }
+        };
+        final DocumentedIntentFilter sf = new DocumentedIntentFilter();
+        sf.addAction(ACTION_SHOW, "Open the Evac Zone pane");
+        AtakBroadcast.getInstance().registerSystemReceiver(showReceiver, sf);
     }
 
     /**
@@ -148,6 +180,14 @@ public class EvacZone implements IPlugin {
 
     @Override
     public void onStop() {
+        if (showReceiver != null) {
+            try {
+                AtakBroadcast.getInstance().unregisterSystemReceiver(showReceiver);
+            } catch (Exception e) {
+                Log.w(TAG, "unregistering the show receiver failed", e);
+            }
+            showReceiver = null;
+        }
         // Close our pane: ATAK keeps a plugin's pane on screen across a reload, and a
         // pane whose buttons point at a stopped instance does nothing when tapped.
         if (pane != null && uiService != null) {
