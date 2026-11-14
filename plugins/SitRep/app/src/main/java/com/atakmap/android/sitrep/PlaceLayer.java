@@ -143,7 +143,7 @@ public final class PlaceLayer {
         // A snapshot taken on main; the store work is on the worker.
         final Map<String, JSONArray> byCat = new HashMap<>();
         for (Report r : reports) {
-            if (r.placesOn.isEmpty())
+            if (r.placesOn.isEmpty() || !r.onMap)
                 continue;
             final Report.Answer a = r.answer("places");
             if (a == null || a.points == null)

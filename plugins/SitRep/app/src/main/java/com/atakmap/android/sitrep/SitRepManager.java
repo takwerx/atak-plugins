@@ -377,7 +377,13 @@ public final class SitRepManager {
             r.placesOn.add(category);
         else
             r.placesOn.remove(category);
+        // A layer switched on in a report that is off the map would draw nothing.
+        final boolean wasOff = on && !r.onMap;
+        if (wasOff)
+            r.onMap = true;
         save(r);
+        if (wasOff)
+            outlines.sync(reports, areasVisible());
         places.sync(reports);
         changed();
     }
@@ -567,6 +573,9 @@ public final class SitRepManager {
         r.onMap = on;
         save(r);
         outlines.sync(reports, areasVisible());
+        // Off takes everything of this report off the map; its place switches are
+        // kept, so On brings back the same layers (operator, 2026-11-13).
+        places.sync(reports);
         changed();
     }
 
