@@ -30,8 +30,8 @@ public final class Esri {
         final StringBuilder group = new StringBuilder();
         for (String f : fields)
             group.append(group.length() == 0 ? "" : ",").append(f);
-        final String form = "f=json"
-                + "&where=" + enc(where == null ? "1=1" : where)
+        final String form = "where=" + enc(where == null ? "1=1" : where)
+                + "&f=json"
                 + area.esriQueryForm()
                 + "&groupByFieldsForStatistics=" + enc(group.toString())
                 + "&outStatistics=" + enc("[{\"statisticType\":\"count\",\"onStatisticField\":\"OBJECTID\","
@@ -48,8 +48,8 @@ public final class Esri {
 
     /** How many features inside the area match. */
     public static int count(String layer, String where, Area area) throws IOException {
-        final String form = "f=json&returnCountOnly=true"
-                + "&where=" + enc(where == null ? "1=1" : where)
+        final String form = "where=" + enc(where == null ? "1=1" : where)
+                + "&f=json&returnCountOnly=true"
                 + area.esriQueryForm();
         final JSONObject o = parse(Http.post(layer + "/query", form));
         if (!o.has("count"))
@@ -60,8 +60,8 @@ public final class Esri {
     /** The attributes of every feature inside the area that matches; no geometry. */
     public static List<JSONObject> attributes(String layer, String where, Area area, String outFields)
             throws IOException {
-        final String form = "f=json&returnGeometry=false"
-                + "&where=" + enc(where == null ? "1=1" : where)
+        final String form = "where=" + enc(where == null ? "1=1" : where)
+                + "&f=json&returnGeometry=false"
                 + "&outFields=" + enc(outFields)
                 + area.esriQueryForm();
         final JSONArray feats = features(Http.post(layer + "/query", form));
@@ -80,8 +80,8 @@ public final class Esri {
      */
     public static List<JSONObject> points(String layer, String where, Area area, String outFields,
             int nearbyMiles) throws IOException {
-        final String form = "f=json&returnGeometry=true&outSR=4326"
-                + "&where=" + enc(where == null ? "1=1" : where)
+        final String form = "where=" + enc(where == null ? "1=1" : where)
+                + "&f=json&returnGeometry=true&outSR=4326"
                 + "&outFields=" + enc(outFields)
                 + area.esriQueryForm()
                 + (nearbyMiles > 0 ? "&distance=" + nearbyMiles + "&units=esriSRUnit_StatuteMile" : "");
@@ -113,8 +113,8 @@ public final class Esri {
      */
     public static List<JSONObject> areas(String layer, String where, Area area, String outFields,
             int nearbyMiles) throws IOException {
-        final String form = "f=json&returnGeometry=true&returnCentroid=true&outSR=4326&maxAllowableOffset=0.0005"
-                + "&where=" + enc(where == null ? "1=1" : where)
+        final String form = "where=" + enc(where == null ? "1=1" : where)
+                + "&f=json&returnGeometry=true&returnCentroid=true&outSR=4326&maxAllowableOffset=0.0005"
                 + "&outFields=" + enc(outFields)
                 + area.esriQueryForm()
                 + (nearbyMiles > 0 ? "&distance=" + nearbyMiles + "&units=esriSRUnit_StatuteMile" : "");
@@ -159,8 +159,8 @@ public final class Esri {
         final String env = String.format(java.util.Locale.US,
                 "{\"xmin\":%.6f,\"ymin\":%.6f,\"xmax\":%.6f,\"ymax\":%.6f,\"spatialReference\":{\"wkid\":4326}}",
                 area.west - dLon, area.south - dLat, area.east + dLon, area.north + dLat);
-        final String form = "f=json&returnGeometry=true&outSR=4326"
-                + "&where=" + enc(where == null ? "1=1" : where)
+        final String form = "where=" + enc(where == null ? "1=1" : where)
+                + "&f=json&returnGeometry=true&outSR=4326"
                 + "&outFields=" + enc(outFields)
                 + "&geometry=" + enc(env) + "&geometryType=esriGeometryEnvelope&inSR=4326"
                 + "&spatialRel=esriSpatialRelIntersects";
@@ -191,8 +191,8 @@ public final class Esri {
      */
     public static List<JSONObject> lines(String layer, String where, Area area, String outFields)
             throws IOException {
-        final String form = "f=json&returnGeometry=true&outSR=4326&maxAllowableOffset=0.0002"
-                + "&where=" + enc(where == null ? "1=1" : where)
+        final String form = "where=" + enc(where == null ? "1=1" : where)
+                + "&f=json&returnGeometry=true&outSR=4326&maxAllowableOffset=0.0002"
                 + "&outFields=" + enc(outFields)
                 + area.esriQueryForm();
         final JSONArray feats = features(Http.post(layer + "/query", form));
@@ -234,6 +234,11 @@ public final class Esri {
         }
     }
 
+    /**
+     * Form-encodes a value. Every query puts "where" first in its body: the USGS
+     * firewall answers 403 to a POST whose where clause carries UPPER(...) or LIKE
+     * after another parameter, and passes the same clause first (2026-11-13).
+     */
     public static String enc(String s) {
         try {
             return URLEncoder.encode(s, "UTF-8");

@@ -351,6 +351,14 @@ public final class Places extends Section {
             } catch (Exception e) {
                 missing.add(st[2]);
             }
+        // Rural areas: no police station in reach (Bayview, Idaho, 2026-11-13). Who comes
+        // matters more than "none": the nearest station and the county sheriff, however far.
+        if (found.get("police").isEmpty() && !missing.contains("police"))
+            try {
+                farPolice(area, found.get("police"));
+            } catch (Exception e) {
+                missing.add("police");
+            }
 
         // Power plants: California's CEC list (it splits battery storage out and lists
         // retired plants, which are left out); EPA's national list elsewhere.
@@ -702,6 +710,51 @@ public final class Places extends Section {
 
     private static int floor(double v, int step) {
         return (int) (Math.floor(v / step) * step);
+    }
+
+    /** The nearest police station within 50 mi, and the sheriff of the county at the area's center. */
+    private static void farPolice(Area area, List<JSONObject> into) throws Exception {
+        final List<JSONObject> wide = Esri.points(USGS + "18", "1=1", area, "name,address,city,state", 50);
+        JSONObject nearest = null;
+        double best = Double.MAX_VALUE;
+        for (JSONObject a : wide) {
+            final double d = area.distanceMeters(a.optDouble("_lat"), a.optDouble("_lon"));
+            if (d < best) {
+                best = d;
+                nearest = a;
+            }
+        }
+        // The county from Census at the area's center: "Kootenai County, ID".
+        String county = null;
+        for (com.atakmap.android.sitrep.net.Places.Place p : com.atakmap.android.sitrep.net.Places.at(
+                new com.atakmap.coremap.maps.coords.GeoPoint((area.south + area.north) / 2, (area.west + area.east) / 2))) {
+            final java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("^(.+? (?:County|Parish|Borough)), [A-Z]{2}$").matcher(p.label);
+            if (m.matches()) {
+                county = m.group(1);
+                break;
+            }
+        }
+        JSONObject sheriff = null;
+        if (county != null && county.matches("[A-Za-z .'-]+")) {
+            final String like = county.toUpperCase(Locale.US).replace("'", "''");
+            for (JSONObject a : Esri.points(USGS + "18", "UPPER(name) LIKE '" + like + " SHERIFF%'", area,
+                    "name,address,city,state", 150)) {
+                if (sheriff == null || area.distanceMeters(a.optDouble("_lat"), a.optDouble("_lon"))
+                        < area.distanceMeters(sheriff.optDouble("_lat"), sheriff.optDouble("_lon")))
+                    sheriff = a;
+            }
+        }
+        for (JSONObject a : new JSONObject[] { sheriff, nearest }) {
+            if (a == null || (a == nearest && sheriff != null && a.optString("name").equals(sheriff.optString("name"))))
+                continue;
+            final double d = area.distanceMeters(a.optDouble("_lat"), a.optDouble("_lon"));
+            final List<String> info = new ArrayList<>();
+            info.add(a == sheriff ? "The sheriff of " + county + "; no police station within Nearby."
+                    : "The nearest police station; none within Nearby.");
+            info.add(join(a.optString("address", ""), a.optString("city", ""), a.optString("state", "")));
+            into.add(point("police", a.optString("name"), a.optDouble("_lat"), a.optDouble("_lon"), d, area, info));
+        }
     }
 
     /** MIRTA's reporting component in words. */
