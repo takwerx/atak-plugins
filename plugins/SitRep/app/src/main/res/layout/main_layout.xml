@@ -90,6 +90,19 @@
         android:orientation="vertical"
         android:visibility="gone">
 
+        <!-- The report's name across the top, the controls under it
+             (operator, 2026-11-14). -->
+        <TextView
+            android:id="@+id/report_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/white"
+            android:maxLines="2"
+            android:ellipsize="end" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -100,30 +113,28 @@
             <Button
                 android:id="@+id/btn_report_back"
                 style="@style/TakwerxButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:minWidth="90dp"
-                android:text="@string/back" />
-
-            <TextView
-                android:id="@+id/report_title"
                 android:layout_width="0dp"
                 android:layout_weight="1"
                 android:layout_height="wrap_content"
-                android:layout_marginLeft="12dp"
-                android:textSize="17sp"
-                android:textStyle="bold"
-                android:textColor="@color/white"
-                android:maxLines="2"
-                android:ellipsize="end" />
+                android:text="@string/back" />
 
             <Button
                 android:id="@+id/btn_report_rename"
                 style="@style/TakwerxButton"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="wrap_content"
                 android:layout_marginLeft="6dp"
                 android:text="@string/rename" />
+
+            <Button
+                android:id="@+id/btn_report_settings"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="6dp"
+                android:text="@string/settings" />
 
             <ImageButton
                 android:id="@+id/btn_wide_report"

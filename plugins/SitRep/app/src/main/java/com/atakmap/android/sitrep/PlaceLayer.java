@@ -255,6 +255,31 @@ public final class PlaceLayer {
                             if (xy != null)
                                 edge.addPoint(xy.optDouble(0), xy.optDouble(1));
                         }
+                        if ("nuclear".equals(c[0])) {
+                            // The emergency planning zones: 10 mi red, 50 mi amber, each
+                            // labeled at its top and explained on a tap (operator, 2026-11-14).
+                            final boolean plume = k == 0;
+                            final String zone = plume ? "10 mi plume zone" : "50 mi ingestion zone";
+                            final long rfid = store.insertFeature(new Feature(set, name + ": " + zone, edge,
+                                    new com.atakmap.map.layer.feature.style.CompositeStyle(new com.atakmap.map.layer.feature.style.Style[] {
+                                            new com.atakmap.map.layer.feature.style.BasicStrokeStyle(0xFF101010, plume ? 5.5f : 5f),
+                                            new com.atakmap.map.layer.feature.style.BasicStrokeStyle(plume ? 0xFFFF5252 : 0xFFFFC400,
+                                                    plume ? 3f : 2.5f) }),
+                                    attrs));
+                            final String meaning = plume ? Places.PLUME_ZONE : Places.INGESTION_ZONE;
+                            details.put(rfid, new String[] { name + ": " + zone, meaning });
+                            final JSONArray top = ring.optJSONArray(0);
+                            if (top != null) {
+                                final long lfid = store.insertFeature(new Feature(set, zone,
+                                        new Point(top.optDouble(0), top.optDouble(1)),
+                                        new com.atakmap.map.layer.feature.style.LabelPointStyle(zone,
+                                                plume ? 0xFFFF5252 : 0xFFFFC400, 0xC0000000,
+                                                com.atakmap.map.layer.feature.style.LabelPointStyle.ScrollMode.DEFAULT),
+                                        attrs));
+                                details.put(lfid, new String[] { name + ": " + zone, meaning });
+                            }
+                            continue;
+                        }
                         final long efid = store.insertFeature(new Feature(set, name, edge,
                                 new com.atakmap.map.layer.feature.style.CompositeStyle(new com.atakmap.map.layer.feature.style.Style[] {
                                         new com.atakmap.map.layer.feature.style.BasicStrokeStyle(0xFF1B1F10, 5f),

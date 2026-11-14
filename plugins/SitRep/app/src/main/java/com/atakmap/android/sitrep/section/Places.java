@@ -436,11 +436,18 @@ public final class Places extends Section {
                 final JSONObject a = e.getValue();
                 final double d = area.distanceMeters(a.optDouble("_lat"), a.optDouble("_lon"));
                 final List<String> info = new ArrayList<>(reactors.get(e.getKey()));
-                info.add(d <= 16_093 ? "The area is inside its 10-mile emergency planning zone."
-                        : "The area is inside its 50-mile ingestion planning zone.");
+                info.add(d <= RING_10_MI ? "The area is inside its 10-mile plume zone."
+                        : "The area is inside its 50-mile ingestion zone.");
+                info.add(PLUME_ZONE);
+                info.add(INGESTION_ZONE);
                 info.add("Operator: " + a.optString("owner_operator", "") + ".");
-                found.get("nuclear").add(point("nuclear", e.getKey(), a.optDouble("_lat"),
-                        a.optDouble("_lon"), d, area, info));
+                final JSONObject pt = point("nuclear", e.getKey(), a.optDouble("_lat"),
+                        a.optDouble("_lon"), d, area, info);
+                // The two emergency planning zones as rings on the map (operator,
+                // 2026-11-14), the 10-mile first; PlaceLayer labels and explains them.
+                pt.put("g", new JSONArray().put(circle(a.optDouble("_lat"), a.optDouble("_lon"), RING_10_MI))
+                        .put(circle(a.optDouble("_lat"), a.optDouble("_lon"), RING_50_MI)));
+                found.get("nuclear").add(pt);
             }
         } catch (Exception e) {
             missing.add("nuclear plants");
@@ -849,6 +856,30 @@ public final class Places extends Section {
             case "OBG": case "WDS": case "BIO": return "Biomass";
             default: return code == null || code.isEmpty() ? "Power plant" : "Fuel " + code;
         }
+    }
+
+    /** NRC emergency planning zones (10 CFR 50.47(c)(2)): about 10 and 50 miles. */
+    public static final double RING_10_MI = 16_093.44, RING_50_MI = 80_467.2;
+    /** What the rings mean, in the plant's details and on a tap on a ring. */
+    public static final String PLUME_ZONE = "10-mile plume zone (NRC emergency planning zone): after a release, "
+            + "people inside may be told to shelter in place or evacuate, and to take potassium iodide. "
+            + "Sirens and evacuation routes cover this zone. The state plan sets the exact line.";
+    public static final String INGESTION_ZONE = "50-mile ingestion zone (NRC emergency planning zone): after a release, "
+            + "food, water, milk and crops inside may be tested, held or stopped. People are not usually moved.";
+
+    /** A circle of {@code meters} around a point, as [[lon, lat], ...], closed, 96 sides. */
+    private static JSONArray circle(double lat, double lon, double meters) throws Exception {
+        final JSONArray ring = new JSONArray();
+        final double r = meters / 6_371_008.8, la = Math.toRadians(lat), lo = Math.toRadians(lon);
+        for (int k = 0; k <= 96; k++) {
+            final double b = Math.toRadians(k * 360.0 / 96);
+            final double la2 = Math.asin(Math.sin(la) * Math.cos(r) + Math.cos(la) * Math.sin(r) * Math.cos(b));
+            final double lo2 = lo + Math.atan2(Math.sin(b) * Math.sin(r) * Math.cos(la),
+                    Math.cos(r) - Math.sin(la) * Math.sin(la2));
+            ring.put(new JSONArray().put(Math.round(Math.toDegrees(lo2) * 1e6) / 1e6)
+                    .put(Math.round(Math.toDegrees(la2) * 1e6) / 1e6));
+        }
+        return ring;
     }
 
     private static JSONObject point(String c, String name, double lat, double lon, double d, Area area,

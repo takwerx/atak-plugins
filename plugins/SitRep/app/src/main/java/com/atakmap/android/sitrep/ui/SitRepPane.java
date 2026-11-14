@@ -58,6 +58,9 @@ public final class SitRepPane {
     private final ScrollView reportScroll;
     /** The place a radial's Details asked for: its row is marked and scrolled to once. */
     private String focusKey;
+    /** The report the Settings page was opened from: its Back goes there. */
+    private String settingsFrom;
+    private int settingsFromY;
     private View focusRow;
     private final Adapter adapter = new Adapter();
     private List<Report> shown = new ArrayList<>();
@@ -123,7 +126,33 @@ public final class SitRepPane {
         root.findViewById(R.id.btn_settings_back).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                showMain();
+                // Back to the report Settings was opened from, if any.
+                final String back = settingsFrom;
+                final int y = settingsFromY;
+                settingsFrom = null;
+                if (back != null && manager.find(back) != null) {
+                    showReport(back);
+                    // Where the operator was in the report, not its top.
+                    reportScroll.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            reportScroll.scrollTo(0, y);
+                        }
+                    }, 60);
+                } else
+                    showMain();
+            }
+        });
+        root.findViewById(R.id.btn_report_settings).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Settings from inside a report, so the places zoom can be changed
+                // without leaving it (operator, 2026-11-14).
+                final String from = openId;
+                final int y = reportScroll.getScrollY();
+                showSettings();
+                settingsFrom = from;
+                settingsFromY = y;
             }
         });
         root.findViewById(R.id.btn_report_back).setOnClickListener(new View.OnClickListener() {
@@ -190,6 +219,7 @@ public final class SitRepPane {
     public void showMain() {
         openId = null;
         focusKey = null;
+        settingsFrom = null;
         settingsPage.setVisibility(View.GONE);
         reportPage.setVisibility(View.GONE);
         list.setVisibility(View.VISIBLE);
@@ -197,6 +227,7 @@ public final class SitRepPane {
     }
 
     private void showSettings() {
+        settingsFrom = null;
         openId = null;
         list.setVisibility(View.GONE);
         reportPage.setVisibility(View.GONE);
