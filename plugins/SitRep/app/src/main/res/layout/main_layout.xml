@@ -110,39 +110,40 @@
             android:gravity="center_vertical"
             android:layout_marginTop="6dp">
 
-            <Button
+            <ImageButton
                 android:id="@+id/btn_report_back"
-                style="@style/TakwerxButton"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="@string/back" />
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/back"
+                android:src="@drawable/ic_back_arrow" />
 
-            <Button
+            <ImageButton
+                android:id="@+id/btn_report_goto"
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/go_to" />
+
+            <ImageButton
+                android:id="@+id/btn_report_refresh"
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/refresh" />
+
+            <ImageButton
+                android:id="@+id/btn_report_delete"
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/delete" />
+
+            <ImageButton
                 android:id="@+id/btn_report_rename"
-                style="@style/TakwerxButton"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="6dp"
-                android:text="@string/rename" />
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/rename" />
 
-            <Button
+            <ImageButton
                 android:id="@+id/btn_report_settings"
-                style="@style/TakwerxButton"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="6dp"
-                android:text="@string/settings" />
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/settings" />
 
             <ImageButton
                 android:id="@+id/btn_wide_report"
                 style="@style/TakwerxIconButton"
-                android:layout_width="48dp"
-                android:layout_weight="0"
-                android:layout_marginLeft="6dp"
-                android:layout_marginRight="0dp"
                 android:contentDescription="@string/wide"
                 android:src="@drawable/ic_wide" />
         </LinearLayout>
@@ -176,38 +177,6 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical" />
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginTop="14dp">
-
-                    <Button
-                        android:id="@+id/btn_report_goto"
-                        style="@style/TakwerxButton"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:text="@string/go_to" />
-
-                    <Button
-                        android:id="@+id/btn_report_refresh"
-                        style="@style/TakwerxButton"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:layout_marginLeft="6dp"
-                        android:text="@string/refresh" />
-
-                    <Button
-                        android:id="@+id/btn_report_delete"
-                        style="@style/TakwerxButton"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:layout_marginLeft="6dp"
-                        android:text="@string/delete" />
-                </LinearLayout>
             </LinearLayout>
         </ScrollView>
     </LinearLayout>

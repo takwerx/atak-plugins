@@ -97,6 +97,7 @@ public final class SitRepManager {
         places.start();
         mapView.addOnMapMovedListener(moved);
         main.post(gateTick);
+        main.postDelayed(callsTick, CALLS_EVERY_MS);
         disk.execute(new Runnable() {
             @Override
             public void run() {
@@ -130,6 +131,7 @@ public final class SitRepManager {
         stopped = true;
         mapView.removeOnMapMovedListener(moved);
         main.removeCallbacks(gateTick);
+        main.removeCallbacks(callsTick);
         pick.cancel();
         places.stop();
         if (picker != null) {
@@ -473,6 +475,39 @@ public final class SitRepManager {
      * Fetches one section on a worker. A failure touches this section alone; a failed
      * refresh keeps the answer it had and says how old that is (PLAN section 3).
      */
+    /** How often 911 calls on the map are fetched again: the feeds update every 5 min. */
+    private static final long CALLS_EVERY_MS = 5L * 60 * 1000;
+
+    /**
+     * Every 5 minutes, the 911 calls of each report showing them on the map, whether
+     * or not the pane is open (operator, 2026-11-14). Only that section; it lives with
+     * the manager, so it outlasts the pane and any tool.
+     */
+    private final Runnable callsTick = new Runnable() {
+        @Override
+        public void run() {
+            if (stopped)
+                return;
+            Section calls = null;
+            for (Section s : Sections.all())
+                if ("calls".equals(s.key))
+                    calls = s;
+            for (Report r : new ArrayList<>(reports)) {
+                if (calls == null || !r.onMap || !r.placesOn.contains("calls"))
+                    continue;
+                final Report.Answer a = r.answer("calls");
+                if (a == null || a.state == Report.State.LOADING || isRefreshing(r, "calls"))
+                    continue;
+                if (a.state == Report.State.OK)
+                    refreshing.add(r.id + "/calls");
+                else
+                    r.answers.put("calls", Report.newLoading());
+                SitRepManager.this.run(r, calls);
+            }
+            main.postDelayed(this, CALLS_EVERY_MS);
+        }
+    };
+
     private void run(final Report r, final Section s) {
         final int nearby = nearbyMiles();
         fetch.execute(new Runnable() {
@@ -522,7 +557,7 @@ public final class SitRepManager {
             r.answers.put(s.key, a);
         }
         save(r);
-        if ("places".equals(s.key))
+        if ("places".equals(s.key) || "calls".equals(s.key))
             places.sync(reports);
         changed();
     }

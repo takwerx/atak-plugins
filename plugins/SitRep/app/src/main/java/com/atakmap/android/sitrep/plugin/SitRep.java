@@ -40,6 +40,8 @@ public class SitRep implements IPlugin {
     MapView mapView;
     private com.atakmap.android.menu.MapMenuEventListener tapOpensReport;
     private com.atakmap.android.sitrep.PlaceRadial radial;
+    public static final String SHOW = "com.atakmap.android.sitrep.SHOW";
+    private android.content.BroadcastReceiver showReceiver;
 
     public SitRep(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -113,6 +115,25 @@ public class SitRep implements IPlugin {
         });
         radial.register();
         registerTap();
+        // Opens the pane from adb and from other plugins: am broadcast cannot reach a
+        // process-local receiver, so this one is a system receiver.
+        showReceiver = new android.content.BroadcastReceiver() {
+            @Override
+            public void onReceive(Context c, android.content.Intent i) {
+                final String id = i.getStringExtra("report");
+                if (mapView != null)
+                    mapView.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            showPane(id != null && manager != null && manager.find(id) != null ? id : null);
+                        }
+                    });
+            }
+        };
+        final com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter show =
+                new com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter();
+        show.addAction(SHOW, "open the Sit Rep pane, optionally on one report (extra: report)");
+        com.atakmap.android.ipc.AtakBroadcast.getInstance().registerSystemReceiver(showReceiver, show);
     }
 
     @Override
@@ -130,6 +151,14 @@ public class SitRep implements IPlugin {
         pane = null;
         paneUi = null;
         unregisterTap();
+        if (showReceiver != null) {
+            try {
+                com.atakmap.android.ipc.AtakBroadcast.getInstance().unregisterSystemReceiver(showReceiver);
+            } catch (Exception ignored) {
+                // Never registered.
+            }
+            showReceiver = null;
+        }
         if (radial != null) {
             radial.unregister();
             radial = null;

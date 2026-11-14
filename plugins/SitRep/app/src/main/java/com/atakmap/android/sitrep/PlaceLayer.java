@@ -170,11 +170,15 @@ public final class PlaceLayer {
         for (Report r : reports) {
             if (r.placesOn.isEmpty() || !r.onMap)
                 continue;
-            final Report.Answer a = r.answer("places");
-            if (a == null || a.points == null)
-                continue;
-            for (int i = 0; i < a.points.length(); i++) {
-                final JSONObject p = a.points.optJSONObject(i);
+            // Places, and the 911 calls section's calls (category "calls").
+            final JSONArray pts = new JSONArray();
+            for (String key : new String[] { "places", "calls" }) {
+                final Report.Answer a = r.answer(key);
+                for (int i = 0; a != null && a.points != null && i < a.points.length(); i++)
+                    pts.put(a.points.opt(i));
+            }
+            for (int i = 0; i < pts.length(); i++) {
+                final JSONObject p = pts.optJSONObject(i);
                 if (p == null || !r.placesOn.contains(p.optString("c")))
                     continue;
                 JSONArray l = byCat.get(p.optString("c"));

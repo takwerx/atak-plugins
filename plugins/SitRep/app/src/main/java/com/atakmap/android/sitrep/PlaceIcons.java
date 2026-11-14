@@ -534,6 +534,19 @@ final class PlaceIcons {
                 c.drawPath(star, white);
                 break;
             }
+            case "calls": {
+                // A 911 call: red disc, white "911".
+                c.drawCircle(cx, cy, h, white);
+                fill.setColor(0xFFC62828);
+                c.drawCircle(cx, cy, h - s * 0.06f, fill);
+                final Paint t = new Paint(Paint.ANTI_ALIAS_FLAG);
+                t.setColor(0xFFFFFFFF);
+                t.setFakeBoldText(true);
+                t.setTextAlign(Paint.Align.CENTER);
+                t.setTextSize(s * 0.36f);
+                c.drawText("911", cx, cy + s * 0.13f, t);
+                break;
+            }
             case "nuclear": {
                 c.drawCircle(cx, cy, h, black);
                 fill.setColor(0xFFFBC02D);

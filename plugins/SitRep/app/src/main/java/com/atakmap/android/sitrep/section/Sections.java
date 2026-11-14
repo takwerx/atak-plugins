@@ -16,6 +16,7 @@ public final class Sections {
         final List<Section> s = new ArrayList<>();
         s.add(new Weather());
         s.add(new Alerts());
+        s.add(new Calls());
         s.add(new Fires());
         s.add(new Evacuations());
         s.add(new Roads());

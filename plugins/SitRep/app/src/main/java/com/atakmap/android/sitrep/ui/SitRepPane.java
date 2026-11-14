@@ -161,6 +161,13 @@ public final class SitRepPane {
                 showMain();
             }
         });
+        // ATAK's own icons, from ATAK at run time (operator, 2026-11-14: Go to,
+        // Refresh and Delete as icons at the top).
+        hostIcon((android.widget.ImageButton) root.findViewById(R.id.btn_report_goto), "panto_selected");
+        hostIcon((android.widget.ImageButton) root.findViewById(R.id.btn_report_rename), "ic_edit");
+        hostIcon((android.widget.ImageButton) root.findViewById(R.id.btn_report_settings), "nav_settings");
+        hostIcon((android.widget.ImageButton) root.findViewById(R.id.btn_report_refresh), "ic_refresh");
+        hostIcon((android.widget.ImageButton) root.findViewById(R.id.btn_report_delete), "ic_menu_delete");
         root.findViewById(R.id.btn_report_goto).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -200,6 +207,20 @@ public final class SitRepPane {
         });
         buildSettings();
         refresh();
+    }
+
+    /** Puts one of ATAK's own drawables on a button; logs when ATAK has none by that name. */
+    private void hostIcon(android.widget.ImageButton b, String name) {
+        try {
+            final Context host = mapView.getContext();
+            final int id = host.getResources().getIdentifier(name, "drawable", host.getPackageName());
+            if (id != 0)
+                b.setImageDrawable(host.getResources().getDrawable(id));
+            else
+                Log.w(TAG, "ATAK has no drawable " + name);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "could not load ATAK's " + name, e);
+        }
     }
 
     /** What the wide button does; the drop-down hosting the pane sets it. */
@@ -262,8 +283,20 @@ public final class SitRepPane {
      * opened, and its row marked with what the source said.
      */
     public void showPlace(String reportId, String category, String key) {
-        prefs.edit().putBoolean("sitrep.fold.places", true)
-                .putBoolean("sitrep.fold.places." + category, true).apply();
+        if ("calls".equals(category)) {
+            // A call: the 911 calls section and its agency's fold.
+            folds.put(reportId + "|sitrep.fold.calls", true);
+            final Report r = manager.find(reportId);
+            final Report.Answer a = r == null ? null : r.answer("calls");
+            for (int i = 0; a != null && a.points != null && i < a.points.length(); i++) {
+                final org.json.JSONObject p = a.points.optJSONObject(i);
+                if (p != null && key.equals(com.atakmap.android.sitrep.PlaceLayer.placeKey(p)))
+                    folds.put(reportId + "|sitrep.fold.calls." + p.optString("ag", "Calls").toLowerCase(java.util.Locale.US), true);
+            }
+        } else {
+            folds.put(reportId + "|sitrep.fold.places", true);
+            folds.put(reportId + "|sitrep.fold.places." + category, true);
+        }
         if (!reportId.equals(openId))
             showReport(reportId);
         focusKey = key;
@@ -331,6 +364,13 @@ public final class SitRepPane {
                 placeSwitches(f.body, r, a.points);
                 // The category lists are in the switches' own drop-downs; only the
                 // notes (California only, a source that did not answer) stay as text.
+                final List<String> notes = new ArrayList<>();
+                for (String line : a.lines)
+                    if (!line.startsWith(Section.GROUP) && !line.startsWith("  "))
+                        notes.add(line);
+                addLines(f.body, s.key, notes);
+            } else if ("calls".equals(s.key) && a.points != null) {
+                callRows(f.body, r, a.points);
                 final List<String> notes = new ArrayList<>();
                 for (String line : a.lines)
                     if (!line.startsWith(Section.GROUP) && !line.startsWith("  "))
@@ -1048,6 +1088,83 @@ public final class SitRepPane {
     }
 
     /**
+     * The 911 calls: a map switch, then one fold per agency, newest first. A tap on a
+     * call puts the calls on the map, marks the row and takes the map there, as a
+     * listed place does (operator, 2026-11-14: "if i click on the call can we have
+     * those rendered on the map").
+     */
+    private void callRows(LinearLayout into, final Report r, org.json.JSONArray points) {
+        final Button map = (Button) PluginLayoutInflater.inflate(plugin, R.layout.open_button, null);
+        setState(map, "Calls on map", r.placesOn.contains("calls"));
+        map.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                manager.setPlaceOn(r, "calls", !r.placesOn.contains("calls"));
+            }
+        });
+        into.addView(map);
+        final java.util.Map<String, List<org.json.JSONObject>> byAgency = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < points.length(); i++) {
+            final org.json.JSONObject p = points.optJSONObject(i);
+            if (p == null)
+                continue;
+            List<org.json.JSONObject> l = byAgency.get(p.optString("ag", "Calls"));
+            if (l == null) {
+                l = new ArrayList<>();
+                byAgency.put(p.optString("ag", "Calls"), l);
+            }
+            l.add(p);
+        }
+        for (java.util.Map.Entry<String, List<org.json.JSONObject>> e : byAgency.entrySet()) {
+            final List<org.json.JSONObject> l = e.getValue();
+            java.util.Collections.sort(l, new java.util.Comparator<org.json.JSONObject>() {
+                @Override
+                public int compare(org.json.JSONObject a, org.json.JSONObject b) {
+                    return Long.compare(b.optLong("t", 0), a.optLong("t", 0));
+                }
+            });
+            final Fold fold = new Fold(into, "sitrep.fold.calls." + e.getKey().toLowerCase(java.util.Locale.US));
+            fold.label(e.getKey(), String.valueOf(l.size()));
+            int shown = 0;
+            for (final org.json.JSONObject p : l) {
+                final boolean focus = focusKey != null
+                        && focusKey.equals(com.atakmap.android.sitrep.PlaceLayer.placeKey(p));
+                if (++shown > 40 && !focus) {
+                    if (shown == 41)
+                        fold.body.addView(body("... and " + (l.size() - 40) + " more on the map.", 14));
+                    continue;
+                }
+                final org.json.JSONArray info = p.optJSONArray("i");
+                final String where = info != null && info.length() > 2 ? ", " + info.optString(2) : "";
+                final TextView row = body(ago(p.optLong("t", 0)) + ": " + p.optString("n") + where, 14);
+                row.setPadding(0, dp(6), 0, dp(6));
+                if (focus) {
+                    row.setTextColor(CATEGORY);
+                    row.setBackgroundColor(0x2200E5FF);
+                    focusRow = row;
+                }
+                row.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        if (focus) {
+                            focusKey = null;
+                            refresh();
+                            return;
+                        }
+                        focusKey = com.atakmap.android.sitrep.PlaceLayer.placeKey(p);
+                        if (!r.placesOn.contains("calls"))
+                            manager.setPlaceOn(r, "calls", true);
+                        refresh();
+                        goToPlace(p);
+                    }
+                });
+                fold.body.addView(row);
+            }
+            fold.show();
+        }
+    }
+
+    /**
      * The line that names a plugin showing this on the map: Open when it is loaded and
      * answers SHOW, a line of text when it is loaded and does not, Get when it is not
      * installed.
@@ -1144,6 +1261,28 @@ public final class SitRepPane {
     }
 
     /** One drop-down row: a head naming the thing and its value, an arrow, a body. */
+    /**
+     * Which folds are open, per report, for as long as ATAK runs: a new report opens
+     * with every section closed (operator, 2026-11-14: "certain sections were
+     * expanded on their own" when one report's open folds carried to the next). The
+     * main screen's and Settings' folds stay saved in the preferences.
+     */
+    private final java.util.Map<String, Boolean> folds = new java.util.HashMap<>();
+
+    private boolean isOpen(String pref) {
+        if (openId == null)
+            return prefs.getBoolean(pref, false);
+        final Boolean b = folds.get(openId + "|" + pref);
+        return b != null && b;
+    }
+
+    private void setOpen(String pref, boolean open) {
+        if (openId == null)
+            prefs.edit().putBoolean(pref, open).apply();
+        else
+            folds.put(openId + "|" + pref, open);
+    }
+
     private final class Fold {
         final Button head;
         final ImageButton chevron;
@@ -1158,12 +1297,12 @@ public final class SitRepPane {
             chevron = v.findViewById(R.id.fold_chev);
             body = v.findViewById(R.id.fold_body);
             this.pref = pref;
-            open = prefs.getBoolean(pref, false);
+            open = isOpen(pref);
             final View.OnClickListener flip = new View.OnClickListener() {
                 @Override
                 public void onClick(View x) {
                     open = !open;
-                    prefs.edit().putBoolean(Fold.this.pref, open).apply();
+                    setOpen(Fold.this.pref, open);
                     show();
                 }
             };

@@ -212,6 +212,13 @@ public final class Report {
                 final JSONArray g = cleanPaths(p.optJSONArray("g"));
                 if (g != null)
                     q.put("g", g);
+                // A 911 call's agency and time (ms), for its group and its age.
+                final String ag = text(p.optString("ag", ""), 100);
+                if (ag != null && !ag.isEmpty())
+                    q.put("ag", ag);
+                final long t = p.optLong("t", 0);
+                if (t > 0)
+                    q.put("t", t);
                 out.put(q.put("i", ci));
             } catch (JSONException e) {
                 // skip it
