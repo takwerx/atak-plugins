@@ -19,7 +19,9 @@ import java.util.Map;
 /**
  * Places that matter for people who need help (PLAN decision 9; operator,
  * 2026-11-13: "a toggle for vulnerable folks"): hospitals, schools, nursing and care
- * homes, dialysis, shelters, airports and heliports. Each category is a switch on the report page that puts
+ * homes, dialysis, shelters, airports and heliports, and the Critical Infrastructure
+ * layers: fire and police stations, power plants, battery storage, nuclear plants,
+ * dams and chemical facilities. Each category is a switch on the report page that puts
  * its places on the map as a read-only feature layer. Sources per
  * NOTES-sitrep-poi-sources.md. Hospitals and shelters count within Nearby too: the
  * nearest ER or shelter is often outside the area.
@@ -35,6 +37,13 @@ public final class Places extends Section {
             { "shelter", "Shelters", "+", "#2E7D32" },
             { "airport", "Airports", "A", "#263238" },
             { "heliport", "Heliports", "H", "#000000" },
+            { "fire", "Fire stations", "F", "#C62828" },
+            { "police", "Police", "P", "#1A237E" },
+            { "power", "Power plants", "E", "#EF6C00" },
+            { "battery", "Battery storage (BESS)", "B", "#00897B" },
+            { "nuclear", "Nuclear plants", "N", "#FBC02D" },
+            { "dam", "Dams", "W", "#0277BD" },
+            { "hazmat", "Chemical facilities (RMP)", "!", "#F57C00" },
     };
 
     static final String HOSPITALS = "https://mapdepot.takwerx.org/iwi/hospitals/hospitals.json.gz";
@@ -42,12 +51,20 @@ public final class Places extends Section {
     static final String CDPH = "https://services5.arcgis.com/FlidZxdI0LGC9vAw/arcgis/rest/services/CDPH_LC_Facilities_Data/FeatureServer/0";
     static final String NSS = "https://gis.fema.gov/arcgis/rest/services/NSS/FEMA_NSS/FeatureServer/5";
     static final String AVIATION = "https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_Aviation_Facilities/FeatureServer/0";
+    static final String USGS = "https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/";
+    static final String CEC_PLANTS = "https://services3.arcgis.com/bWPjFyq029ChCGur/arcgis/rest/services/Power_Plant/FeatureServer/0";
+    static final String EPA_PLANTS = "https://geodata.epa.gov/arcgis/rest/services/OEI/FRS_PowerPlants/MapServer/12";
+    static final String NUCLEAR = "https://gis.fema.gov/arcgis/rest/services/Partner/Nuclear_Plant_Power_Reactor_Status/FeatureServer/0";
+    static final String DAMS = "https://geospatial.sec.usace.army.mil/dls/rest/services/NID/National_Inventory_of_Dams_Public_Service/FeatureServer/0";
+    static final String RMP = "https://services.arcgis.com/cJ9YHowT8TU7DUyn/arcgis/rest/services/FRS_INTERESTS_RMP/FeatureServer/0";
     static final String NSS_OPEN = "https://gis.fema.gov/arcgis/rest/services/NSS/OpenShelters/FeatureServer/0";
 
     public Places() {
         super("places", "Places", false,
                 "Hospitals: takwerx IWI pack (CMS, HHS, HIFLD, state lists, FAA). Schools: USGS National Map. "
-                        + "Care homes and dialysis: California CDPH licensed facilities. Shelters: FEMA National Shelter System. Airports and heliports: BTS NTAD Aviation Facilities (FAA data).");
+                        + "Care homes and dialysis: California CDPH licensed facilities. Shelters: FEMA National Shelter System. Airports and heliports: BTS NTAD Aviation Facilities (FAA data). "
+                        + "Fire and police: USGS National Map. Power plants: CEC (California), EPA (elsewhere). "
+                        + "Nuclear: FEMA/NRC. Dams: USACE National Inventory of Dams. Chemical: EPA RMP.");
     }
 
     @Override
@@ -197,6 +214,7 @@ public final class Places extends Section {
         } catch (Exception e) {
             missing.add("airports");
         }
+        infrastructure(area, nearbyMiles, reach, found, missing);
         if (failures >= 3 && missing.contains("hospitals") && missing.contains("schools") && missing.contains("shelters"))
             throw new java.io.IOException("no place source answered");
 
@@ -242,6 +260,149 @@ public final class Places extends Section {
         if (!missing.isEmpty())
             r.line("Did not answer: " + android.text.TextUtils.join(", ", missing) + ". Tap Refresh to try again.");
         return r;
+    }
+
+    /**
+     * Fire and police stations, power plants and battery storage, nuclear plants,
+     * dams and chemical facilities: the Critical Infrastructure layers (PLAN decision
+     * 15). Each source fails alone and is named on the "did not answer" line.
+     */
+    private static void infrastructure(Area area, int nearbyMiles, double reach,
+            Map<String, List<JSONObject>> found, List<String> missing) {
+        final String[][] stations = { { "16", "fire", "fire stations" }, { "18", "police", "police" } };
+        for (String[] st : stations)
+            try {
+                for (JSONObject a : Esri.points(USGS + st[0], "1=1", area, "name,address,city,state", nearbyMiles)) {
+                    final double d = area.distanceMeters(a.optDouble("_lat"), a.optDouble("_lon"));
+                    final List<String> info = new ArrayList<>();
+                    info.add(join(a.optString("address", ""), a.optString("city", ""), a.optString("state", "")));
+                    found.get(st[1]).add(point(st[1], a.optString("name"), a.optDouble("_lat"), a.optDouble("_lon"), d, area, info));
+                }
+            } catch (Exception e) {
+                missing.add(st[2]);
+            }
+
+        // Power plants: California's CEC list (it splits battery storage out and lists
+        // retired plants, which are left out); EPA's national list elsewhere.
+        final boolean ca = area.south < 42.1 && area.north > 32.4 && area.west < -114 && area.east > -124.5;
+        try {
+            final Map<String, JSONObject> plants = new LinkedHashMap<>();
+            if (ca) {
+                for (JSONObject a : Esri.points(CEC_PLANTS, "Retired_Plant=0", area,
+                        "CECPlantID,PlantName,Capacity_Latest,PriEnergySource,County", nearbyMiles)) {
+                    final String id = a.optString("CECPlantID", "");
+                    final JSONObject was = plants.get(id);
+                    if (was == null)
+                        plants.put(id, a);
+                    else
+                        was.put("Capacity_Latest", was.optDouble("Capacity_Latest", 0) + a.optDouble("Capacity_Latest", 0));
+                }
+                for (JSONObject a : plants.values()) {
+                    final String src = a.optString("PriEnergySource", "");
+                    final String cat = "BAT".equals(src) || "ES".equals(src) ? "battery" : "power";
+                    final double d = area.distanceMeters(a.optDouble("_lat"), a.optDouble("_lon"));
+                    final List<String> info = new ArrayList<>();
+                    info.add(fuel(src) + (a.optDouble("Capacity_Latest", 0) > 0
+                            ? String.format(Locale.US, ", %.0f MW", a.optDouble("Capacity_Latest")) : "") + ".");
+                    info.add(capital(a.optString("County", "")) + " County, CA");
+                    found.get(cat).add(point(cat, a.optString("PlantName"), a.optDouble("_lat"), a.optDouble("_lon"), d, area, info));
+                }
+            } else {
+                for (JSONObject a : Esri.points(EPA_PLANTS, "STATUS='OP'", area,
+                        "PLANT_CODE,PLANT_NAME,PRIME_MOVER,ENERGY_SOURCE_1,UTILITY_NAME,CITY_NAME,STATE_CODE", nearbyMiles)) {
+                    final String id = a.optString("PLANT_CODE", "");
+                    if (plants.containsKey(id))
+                        continue;
+                    plants.put(id, a);
+                    final String src = a.optString("ENERGY_SOURCE_1", "");
+                    final String cat = "MWH".equals(src) || "BA".equals(a.optString("PRIME_MOVER")) ? "battery" : "power";
+                    final double d = area.distanceMeters(a.optDouble("_lat"), a.optDouble("_lon"));
+                    final List<String> info = new ArrayList<>();
+                    info.add(fuel(src) + ".");
+                    info.add("Operator: " + a.optString("UTILITY_NAME", "") + ".");
+                    info.add(join(capital(a.optString("CITY_NAME", "")), a.optString("STATE_CODE", "")));
+                    found.get(cat).add(point(cat, a.optString("PLANT_NAME"), a.optDouble("_lat"), a.optDouble("_lon"), d, area, info));
+                }
+            }
+        } catch (Exception e) {
+            missing.add("power plants");
+        }
+
+        // Nuclear plants within 50 mi, the ingestion planning zone; 10 mi is the
+        // plume exposure zone.
+        try {
+            for (JSONObject a : Esri.points(NUCLEAR, "1=1", area,
+                    "power_plant,reactor_name,status,power,location,owner_operator", 50)) {
+                final double d = area.distanceMeters(a.optDouble("_lat"), a.optDouble("_lon"));
+                final List<String> info = new ArrayList<>();
+                info.add(a.optString("reactor_name", "") + ": " + a.optString("status", "") + ", "
+                        + a.optInt("power", 0) + "% power.");
+                info.add(d <= 16_093 ? "The area is inside its 10-mile emergency planning zone."
+                        : "The area is inside its 50-mile ingestion planning zone.");
+                info.add("Operator: " + a.optString("owner_operator", "") + ".");
+                found.get("nuclear").add(point("nuclear", a.optString("power_plant"), a.optDouble("_lat"),
+                        a.optDouble("_lon"), d, area, info));
+            }
+        } catch (Exception e) {
+            missing.add("nuclear plants");
+        }
+
+        // Dams: the service refuses a distance buffer, so a widened box, measured here.
+        try {
+            for (JSONObject a : Esri.pointsInBox(DAMS, "1=1", area,
+                    "NAME,NIDID,HAZARD_POTENTIAL,CONDITION_ASSESSMENT,PRIMARY_PURPOSE,NID_HEIGHT,NID_STORAGE,OWNER_TYPES,CITY",
+                    nearbyMiles)) {
+                final double d = area.distanceMeters(a.optDouble("_lat"), a.optDouble("_lon"));
+                if (d > reach)
+                    continue;
+                final List<String> info = new ArrayList<>();
+                info.add(a.optString("HAZARD_POTENTIAL", "Unknown") + " hazard potential; condition "
+                        + a.optString("CONDITION_ASSESSMENT", "not rated").toLowerCase(Locale.US) + ".");
+                if (a.optDouble("NID_HEIGHT", 0) > 0)
+                    info.add(Math.round(a.optDouble("NID_HEIGHT")) + " ft high, "
+                            + String.format(Locale.US, "%,d", Math.round(a.optDouble("NID_STORAGE", 0))) + " acre-ft stored.");
+                info.add(a.optString("PRIMARY_PURPOSE", "") + "; " + a.optString("OWNER_TYPES", "") + " owner.");
+                info.add("National Inventory of Dams " + a.optString("NIDID", "") + ".");
+                found.get("dam").add(point("dam", capital(a.optString("NAME")), a.optDouble("_lat"), a.optDouble("_lon"), d, area, info));
+            }
+        } catch (Exception e) {
+            missing.add("dams");
+        }
+
+        // Chemical facilities: EPA Risk Management Program reporters, inside the area.
+        try {
+            for (JSONObject a : Esri.points(RMP, "1=1", area,
+                    "PRIMARY_NAME,LOCATION_ADDRESS,CITY_NAME,STATE_CODE,ACTIVE_STATUS", 0)) {
+                if ("INACTIVE".equalsIgnoreCase(a.optString("ACTIVE_STATUS", "")))
+                    continue;
+                final List<String> info = new ArrayList<>();
+                info.add("Files an EPA Risk Management Plan: it holds a listed toxic or flammable chemical above the threshold.");
+                info.add(join(capital(a.optString("LOCATION_ADDRESS", "")), capital(a.optString("CITY_NAME", "")),
+                        a.optString("STATE_CODE", "")));
+                found.get("hazmat").add(point("hazmat", capital(a.optString("PRIMARY_NAME")), a.optDouble("_lat"),
+                        a.optDouble("_lon"), 0, area, info));
+            }
+        } catch (Exception e) {
+            missing.add("chemical facilities");
+        }
+    }
+
+    /** CEC and EIA energy source codes in words. */
+    private static String fuel(String code) {
+        switch (code == null ? "" : code) {
+            case "SUN": return "Solar";
+            case "WND": return "Wind";
+            case "NG": return "Natural gas";
+            case "BAT": case "MWH": case "ES": return "Battery storage";
+            case "WAT": return "Hydro";
+            case "NUC": return "Nuclear";
+            case "GEO": return "Geothermal";
+            case "DFO": case "OIL": return "Oil";
+            case "BIT": case "SUB": case "COL": return "Coal";
+            case "LFG": return "Landfill gas";
+            case "OBG": case "WDS": case "BIO": return "Biomass";
+            default: return code == null || code.isEmpty() ? "Power plant" : "Fuel " + code;
+        }
     }
 
     private static JSONObject point(String c, String name, double lat, double lon, double d, Area area,

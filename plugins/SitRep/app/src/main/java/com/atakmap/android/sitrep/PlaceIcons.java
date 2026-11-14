@@ -26,7 +26,7 @@ final class PlaceIcons {
 
     private static final String TAG = "SitRep.PlaceIcons";
     /** Bump when the drawing changes: a cached file never redraws. */
-    private static final int VERSION = 2;
+    private static final int VERSION = 3;
     private static final float SIZE_DP = 30f;
 
     /** What the style needs: the file, its size and the offset that puts the glyph on the point. */
@@ -243,6 +243,135 @@ final class PlaceIcons {
                 c.drawRect(cx - s * 0.16f, top, cx - s * 0.16f + bar, bot, white);
                 c.drawRect(cx + s * 0.16f - bar, top, cx + s * 0.16f, bot, white);
                 c.drawRect(cx - s * 0.16f, cy - bar / 2, cx + s * 0.16f, cy + bar / 2, white);
+                break;
+            }
+            case "fire": {
+                c.drawRoundRect(box, r, r, white);
+                fill.setColor(0xFFC62828);
+                c.drawRoundRect(inset(box, s * 0.07f), r * 0.8f, r * 0.8f, fill);
+                // A flame.
+                final Path f = new Path();
+                f.moveTo(cx, cy - s * 0.32f);
+                f.cubicTo(cx + s * 0.30f, cy - s * 0.05f, cx + s * 0.26f, cy + s * 0.30f, cx, cy + s * 0.30f);
+                f.cubicTo(cx - s * 0.26f, cy + s * 0.30f, cx - s * 0.30f, cy + s * 0.02f, cx - s * 0.10f, cy - s * 0.12f);
+                f.cubicTo(cx - s * 0.08f, cy - s * 0.02f, cx - s * 0.02f, cy + s * 0.02f, cx + s * 0.02f, cy - s * 0.04f);
+                f.cubicTo(cx + s * 0.06f, cy - s * 0.14f, cx + s * 0.02f, cy - s * 0.24f, cx, cy - s * 0.32f);
+                f.close();
+                c.drawPath(f, white);
+                break;
+            }
+            case "police": {
+                c.drawRoundRect(box, r, r, white);
+                fill.setColor(0xFF1A237E);
+                c.drawRoundRect(inset(box, s * 0.07f), r * 0.8f, r * 0.8f, fill);
+                // A five-pointed star.
+                final Path star = new Path();
+                for (int i = 0; i < 10; i++) {
+                    final double a = Math.toRadians(-90 + i * 36);
+                    final float rad = (i % 2 == 0 ? 0.32f : 0.13f) * s;
+                    final float x = cx + (float) (Math.cos(a) * rad), y = cy + s * 0.02f + (float) (Math.sin(a) * rad);
+                    if (i == 0)
+                        star.moveTo(x, y);
+                    else
+                        star.lineTo(x, y);
+                }
+                star.close();
+                c.drawPath(star, white);
+                break;
+            }
+            case "power": {
+                c.drawRoundRect(box, r, r, white);
+                fill.setColor(0xFFEF6C00);
+                c.drawRoundRect(inset(box, s * 0.07f), r * 0.8f, r * 0.8f, fill);
+                // A lightning bolt.
+                final Path bolt = new Path();
+                bolt.moveTo(cx + s * 0.06f, cy - s * 0.34f);
+                bolt.lineTo(cx - s * 0.20f, cy + s * 0.04f);
+                bolt.lineTo(cx - s * 0.01f, cy + s * 0.04f);
+                bolt.lineTo(cx - s * 0.08f, cy + s * 0.34f);
+                bolt.lineTo(cx + s * 0.20f, cy - s * 0.06f);
+                bolt.lineTo(cx + s * 0.01f, cy - s * 0.06f);
+                bolt.close();
+                c.drawPath(bolt, white);
+                break;
+            }
+            case "battery": {
+                c.drawRoundRect(box, r, r, white);
+                fill.setColor(0xFF00796B);
+                c.drawRoundRect(inset(box, s * 0.07f), r * 0.8f, r * 0.8f, fill);
+                // A battery with a bolt through it.
+                final RectF body = new RectF(cx - s * 0.30f, cy - s * 0.16f, cx + s * 0.24f, cy + s * 0.16f);
+                c.drawRoundRect(body, s * 0.04f, s * 0.04f, white);
+                c.drawRect(cx + s * 0.24f, cy - s * 0.07f, cx + s * 0.31f, cy + s * 0.07f, white);
+                final Path bolt = new Path();
+                bolt.moveTo(cx + s * 0.02f, cy - s * 0.13f);
+                bolt.lineTo(cx - s * 0.12f, cy + s * 0.02f);
+                bolt.lineTo(cx - s * 0.02f, cy + s * 0.02f);
+                bolt.lineTo(cx - s * 0.06f, cy + s * 0.13f);
+                bolt.lineTo(cx + s * 0.09f, cy - s * 0.03f);
+                bolt.lineTo(cx - s * 0.01f, cy - s * 0.03f);
+                bolt.close();
+                c.drawPath(bolt, fill);
+                break;
+            }
+            case "nuclear": {
+                c.drawCircle(cx, cy, h, black);
+                fill.setColor(0xFFFBC02D);
+                c.drawCircle(cx, cy, h - s * 0.06f, fill);
+                // The trefoil: three blades and a center.
+                final RectF ring = new RectF(cx - s * 0.36f, cy - s * 0.36f, cx + s * 0.36f, cy + s * 0.36f);
+                for (int i = 0; i < 3; i++)
+                    c.drawArc(ring, -120 + i * 120 - 30, 60, true, black);
+                c.drawCircle(cx, cy, s * 0.13f, fill);
+                c.drawCircle(cx, cy, s * 0.08f, black);
+                break;
+            }
+            case "dam": {
+                c.drawRoundRect(box, r, r, white);
+                fill.setColor(0xFF0277BD);
+                c.drawRoundRect(inset(box, s * 0.07f), r * 0.8f, r * 0.8f, fill);
+                // A dam wall with water behind it.
+                final Path wall = new Path();
+                wall.moveTo(cx - s * 0.04f, cy - s * 0.30f);
+                wall.lineTo(cx + s * 0.08f, cy - s * 0.30f);
+                wall.lineTo(cx + s * 0.30f, cy + s * 0.30f);
+                wall.lineTo(cx - s * 0.04f, cy + s * 0.30f);
+                wall.close();
+                c.drawPath(wall, white);
+                final Paint wave = new Paint(Paint.ANTI_ALIAS_FLAG);
+                wave.setStyle(Paint.Style.STROKE);
+                wave.setStrokeWidth(s * 0.06f);
+                wave.setColor(0xFFFFFFFF);
+                for (int i = 0; i < 3; i++) {
+                    final float y = cy - s * 0.14f + i * s * 0.14f;
+                    final Path w = new Path();
+                    w.moveTo(cx - s * 0.32f, y);
+                    w.quadTo(cx - s * 0.24f, y - s * 0.06f, cx - s * 0.16f, y);
+                    w.quadTo(cx - s * 0.11f, y + s * 0.05f, cx - s * 0.08f, y);
+                    c.drawPath(w, wave);
+                }
+                break;
+            }
+            case "hazmat": {
+                // An orange diamond with a black exclamation mark.
+                final Path dia = new Path();
+                dia.moveTo(cx, cy - h);
+                dia.lineTo(cx + h, cy);
+                dia.lineTo(cx, cy + h);
+                dia.lineTo(cx - h, cy);
+                dia.close();
+                c.drawPath(dia, black);
+                final Path in = new Path();
+                final float k = s * 0.09f;
+                in.moveTo(cx, cy - h + k);
+                in.lineTo(cx + h - k, cy);
+                in.lineTo(cx, cy + h - k);
+                in.lineTo(cx - h + k, cy);
+                in.close();
+                fill.setColor(0xFFF57C00);
+                c.drawPath(in, fill);
+                c.drawRect(cx - s * 0.045f, cy - s * 0.24f, cx + s * 0.045f, cy + s * 0.07f, black);
+                c.drawCircle(cx, cy + s * 0.16f, s * 0.055f, black);
                 break;
             }
             default: { // shelter
