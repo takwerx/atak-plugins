@@ -95,32 +95,18 @@ public final class Places {
             }
         }
         // Towns with no Census boundary (Bayview, Idaho): USGS GNIS populated places,
-        // a point each; the report's area is a circle around it.
+        // a point each; the report's area is a circle around it. GET: the USGS
+        // firewall refuses a POST whose LIKE has "+" for spaces (403, 2026-11-13).
+        final String stp = fips == null ? null : POSTAL.get(fips);
         try {
-            final String where = "UPPER(gaz_name) LIKE '" + q + "%'"
-                    + (fips == null ? "" : " AND state_alpha='" + POSTAL.get(fips) + "'");
-            final String form = "f=json&returnGeometry=true&outSR=4326&resultRecordCount=25"
-                    + "&where=" + Esri.enc(where) + "&outFields=" + Esri.enc("gaz_id,gaz_name,state_alpha,county_name");
-            final JSONArray f = Esri.parse(Http.post(GNIS + "/query", form)).optJSONArray("features");
-            for (int i = 0; f != null && i < f.length(); i++) {
-                final JSONObject ft = f.optJSONObject(i);
-                final JSONObject a = ft == null ? null : ft.optJSONObject("attributes");
-                final JSONObject g = ft == null ? null : ft.optJSONObject("geometry");
-                final JSONArray pts = g == null ? null : g.optJSONArray("points");
-                final JSONArray xy = pts != null && pts.length() > 0 ? pts.optJSONArray(0)
-                        : null;
-                final double lon = xy != null ? xy.optDouble(0) : g == null ? Double.NaN : g.optDouble("x"),
-                        lat = xy != null ? xy.optDouble(1) : g == null ? Double.NaN : g.optDouble("y");
-                if (a == null || !(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180))
-                    continue;
-                final String stp = a.optString("state_alpha", "");
-                final String name = a.optString("gaz_name", "").trim();
-                if (name.isEmpty() || !POSTAL.containsValue(stp) || named.contains(name.toUpperCase(Locale.US) + "|" + stp))
-                    continue;
-                final String county = a.optString("county_name", "").trim();
-                out.add(new Place(name + ", " + stp + " (town, no boundary" + (county.isEmpty() ? "" : ", " + county + " County") + ")",
-                        "gnis", String.valueOf(a.optLong("gaz_id")), stp, 0, lat, lon));
-            }
+            int found = gnis("UPPER(gaz_name) LIKE '" + q + "%'", stp, null, named, out);
+            // Fuzzy: few answers, so every town starting with the same three letters,
+            // kept when it is close to what was typed with spaces ignored ("bay view",
+            // "bayveiw" -> Bayview).
+            final String bare = q.replace(" ", "");
+            // Three letters only, never a cut-off quote in the where clause.
+            if (found < 3 && bare.length() >= 4 && bare.substring(0, 3).matches("[A-Z0-9]{3}"))
+                gnis("UPPER(gaz_name) LIKE '" + bare.substring(0, 3) + "%'", stp, bare, named, out);
         } catch (Exception e) {
             // Census answers alone are still a result.
         }
@@ -189,6 +175,73 @@ public final class Places {
             + "nws_reference_maps/nws_reference_map/MapServer/2";
 
     /** The place's outline: its largest ring, thinned by the server. */
+    /**
+     * GNIS populated places for a where clause, added to out unless Census already
+     * named them; with near, only names within a few letters of it. Returns how many.
+     */
+    private static int gnis(String like, String postal, String near, java.util.Set<String> named,
+            List<Place> out) throws Exception {
+        final String where = like + (postal == null ? "" : " AND state_alpha='" + postal + "'");
+        final String url = GNIS + "/query?f=json&returnGeometry=true&outSR=4326&resultRecordCount="
+                + (near == null ? 25 : 400) + "&where=" + Esri.enc(where)
+                + "&outFields=" + Esri.enc("gaz_id,gaz_name,state_alpha,county_name");
+        final JSONArray f = Esri.parse(Http.get(url)).optJSONArray("features");
+        final List<Object[]> picked = new ArrayList<>();
+        for (int i = 0; f != null && i < f.length(); i++) {
+            final JSONObject ft = f.optJSONObject(i);
+            final JSONObject a = ft == null ? null : ft.optJSONObject("attributes");
+            final JSONObject g = ft == null ? null : ft.optJSONObject("geometry");
+            final JSONArray pts = g == null ? null : g.optJSONArray("points");
+            final JSONArray xy = pts != null && pts.length() > 0 ? pts.optJSONArray(0) : null;
+            final double lon = xy != null ? xy.optDouble(0) : g == null ? Double.NaN : g.optDouble("x"),
+                    lat = xy != null ? xy.optDouble(1) : g == null ? Double.NaN : g.optDouble("y");
+            if (a == null || !(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180))
+                continue;
+            final String st = a.optString("state_alpha", "");
+            final String name = a.optString("gaz_name", "").trim();
+            final String key = name.toUpperCase(Locale.US) + "|" + st;
+            if (name.isEmpty() || !POSTAL.containsValue(st) || !named.add(key))
+                continue;
+            int d = 0;
+            if (near != null) {
+                final String n = name.toUpperCase(Locale.US).replace(" ", "");
+                d = edits(near, n.length() > near.length() + 3 ? n.substring(0, near.length() + 3) : n);
+                if (d > Math.max(1, near.length() / 4)) {
+                    named.remove(key);
+                    continue;
+                }
+            }
+            final String county = a.optString("county_name", "").trim();
+            picked.add(new Object[] { d, new Place(name + ", " + st + " (town, no boundary"
+                    + (county.isEmpty() ? "" : ", " + county + " County") + ")",
+                    "gnis", String.valueOf(a.optLong("gaz_id")), st, 0, lat, lon) });
+        }
+        Collections.sort(picked, new Comparator<Object[]>() {
+            @Override
+            public int compare(Object[] x, Object[] y) {
+                return (Integer) x[0] - (Integer) y[0];
+            }
+        });
+        for (int i = 0; i < picked.size() && i < 25; i++)
+            out.add((Place) picked.get(i)[1]);
+        return Math.min(picked.size(), 25);
+    }
+
+    /** Levenshtein distance, for the fuzzy town match. */
+    static int edits(String a, String b) {
+        final int[] prev = new int[b.length() + 1], cur = new int[b.length() + 1];
+        for (int j = 0; j <= b.length(); j++)
+            prev[j] = j;
+        for (int i = 1; i <= a.length(); i++) {
+            cur[0] = i;
+            for (int j = 1; j <= b.length(); j++)
+                cur[j] = Math.min(Math.min(cur[j - 1] + 1, prev[j] + 1),
+                        prev[j - 1] + (a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1));
+            System.arraycopy(cur, 0, prev, 0, cur.length);
+        }
+        return prev[b.length()];
+    }
+
     /** A town with no boundary is a circle this far around its point (2 mi). */
     static final double TOWN_RADIUS_M = 3_218.69;
 
