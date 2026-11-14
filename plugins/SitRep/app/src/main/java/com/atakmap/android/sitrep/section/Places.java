@@ -74,6 +74,7 @@ public final class Places extends Section {
     static final int PER_CATEGORY = 500;
     static final String MILITARY = "https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_Military_Bases/FeatureServer/0";
     static final String NTAD = "https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/";
+    static final String CARE = "https://mapdepot.takwerx.org/sitrep/care/";
     static final String POWER = "https://mapdepot.takwerx.org/sitrep/power/";
     private static final int MAX_POWER_PATHS = 3_000;
     /** Categories drawn as lines, not icons. */
@@ -87,7 +88,7 @@ public final class Places extends Section {
         // reports (the Corona Animal Shelter duplicate, 2026-11-13).
         super("places", "Places", true,
                 "Hospitals: takwerx IWI pack (CMS, HHS, HIFLD, state lists, FAA). Schools: USGS National Map. "
-                        + "Care homes and dialysis: California CDPH licensed facilities. Shelters: FEMA National Shelter System. Airports and heliports: BTS NTAD Aviation Facilities (FAA data). "
+                        + "Care homes and dialysis: California CDPH licensed facilities; elsewhere CMS certified nursing homes and dialysis (dialysis located by the Census geocoder or by phone match to Overture; about 1 in 11 could not be placed and is not listed). Shelters: FEMA National Shelter System. Airports and heliports: BTS NTAD Aviation Facilities (FAA data). "
                         + "Fire and police: USGS National Map. Military installations: DoD MIRTA via BTS NTAD. Power plants: CEC (California), EPA (elsewhere). "
                         + "Nuclear: FEMA/NRC. Dams: USACE National Inventory of Dams. Chemical: EPA RMP. "
                         + "Animal shelters, fairgrounds, equestrian centers, pharmacies, groceries, fuel and urgent care: "
@@ -222,6 +223,16 @@ public final class Places extends Section {
             }
         }
 
+        // Everywhere else: our national pack from CMS (tools/build_care_pack.py),
+        // certified nursing homes and dialysis, inside the area. California rows are
+        // left to CDPH when it answered, which also lists the small licensed homes.
+        try {
+            carePack(area, found, caCovered);
+        } catch (Exception e) {
+            failures++;
+            missing.add("nursing homes and dialysis");
+        }
+
         // Shelters: designated, and open now. Never the organization contacts.
         try {
             final java.util.Set<String> open = new java.util.HashSet<>();
@@ -325,8 +336,6 @@ public final class Places extends Section {
                         + area.directionTo(p.optDouble("lat"), p.optDouble("lon"))));
             }
         }
-        if (!caCovered)
-            r.line("Nursing homes, care homes and dialysis are listed for California only until the national pack is built.");
         if (!missing.isEmpty())
             r.line("Did not answer: " + android.text.TextUtils.join(", ", missing) + ". Tap Refresh to try again.");
         return r;
@@ -755,6 +764,43 @@ public final class Places extends Section {
             info.add(join(a.optString("address", ""), a.optString("city", ""), a.optString("state", "")));
             into.add(point("police", a.optString("name"), a.optDouble("_lat"), a.optDouble("_lon"), d, area, info));
         }
+    }
+
+    /** CMS nursing homes and dialysis from our pack, inside the area. */
+    private static void carePack(Area area, Map<String, List<JSONObject>> found, boolean caCovered) throws Exception {
+        final JSONObject manifest = new JSONObject(Http.get(CARE + "care.json"));
+        final JSONObject tiles = manifest.optJSONObject("tiles");
+        final int step = Math.max(1, Math.min(10, manifest.optInt("tile_degrees", 2)));
+        if (tiles == null)
+            throw new java.io.IOException("no tiles in the care manifest");
+        for (int lat = floor(area.south, step); lat <= floor(area.north, step); lat += step)
+            for (int lon = floor(area.west, step); lon <= floor(area.east, step); lon += step) {
+                final String key = lat + "_" + lon;
+                if (!tiles.has(key))
+                    continue;
+                final JSONArray rows = new JSONArray(Http.getGzip(CARE + "tiles/" + key + ".json.gz"));
+                for (int i = 0; i < rows.length(); i++) {
+                    final JSONArray x = rows.optJSONArray(i);
+                    if (x == null || x.length() < 9)
+                        continue;
+                    final String cat = x.optString(0, "");
+                    final List<JSONObject> into = found.get(cat);
+                    if (into == null || !("care".equals(cat) || "dialysis".equals(cat)))
+                        continue;
+                    if (caCovered && "CA".equals(x.optString(6)))
+                        continue;
+                    final double plat = x.optDouble(2, Double.NaN), plon = x.optDouble(3, Double.NaN);
+                    if (!(Math.abs(plat) <= 90) || !(Math.abs(plon) <= 180) || !area.contains(plat, plon))
+                        continue;
+                    final List<String> info = new ArrayList<>();
+                    info.add(("care".equals(cat) ? "Certified nursing home" : "Dialysis facility")
+                            + (x.optString(8, "").isEmpty() ? "." : ", " + x.optString(8) + "."));
+                    info.add(join(capital(x.optString(4, "")), capital(x.optString(5, "")), x.optString(6, "")));
+                    if (!x.optString(7, "").isEmpty())
+                        info.add(x.optString(7));
+                    into.add(point(cat, capital(x.optString(1, "")), plat, plon, 0, area, info));
+                }
+            }
     }
 
     /** MIRTA's reporting component in words. */
