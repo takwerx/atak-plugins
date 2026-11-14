@@ -45,6 +45,13 @@ public final class History extends Section {
     public History() {
         super("history", "History", false,
                 "NIFC InterAgency Fire Perimeter History (wildfires, all years); Wildland Fire Lessons Learned Center incident reviews (fatalities and entrapments).");
+        // The burn areas themselves are Feature Layer's Fire History layer (operator,
+        // 2026-11-14). Feature Layer answers SHOW only in its debug build, so no
+        // action: loaded, this is a line of text; not installed, a Get button.
+        seeIn = "See earlier burn areas on the map in Feature Layer: switch on Fire History.";
+        openName = "Feature Layer";
+        openPackage = "com.atakmap.android.featurelayer.plugin";
+        openAction = null;
     }
 
     @Override

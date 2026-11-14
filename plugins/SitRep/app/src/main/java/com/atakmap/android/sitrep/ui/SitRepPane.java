@@ -420,9 +420,10 @@ public final class SitRepPane {
                     see.setPadding(0, dp(6), 0, 0);
                     f.body.addView(see);
                 } else {
-                    pluginLine(f.body, r, s.openName, s.openPackage, s.openAction);
+                    pluginLine(f.body, r, s.openName, s.openPackage, s.openAction,
+                            s.openAction == null ? s.seeIn : null);
                     if (s.alsoName != null)
-                        pluginLine(f.body, r, s.alsoName, s.alsoPackage, s.alsoAction);
+                        pluginLine(f.body, r, s.alsoName, s.alsoPackage, s.alsoAction, null);
                 }
             }
             final TextView src = body("Source: " + s.source
@@ -1315,10 +1316,11 @@ public final class SitRepPane {
      * answers SHOW, a line of text when it is loaded and does not, Get when it is not
      * installed.
      */
-    private void pluginLine(LinearLayout into, final Report r, String name, String pkg, final String action) {
+    private void pluginLine(LinearLayout into, final Report r, String name, String pkg, final String action,
+            String seeText) {
         final boolean loaded = pkg == null || pluginLoaded(pkg);
         if (loaded && action == null) {
-            final TextView see = body("See it on the map in " + name + ".", 14);
+            final TextView see = body(seeText != null ? seeText : "See it on the map in " + name + ".", 14);
             see.setTextColor(CATEGORY);
             see.setPadding(0, dp(6), 0, 0);
             into.addView(see);
