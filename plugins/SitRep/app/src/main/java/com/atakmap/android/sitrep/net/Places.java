@@ -32,13 +32,21 @@ public final class Places {
         final String layer, geoid;
         public final String state;
         final double areaLand;
+        /** A named town with no Census boundary (GNIS): its point; NaN otherwise. */
+        final double lat, lon;
 
         Place(String label, String layer, String geoid, String state, double areaLand) {
+            this(label, layer, geoid, state, areaLand, Double.NaN, Double.NaN);
+        }
+
+        Place(String label, String layer, String geoid, String state, double areaLand, double lat, double lon) {
             this.label = label;
             this.layer = layer;
             this.geoid = geoid;
             this.state = state;
             this.areaLand = areaLand;
+            this.lat = lat;
+            this.lon = lon;
         }
     }
 
@@ -50,15 +58,25 @@ public final class Places {
      * largest. At most 40.
      */
     public static List<Place> search(String typed, final String preferState) throws Exception {
-        final String q = typed == null ? "" : typed.trim().toUpperCase(Locale.US)
-                .replaceAll("[^A-Z0-9 .'-]", "").replace("'", "''");
+        String t = typed == null ? "" : typed.trim().toUpperCase(Locale.US).replaceAll("[^A-Z0-9 .,'-]", "");
+        // "bayview idaho", "Bayview, ID": the state off the end, as a filter (2026-11-13:
+        // the whole string was matched as a name and found nothing).
+        String fips = null;
+        final String[] typedState = stateAtEnd(t);
+        if (typedState != null) {
+            fips = typedState[0];
+            t = typedState[1];
+        }
+        final String q = t.replace(",", " ").replaceAll("\\s+", " ").trim().replace("'", "''");
         final List<Place> out = new ArrayList<>();
         if (q.length() < 2)
             return out;
+        final String inState = fips == null ? "" : " AND STATE='" + fips + "'";
+        final java.util.Set<String> named = new java.util.HashSet<>();
         for (String layer : LAYERS) {
             final String form = "f=json&returnGeometry=false&resultRecordCount=25"
-                    + "&where=" + Esri.enc("UPPER(BASENAME) LIKE '" + q + "%'")
-                    + "&outFields=" + Esri.enc("NAME,STATE,GEOID,AREALAND");
+                    + "&where=" + Esri.enc("UPPER(BASENAME) LIKE '" + q + "%'" + inState)
+                    + "&outFields=" + Esri.enc("NAME,BASENAME,STATE,GEOID,AREALAND");
             final JSONObject o = Esri.parse(Http.post(BASE + layer + "/query", form));
             final JSONArray f = o.optJSONArray("features");
             if (f == null)
@@ -73,7 +91,38 @@ public final class Places {
                     continue;
                 final String name = a.optString("NAME", "").replace(" CDP", " (community)");
                 out.add(new Place(name + ", " + st, layer, geoid, st, a.optDouble("AREALAND", 0)));
+                named.add(a.optString("BASENAME", "").toUpperCase(Locale.US) + "|" + st);
             }
+        }
+        // Towns with no Census boundary (Bayview, Idaho): USGS GNIS populated places,
+        // a point each; the report's area is a circle around it.
+        try {
+            final String where = "UPPER(gaz_name) LIKE '" + q + "%'"
+                    + (fips == null ? "" : " AND state_alpha='" + POSTAL.get(fips) + "'");
+            final String form = "f=json&returnGeometry=true&outSR=4326&resultRecordCount=25"
+                    + "&where=" + Esri.enc(where) + "&outFields=" + Esri.enc("gaz_id,gaz_name,state_alpha,county_name");
+            final JSONArray f = Esri.parse(Http.post(GNIS + "/query", form)).optJSONArray("features");
+            for (int i = 0; f != null && i < f.length(); i++) {
+                final JSONObject ft = f.optJSONObject(i);
+                final JSONObject a = ft == null ? null : ft.optJSONObject("attributes");
+                final JSONObject g = ft == null ? null : ft.optJSONObject("geometry");
+                final JSONArray pts = g == null ? null : g.optJSONArray("points");
+                final JSONArray xy = pts != null && pts.length() > 0 ? pts.optJSONArray(0)
+                        : null;
+                final double lon = xy != null ? xy.optDouble(0) : g == null ? Double.NaN : g.optDouble("x"),
+                        lat = xy != null ? xy.optDouble(1) : g == null ? Double.NaN : g.optDouble("y");
+                if (a == null || !(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180))
+                    continue;
+                final String stp = a.optString("state_alpha", "");
+                final String name = a.optString("gaz_name", "").trim();
+                if (name.isEmpty() || !POSTAL.containsValue(stp) || named.contains(name.toUpperCase(Locale.US) + "|" + stp))
+                    continue;
+                final String county = a.optString("county_name", "").trim();
+                out.add(new Place(name + ", " + stp + " (town, no boundary" + (county.isEmpty() ? "" : ", " + county + " County") + ")",
+                        "gnis", String.valueOf(a.optLong("gaz_id")), stp, 0, lat, lon));
+            }
+        } catch (Exception e) {
+            // Census answers alone are still a result.
         }
         Collections.sort(out, new Comparator<Place>() {
             @Override
@@ -140,7 +189,22 @@ public final class Places {
             + "nws_reference_maps/nws_reference_map/MapServer/2";
 
     /** The place's outline: its largest ring, thinned by the server. */
+    /** A town with no boundary is a circle this far around its point (2 mi). */
+    static final double TOWN_RADIUS_M = 3_218.69;
+
     public static GeoPoint[] outline(Place p) throws Exception {
+        if ("gnis".equals(p.layer)) {
+            if (!(Math.abs(p.lat) <= 90) || !(Math.abs(p.lon) <= 180))
+                throw new java.io.IOException("no point for that town");
+            final GeoPoint[] ring = new GeoPoint[48];
+            final double mLat = 111_320d, mLon = 111_320d * Math.cos(Math.toRadians(p.lat));
+            for (int i = 0; i < ring.length; i++) {
+                final double a = 2 * Math.PI * i / ring.length;
+                ring[i] = new GeoPoint(p.lat + TOWN_RADIUS_M * Math.cos(a) / mLat,
+                        p.lon + TOWN_RADIUS_M * Math.sin(a) / mLon);
+            }
+            return ring;
+        }
         final String form = "f=json&returnGeometry=true&outSR=4326&maxAllowableOffset=0.0005"
                 + "&where=" + Esri.enc("GEOID='" + p.geoid + "'") + "&outFields=GEOID";
         final JSONObject o = Esri.parse(Http.post(BASE + p.layer + "/query", form));
@@ -182,6 +246,52 @@ public final class Places {
                 s += a.optDouble(0) * b.optDouble(1) - b.optDouble(0) * a.optDouble(1);
         }
         return s / 2;
+    }
+
+    static final String GNIS = "https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/3";
+
+    /**
+     * A state name or postal code at the end of what was typed: {fips, the rest}, or
+     * null. "BAYVIEW IDAHO", "BAYVIEW, ID", "SALEM NEW YORK".
+     */
+    static String[] stateAtEnd(String t) {
+        final String s = t.trim();
+        for (Map.Entry<String, String> e : NAMES.entrySet()) {
+            final String name = e.getKey();
+            if (s.length() > name.length() + 1 && s.endsWith(name)) {
+                final char before = s.charAt(s.length() - name.length() - 1);
+                if (before == ' ' || before == ',')
+                    return new String[] { e.getValue(), s.substring(0, s.length() - name.length()).trim() };
+            }
+        }
+        final java.util.regex.Matcher m = java.util.regex.Pattern.compile("^(.+?)[ ,]+([A-Z]{2})$").matcher(s);
+        if (m.matches())
+            for (Map.Entry<String, String> e : POSTAL.entrySet())
+                if (e.getValue().equals(m.group(2)))
+                    return new String[] { e.getKey(), m.group(1).trim() };
+        return null;
+    }
+
+    /** State names to FIPS, longest first so "WEST VIRGINIA" wins over "VIRGINIA". */
+    private static final Map<String, String> NAMES = new java.util.TreeMap<>(new Comparator<String>() {
+        @Override
+        public int compare(String a, String b) {
+            return a.length() != b.length() ? b.length() - a.length() : a.compareTo(b);
+        }
+    });
+
+    static {
+        final String[] n = { "01ALABAMA", "02ALASKA", "04ARIZONA", "05ARKANSAS", "06CALIFORNIA", "08COLORADO",
+                "09CONNECTICUT", "10DELAWARE", "11DISTRICT OF COLUMBIA", "12FLORIDA", "13GEORGIA", "15HAWAII",
+                "16IDAHO", "17ILLINOIS", "18INDIANA", "19IOWA", "20KANSAS", "21KENTUCKY", "22LOUISIANA", "23MAINE",
+                "24MARYLAND", "25MASSACHUSETTS", "26MICHIGAN", "27MINNESOTA", "28MISSISSIPPI", "29MISSOURI",
+                "30MONTANA", "31NEBRASKA", "32NEVADA", "33NEW HAMPSHIRE", "34NEW JERSEY", "35NEW MEXICO",
+                "36NEW YORK", "37NORTH CAROLINA", "38NORTH DAKOTA", "39OHIO", "40OKLAHOMA", "41OREGON",
+                "42PENNSYLVANIA", "44RHODE ISLAND", "45SOUTH CAROLINA", "46SOUTH DAKOTA", "47TENNESSEE", "48TEXAS",
+                "49UTAH", "50VERMONT", "51VIRGINIA", "53WASHINGTON", "54WEST VIRGINIA", "55WISCONSIN", "56WYOMING",
+                "72PUERTO RICO" };
+        for (String x : n)
+            NAMES.put(x.substring(2), x.substring(0, 2));
     }
 
     /** State FIPS to postal code. */

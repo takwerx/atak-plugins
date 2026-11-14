@@ -359,7 +359,8 @@ public final class SitRepManager {
                             return;
                         }
                         note = null;
-                        startReport(r, p.label);
+                        // A town with no boundary: the list says so, the report name does not.
+                        startReport(r, p.label.replaceFirst(" \\(town, no boundary.*\\)$", ""));
                     }
                 });
             }
