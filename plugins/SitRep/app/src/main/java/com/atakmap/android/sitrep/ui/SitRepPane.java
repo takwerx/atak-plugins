@@ -686,7 +686,7 @@ public final class SitRepPane {
         final android.content.Context host = mapView.getContext();
         final android.widget.EditText box = new android.widget.EditText(host);
         box.setSingleLine(true);
-        box.setHint("City, town or county");
+        box.setHint("Type a city, town or county");
         box.setInputType(android.text.InputType.TYPE_CLASS_TEXT
                 | android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS);
         // No full-screen keyboard in landscape: it covers the dialog with a white edit box.
@@ -698,7 +698,6 @@ public final class SitRepPane {
         frame.setPadding(pad, 0, pad, 0);
         frame.addView(box);
         final AlertDialog d = new AlertDialog.Builder(host)
-                .setTitle("Type a name")
                 .setView(frame)
                 .setPositiveButton("Search", null)
                 .setNegativeButton("Cancel", null)
@@ -739,10 +738,27 @@ public final class SitRepPane {
                 });
             }
         });
-        if (d.getWindow() != null)
-            d.getWindow().setSoftInputMode(
-                    android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
-                            | android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        showAboveKeyboard(d, box);
+    }
+
+    /**
+     * A one-box text dialog that stays readable in landscape (S22, 2026-11-14: the
+     * box was squashed to a line and the typing could not be seen). The keyboard
+     * leaves about 130 dp; a title, a box and the buttons do not fit, and with
+     * adjustResize the dialog crushed the box. So: no title (the hint says what to
+     * type), a box that cannot shrink below a touch target, and the dialog pinned to
+     * the top with the keyboard laid over the map below it.
+     */
+    private void showAboveKeyboard(AlertDialog d, android.widget.EditText box) {
+        final float dp = mapView.getContext().getResources().getDisplayMetrics().density;
+        box.setMinHeight((int) (48 * dp));
+        box.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 18);
+        final android.view.Window w = d.getWindow();
+        if (w != null) {
+            w.setGravity(android.view.Gravity.TOP | android.view.Gravity.CENTER_HORIZONTAL);
+            w.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+                    | android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
+        }
         d.show();
         box.requestFocus();
     }
@@ -790,7 +806,7 @@ public final class SitRepPane {
         box.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_DONE
                 | android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI
                 | android.view.inputmethod.EditorInfo.IME_FLAG_NO_FULLSCREEN);
-        box.setHint("Empty = automatic name");
+        box.setHint("New name (empty = automatic name)");
         box.setFilters(new android.text.InputFilter[] {
                 new android.text.InputFilter.LengthFilter(60)
         });
@@ -801,7 +817,6 @@ public final class SitRepPane {
         frame.setPadding(pad, 0, pad, 0);
         frame.addView(box);
         final AlertDialog d = new AlertDialog.Builder(host)
-                .setTitle("Rename")
                 .setView(frame)
                 .setPositiveButton("Save", new DialogInterface.OnClickListener() {
                     @Override
@@ -811,12 +826,7 @@ public final class SitRepPane {
                 })
                 .setNegativeButton("Cancel", null)
                 .create();
-        if (d.getWindow() != null)
-            d.getWindow().setSoftInputMode(
-                    android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
-                            | android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-        d.show();
-        box.requestFocus();
+        showAboveKeyboard(d, box);
     }
 
     private void confirmDelete() {
