@@ -28,6 +28,7 @@ public final class Sections {
         s.add(new Risk());
         s.add(new People());
         s.add(new Places());
+        s.add(new Comms());
         s.add(new Structures());
         s.add(new History());
         ALL = Collections.unmodifiableList(s);
