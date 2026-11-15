@@ -29,6 +29,7 @@ public final class Sections {
         s.add(new People());
         s.add(new Places());
         s.add(new Structures());
+        s.add(new Exposure());
         s.add(new History());
         ALL = Collections.unmodifiableList(s);
     }
