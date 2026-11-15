@@ -37,3 +37,6 @@ captures/
 # Submission zips
 dist/
 *.zip
+
+# Built by gradle/typst.gradle; tak.gov builds its own from docs/user_manual
+app/src/main/assets/usermanual.pdf

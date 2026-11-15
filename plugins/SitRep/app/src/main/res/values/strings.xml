@@ -19,5 +19,8 @@
     <string name="go_to">Go to</string>
     <string name="heading_reports">Reports</string>
     <string name="show_settings">Open or close</string>
+    <string name="prefs_summary">The Sit Rep user guide</string>
+    <string name="manual_title">Plugin Documentation</string>
+    <string name="manual_summary">Open the Sit Rep user guide: making a report, reading each section, places on the map</string>
     <string name="status_start">Draw an area to make a sit rep.</string>
 </resources>

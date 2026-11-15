@@ -134,6 +134,32 @@ public class SitRep implements IPlugin {
                 new com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter();
         show.addAction(SHOW, "open the Sit Rep pane, optionally on one report (extra: report)");
         com.atakmap.android.ipc.AtakBroadcast.getInstance().registerSystemReceiver(showReceiver, show);
+        registerPreferences();
+    }
+
+    private static final String PREFS_KEY = "sitrep_preferences";
+
+    /** The Tool Preferences entry: the only way to reach the user manual. */
+    private void registerPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.register(
+                    new com.atakmap.app.preferences.ToolsPreferenceFragment.ToolPreference(
+                            pluginContext.getString(R.string.app_name),
+                            pluginContext.getString(R.string.prefs_summary),
+                            PREFS_KEY,
+                            pluginContext.getResources().getDrawable(R.drawable.ic_toolbar),
+                            new SitRepPreferenceFragment(pluginContext)));
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not register preferences: " + notThisBuild);
+        }
+    }
+
+    private void unregisterPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.unregister(PREFS_KEY);
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not unregister preferences: " + notThisBuild);
+        }
     }
 
     @Override
@@ -167,6 +193,7 @@ public class SitRep implements IPlugin {
             manager.stop();
             manager = null;
         }
+        unregisterPreferences();
         if (uiService != null)
             uiService.removeToolbarItem(toolbarItem);
     }
