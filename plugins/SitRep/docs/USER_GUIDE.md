@@ -1,12 +1,12 @@
-**Download Sit Rep 0.1** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Sit Rep 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/sit-rep/releases/download/v0.1/ATAK-Plugin-SitRep-0.1--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/sit-rep/releases/download/v0.1/ATAK-Plugin-SitRep-0.1--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/sit-rep/releases/download/v0.1/ATAK-Plugin-SitRep-0.1--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/sit-rep/releases/download/v0.2/ATAK-Plugin-SitRep-0.2--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/sit-rep/releases/download/v0.2/ATAK-Plugin-SitRep-0.2--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/sit-rep/releases/download/v0.2/ATAK-Plugin-SitRep-0.2--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/sit-rep/releases
 
-# Sit Rep 0.1: User Guide
+# Sit Rep 0.2: User Guide
 
 Sit Rep makes a situation report for any area you choose. It asks the public
 agency sources for that area and writes a read-only report that you can save,
@@ -23,7 +23,7 @@ refresh and open again with no network.
 
 ## Before you start
 
-- **Match the plugin to your ATAK version.** Sit Rep 0.1 is published for
+- **Match the plugin to your ATAK version.** Sit Rep 0.2 is published for
   ATAK-CIV 5.6, 5.7 and 5.8. Pick the download for the version on your device.
 - **A network connection makes the report.** A saved report opens with no
   network. Live sections (alerts, fires, weather) show their age.
@@ -34,6 +34,8 @@ refresh and open again with no network.
 
 Load Sit Rep from ATAK's Plugins manager, then open it from the toolbar with
 the SITREP icon (a clipboard, binoculars and a radio).
+
+![The SITREP icon in the toolbar](screenshots/07_toolbar.png)
 
 ## The main screen
 
@@ -60,8 +62,14 @@ Tap **New area** and choose how to give the area:
 - **Search:** type a city, town, community or county and pick it from the list.
 - **Tap on map:** tap a point and choose the county or city there.
 
+![Search results, nearest to the map first](screenshots/09_search.png)
+
+![Tap on map: the city or the county at that point](screenshots/10_tap_on_map.png)
+
 The report fills in section by section. The status line counts the sections
 still loading.
+
+![A drawn area and its report filling in](screenshots/08_draw_area.png)
 
 ## Read a report
 
@@ -75,6 +83,10 @@ The buttons across the top:
 - **Settings** (the gear). **Wide or half width** (the arrows).
 
 Each section is one row. Its head is the short answer. Tap the row to open it.
+
+**Go to** puts the report's area in view, its outline drawn on the map:
+
+![The report's area on the map](screenshots/11_outline.png)
 
 ## Open a section
 
@@ -98,8 +110,32 @@ In the **Places** section, each category is a switch with its count: **OFF**
 in red, **ON** in green. Tap the name to put that category on the map. Tap the
 arrow to list the places, nearest first.
 
+![Hospitals and schools on the map](screenshots/12_places_on_map.png)
+
 Tap a place on the map for its radial: **Details** (opens it in the report),
 **Bloodhound**, **Range and Bearing** and **polar coordinates**.
+
+![The radial on a hospital](screenshots/13_radial.png)
+
+**Details** opens the report at that place, its row marked:
+
+![Details: the place's row in the report](screenshots/14_details.png)
+
+A nuclear plant within 50 mi of the area is listed, and on the map it carries
+its two NRC planning zones: the 10 mile plume zone (red) and the 50 mile
+ingestion zone (amber).
+
+![A nuclear plant and its 10 mile zone](screenshots/15_nuclear_rings.png)
+
+## 911 calls
+
+Where a city or county publishes its 911 calls, the **911 calls** section
+lists the last 2 hours inside the area, by agency. **Calls on map** puts them
+on the map; while it is on, they are fetched again every 5 minutes. Medical
+calls are shown to the block in the text. Where no agency publishes calls, the
+section says "No public call feed here".
+
+![911 calls on the map](screenshots/16_calls.png)
 
 Places show only at the zoom you set in Settings, so the map stays readable.
 The status line says when places are hidden.
@@ -114,5 +150,9 @@ The status line says when places are hidden.
   map. Pick a value, **Always**, or **Use this zoom** for the zoom you have now.
 - **Map key:** what each map symbol means.
 
+![The map key](screenshots/17_map_key.png)
+
 This guide is also in ATAK as a PDF: **Settings > Tool Preferences > Sit Rep >
 Plugin Documentation**.
+
+![Sit Rep in Tool Preferences](screenshots/18_tool_preferences.png)

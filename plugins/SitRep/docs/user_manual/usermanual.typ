@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Sit Rep",
-   plugin-version: "0.1",
+   plugin-version: "0.2",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -46,7 +46,11 @@ refresh and open again with no network.
 #v(6pt)
 
 Load Sit Rep from ATAK's Plugins manager, then open it from the toolbar with
-the SITREP icon (a clipboard, binoculars and a radio).
+the SITREP icon (a clipboard, binoculars and a radio):
+
+#v(4pt)
+
+#image("07.png", width: 100%)
 ]
 
 #tak-slide[
@@ -87,6 +91,33 @@ still loading.
 ]
 
 #tak-slide[
+= Search and Tap on map
+
+#toolbox.side-by-side(columns: (1fr, 1fr))[
+  #image("09.png", width: 78%)
+][
+*Search* lists the places that start with what you typed, nearest to the
+map first. A small typo still finds the place. A town with no Census
+boundary is a circle around its point ("town, no boundary").
+
+#v(6pt)
+
+#image("10.png", width: 80%)
+
+*Tap on map* offers the city and the county at the point you tapped.
+]
+]
+
+#tak-slide[
+= A new report
+
+#image("08.png", width: 74%)
+
+The area on the map, and the report filling in: "Making sit rep: 15 of 17
+sections."
+]
+
+#tak-slide[
 = Read a report
 
 #toolbox.side-by-side(columns: (1fr, 1fr))[
@@ -101,6 +132,21 @@ The buttons across the top:
 
 Each section is one row. Its head is the short answer. Tap the row to open
 it.
+]
+]
+
+#tak-slide[
+= The area on the map
+
+#toolbox.side-by-side(columns: (1fr, 1fr))[
+  #image("11.png", width: 72%)
+][
+*Go to* puts the report's area in view, its outline drawn on the map.
+
+Tap the outline to open that report.
+
+*Areas ON / OFF* on the main screen shows or hides every saved area;
+*Map ON / OFF* on a report's row does it for that one.
 ]
 ]
 
@@ -141,6 +187,56 @@ The status line says when places are hidden.
 ]
 
 #tak-slide[
+= Places on the map
+
+#image("12.png", width: 74%)
+
+Hospitals and Schools ON in the Corona report, at street zoom.
+]
+
+#tak-slide[
+= The radial and Details
+
+#toolbox.side-by-side(columns: (1fr, 1.6fr))[
+  #image("13.png", width: 78%)
+][
+#image("14.png", width: 100%)
+
+Tap a place for its radial: *Details*, *Bloodhound*, *Range and Bearing*
+and *polar coordinates*. *Details* opens the report at that place, its row
+marked: here the nearest emergency room.
+]
+]
+
+#tak-slide[
+= Nuclear plants
+
+#toolbox.side-by-side(columns: (1fr, 1fr))[
+  #image("15.png", width: 72%)
+][
+A nuclear plant within 50 mi of the area is listed under Places. On the map
+it carries its two NRC planning zones:
+
+- *10 mile plume zone* (red): after a release, shelter or evacuation may be
+  ordered here.
+- *50 mile ingestion zone* (amber): food and water may be controlled here.
+
+Zoom out to see the 50 mile ring.
+]
+]
+
+#tak-slide[
+= 911 calls
+
+#image("16.png", width: 74%)
+
+Where a city or county publishes its 911 calls, the section lists the last 2
+hours inside the area, by agency. *Calls on map* puts them on the map and
+fetches them again every 5 minutes. Medical calls are shown to the block in
+the text.
+]
+
+#tak-slide[
 = Settings
 
 #toolbox.side-by-side(columns: (1fr, 1fr))[
@@ -152,7 +248,17 @@ The status line says when places are hidden.
   map. Pick a value, *Always*, or *Use this zoom* for the zoom you have now.
 - *Map key:* what each map symbol means.
 
+#image("17.png", width: 45%)
+
 This manual is in ATAK under *Settings, Tool Preferences, Sit Rep, Plugin
 Documentation*.
 ]
+]
+
+#tak-slide[
+= Where this manual lives
+
+#image("18.png", width: 100%)
+
+ATAK *Settings > Tool Preferences > Sit Rep > Plugin Documentation*.
 ]

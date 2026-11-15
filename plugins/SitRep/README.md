@@ -1,10 +1,10 @@
 ATAK Plugin — Sit Rep
 
-**Download Sit Rep 0.1** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Sit Rep 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/sit-rep/releases/download/v0.1/ATAK-Plugin-SitRep-0.1--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/sit-rep/releases/download/v0.1/ATAK-Plugin-SitRep-0.1--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/sit-rep/releases/download/v0.1/ATAK-Plugin-SitRep-0.1--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/sit-rep/releases/download/v0.2/ATAK-Plugin-SitRep-0.2--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/sit-rep/releases/download/v0.2/ATAK-Plugin-SitRep-0.2--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/sit-rep/releases/download/v0.2/ATAK-Plugin-SitRep-0.2--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/sit-rep/releases
 
@@ -49,9 +49,14 @@ and others), with an Open or Get button.
 _________________________________________________________________
 STATUS
 
-Version 0.1: first release.
+Version 0.2: first public release. 0.1 went to tak.gov once for ATAK 5.8 as
+the build the manual's map pictures were taken on, and was not published.
+0.2 makes the Search and Rename boxes readable in landscape on phones with a
+taller keyboard (Galaxy S22), and finds a city's boundary through a typo in
+Search.
 
-Tested on hardware: Samsung Galaxy S10 (ATAK-CIV 5.8), release build, with
+Tested on hardware: Samsung Galaxy S10 (ATAK-CIV 5.8, release build) and
+Samsung Galaxy S22 Ultra (official ATAK-CIV 5.8, tak.gov-signed 0.1), with
 report areas in California (Corona, Murrieta), Idaho (Bayview) and Colorado
 (Pagosa Springs). Release builds compile against ATAK-CIV 5.6, 5.7 and 5.8.
 
