@@ -174,6 +174,7 @@ opening the plugin.
 | Rain and rivers | Flash Flood Outlook | Excessive rainfall areas for three days, marginal to high |
 | Rain and rivers | River Gauges | Gauges colored by flood category; stage, flow and hydrograph behind a tap |
 | Rain and rivers | Flooded Ground | Where the river model puts water over the banks, now or at the worst of the next 5 days (experimental) |
+| Rain and rivers | FEMA Flood Zones | FEMA's flood map, not a forecast: floodway, coastal zones with waves, the 1% (100-year) and 0.2% (500-year) flood areas, areas behind a levee and areas FEMA has not studied; the flood elevation behind a tap; kept on the device for use with no network |
 | Rain and rivers | Rain Totals | The rain that fell, as a picture: the NWS radar estimate for the last hour to 3 days, the gauge-corrected analysis for 7 or 30 days, since Oct 1 or Jan 1, or the radar estimate of the hours before a date and time you pick; in the NWS colors, with a transparency slider |
 | Rain and rivers | Rain Gauges | Measured rain gauges around the map (USGS, airports, NWS observers, county flood control, RAWS) with their total for the time you pick, from the last 24 hours to since Jan 1, one day, or the hours before a date and time; inches in the pill, in the Rain Totals colors |
 | Rain and rivers | Streams Running High | Stream stretches over their high-water mark, colored by how rare the flow is; the numbers behind a tap |
@@ -202,6 +203,8 @@ opening the plugin.
 <td><img src="screenshots/30_flash_flood.jpg" width="420"><br>Flash flood outlook, Day 2</td></tr>
 <tr><td><img src="screenshots/36_flooded_ground.jpg" width="420"><br>Flooded ground along a river at major flood</td>
 <td><img src="screenshots/39_streams.jpg" width="420"><br>Streams running high on the same river</td></tr>
+<tr><td><img src="screenshots/124_floodzones_row.png" width="420"><br>FEMA Flood Zones: what is in view, and the zoom it draws at</td>
+<td><img src="screenshots/125_floodzones_key.png" width="420"><br>FEMA Flood Zones: the map key</td></tr>
 <tr><td><img src="screenshots/42_waves.jpg" width="420"><br>Waves: sea state and swell</td>
 <td><img src="screenshots/52_hurricane.jpg" width="420"><br>Hurricanes: track and cone</td></tr>
 <tr><td><img src="screenshots/48_beach.jpg" width="420"><br>Beach forecast: rip current risk</td>

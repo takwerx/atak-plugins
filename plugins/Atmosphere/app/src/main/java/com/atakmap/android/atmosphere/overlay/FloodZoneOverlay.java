@@ -299,6 +299,11 @@ public final class FloodZoneOverlay {
 
     /** Whether the view holds more tiles than the layer draws, whatever the gate. */
     public boolean tooWide() {
+        // Only when the zoom gate lets the zones through: zoomed out past the gate,
+        // the gate is the reason and its own line already says "hidden". Both at once
+        // read "hidden -- hidden, the view is too wide" (s10-dev-2, 2026-11-14).
+        if (mapView.getMapResolution() > gate() * GATE_SLACK)
+            return false;
         final GeoBounds b = mapView.getBounds();
         return b != null && tiles(b) == null;
     }

@@ -822,6 +822,28 @@ the same gauges.
 ]
 
 #tak-slide[
+= FEMA Flood Zones
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 5fr))[
+  #image("124.png", width: 100%)
+][
+  #image("125.png", width: 100%)
+][
+  *FEMA Flood Zones* draws FEMA's flood map. It is not a forecast: it does not
+  change with the weather. On top is the *floodway*, the channel and the land
+  that must stay open to carry a flood. Under it, the *coastal* zones with waves
+  (V, VE), the *1%* chance a year flood area (the 100-year flood, A zones), the
+  *0.2%* area (500-year), areas *behind a levee*, and zone *D*, not studied.
+
+  Tap a zone for what it means, with the base flood elevation or the flood
+  depth when FEMA gives one. Zoom in to the scale bar distance set under the
+  switch (3 mi by default) to see the zones. Where FEMA has no digital flood
+  map, the status line says so; that is not the same as no flood risk. Zones
+  this device has seen are kept for 30 days and draw with no network.
+]
+]
+
+#tak-slide[
 = Streams Running High
 
 #toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
