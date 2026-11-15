@@ -78,28 +78,13 @@ public final class Places {
             return out;
         final String inState = fips == null ? "" : " AND STATE='" + fips + "'";
         final java.util.Set<String> named = new java.util.HashSet<>();
-        for (String layer : LAYERS) {
-            final String form = "f=json&returnGeometry=false&resultRecordCount=25"
-                    + "&where=" + Esri.enc("UPPER(BASENAME) LIKE '" + q + "%'" + inState)
-                    + "&outFields=" + Esri.enc("NAME,BASENAME,STATE,GEOID,AREALAND,INTPTLAT,INTPTLON");
-            final JSONObject o = Esri.parse(Http.post(BASE + layer + "/query", form));
-            final JSONArray f = o.optJSONArray("features");
-            if (f == null)
-                continue;
-            for (int i = 0; i < f.length(); i++) {
-                final JSONObject a = f.optJSONObject(i) == null ? null : f.optJSONObject(i).optJSONObject("attributes");
-                if (a == null)
-                    continue;
-                final String geoid = a.optString("GEOID", "");
-                final String st = POSTAL.get(a.optString("STATE", ""));
-                if (!geoid.matches("\\d{5,7}") || st == null)
-                    continue;
-                final String name = a.optString("NAME", "").replace(" CDP", " (community)");
-                out.add(new Place(name + ", " + st, layer, geoid, st, a.optDouble("AREALAND", 0),
-                        num(a.optString("INTPTLAT", "")), num(a.optString("INTPTLON", ""))));
-                named.add(a.optString("BASENAME", "").toUpperCase(Locale.US) + "|" + st);
-            }
-        }
+        int census = census("UPPER(BASENAME) LIKE '" + q + "%'" + inState, 25, null, named, out);
+        // A typo finds nothing by exact start ("Seatle"; the S22's squashed search box,
+        // 2026-11-14, left the operator typing blind): the same three-letter fuzzy match
+        // the town search uses, so the city's own boundary is offered, not only a point.
+        final String bareQ = q.replace(" ", "");
+        if (census == 0 && bareQ.length() >= 4 && bareQ.substring(0, 3).matches("[A-Z0-9]{3}"))
+            census("UPPER(BASENAME) LIKE '" + bareQ.substring(0, 3) + "%'" + inState, 200, bareQ, named, out);
         // Towns with no Census boundary (Bayview, Idaho): USGS GNIS populated places,
         // a point each; the report's area is a circle around it. GET: the USGS
         // firewall refuses a POST whose LIKE has "+" for spaces (403, 2026-11-13).
@@ -255,6 +240,54 @@ public final class Places {
         });
         for (int i = 0; i < picked.size(); i++)
             out.add((Place) picked.get(i)[1]);
+        return picked.size();
+    }
+
+    /**
+     * Census incorporated places and communities matching {@code where}; with
+     * {@code near}, only names within a few edits of it (spaces ignored), closest first.
+     */
+    private static int census(String where, int max, String near, java.util.Set<String> named, List<Place> out)
+            throws Exception {
+        final List<Object[]> picked = new ArrayList<>();
+        for (String layer : LAYERS) {
+            final String form = "f=json&returnGeometry=false&resultRecordCount=" + max
+                    + "&where=" + Esri.enc(where)
+                    + "&outFields=" + Esri.enc("NAME,BASENAME,STATE,GEOID,AREALAND,INTPTLAT,INTPTLON");
+            final JSONObject o = Esri.parse(Http.post(BASE + layer + "/query", form));
+            final JSONArray f = o.optJSONArray("features");
+            if (f == null)
+                continue;
+            for (int i = 0; i < f.length(); i++) {
+                final JSONObject a = f.optJSONObject(i) == null ? null : f.optJSONObject(i).optJSONObject("attributes");
+                if (a == null)
+                    continue;
+                final String geoid = a.optString("GEOID", "");
+                final String st = POSTAL.get(a.optString("STATE", ""));
+                if (!geoid.matches("\\d{5,7}") || st == null)
+                    continue;
+                final String base = a.optString("BASENAME", "").toUpperCase(Locale.US);
+                int d = 0;
+                if (near != null) {
+                    final String n = base.replace(" ", "");
+                    d = edits(near, n.length() > near.length() + 3 ? n.substring(0, near.length() + 3) : n);
+                    if (d > Math.max(1, near.length() / 4))
+                        continue;
+                }
+                final String name = a.optString("NAME", "").replace(" CDP", " (community)");
+                picked.add(new Object[] { d, new Place(name + ", " + st, layer, geoid, st, a.optDouble("AREALAND", 0),
+                        num(a.optString("INTPTLAT", "")), num(a.optString("INTPTLON", ""))) });
+                named.add(base + "|" + st);
+            }
+        }
+        Collections.sort(picked, new Comparator<Object[]>() {
+            @Override
+            public int compare(Object[] x, Object[] y) {
+                return (Integer) x[0] - (Integer) y[0];
+            }
+        });
+        for (Object[] x : picked)
+            out.add((Place) x[1]);
         return picked.size();
     }
 
