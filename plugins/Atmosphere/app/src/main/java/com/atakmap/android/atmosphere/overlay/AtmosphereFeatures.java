@@ -374,6 +374,49 @@ final class AtmosphereFeatures {
     }
 
     private volatile HitFilter hitFilter;
+
+    /**
+     * A layer's say in what a tap's details read, from where the tap was. Dam failure
+     * areas say where the dam is from the tap: the flood runs miles downstream, and
+     * an area over another dam's lake read as that lake's dam (operator, 2026-11-15).
+     */
+    interface TapNote {
+        void note(MapItem item, com.atakmap.coremap.maps.coords.GeoPoint tap);
+    }
+
+    private volatile TapNote tapNote;
+
+    void setTapNote(TapNote n) {
+        tapNote = n;
+    }
+
+    /** Let the layer write its tap-dependent text onto every hit it kept. */
+    private void noteTap(java.util.SortedSet<MapItem> hits,
+            com.atakmap.coremap.maps.coords.GeoPoint tap) {
+        final TapNote n = tapNote;
+        if (n == null || hits == null || tap == null)
+            return;
+        // The details pane finds the item again by uid, which builds a new copy from
+        // the store; the last tap's text is kept by feature id and put on that copy.
+        final java.util.Map<Long, String[]> notes = new java.util.HashMap<>();
+        for (MapItem m : hits)
+            try {
+                final String before = m.getMetaString("remarks", "");
+                final String titleBefore = m.getMetaString("title", "");
+                n.note(m, tap);
+                final String after = m.getMetaString("remarks", "");
+                final String title = m.getMetaString("title", "");
+                if ((!after.equals(before) || !title.equals(titleBefore))
+                        && m.hasMetaValue("featureid"))
+                    notes.put(m.getMetaLong("featureid", -1), new String[] { after, title });
+            } catch (RuntimeException e) {
+                // a note that fails leaves the details as they were
+            }
+        tapNotes = notes;
+    }
+
+    /** The last tap's notes, by feature id; see {@link #noteTap}. */
+    private volatile java.util.Map<Long, String[]> tapNotes = java.util.Collections.emptyMap();
     /** A rating's label as an exact-color pill; see {@link ZonePills#pill(String, int, int)}. */
     private ZonePills ratingPills;
 
@@ -977,6 +1020,7 @@ final class AtmosphereFeatures {
                             onePerPlace(hits, params == null ? null : params.geo);
                             narrow(hits, params == null ? null : params.geo);
                             atLabelOnly(hits, view, params == null ? null : params.geo);
+                            noteTap(hits, params == null ? null : params.geo);
                             Log.d(tag, "deepHitTest: " + (controls == null ? -1 : controls.size())
                                     + " controls, " + raw + " hits"
                                     + (hits != null && hits.size() != raw ? ", " + hits.size() + " kept" : ""));
@@ -992,6 +1036,7 @@ final class AtmosphereFeatures {
                             onePerPlace(hits, point);
                             narrow(hits, point);
                             atLabelOnly(hits, view, point);
+                            noteTap(hits, point);
                             Log.d(tag, "deepHitTestItems: " + raw + " hits"
                                     + (hits != null && hits.size() != raw ? ", " + hits.size() + " kept" : ""));
                             return hits;
@@ -1113,6 +1158,7 @@ final class AtmosphereFeatures {
                                 item.setMetaString("remarks",
                                         com.atakmap.android.atmosphere.ui
                                                 .StormDetailsReceiver.render(a));
+
                             // What the details pane shows as its heading and subtitle.
                             String title = feature.getName();
                             if ((title == null || title.isEmpty()) && a != null)
@@ -1126,6 +1172,15 @@ final class AtmosphereFeatures {
                             item.setMetaString("title", title);
                             item.setMetaString("callsign", title);
                             item.setMetaString("storm_set", setOf(feature.getId()));
+                            final String[] noted = tapNotes.get(feature.getId());
+                            if (noted != null) {
+                                item.setMetaString("remarks", noted[0]);
+                                if (!noted[1].isEmpty()) {
+                                    item.setMetaString("title", noted[1]);
+                                    item.setMetaString("callsign", noted[1]);
+                                    item.setTitle(noted[1]);
+                                }
+                            }
                             // Marks it as ours, so a tap opens its page or its details
                             // instead of ATAK's radial (the plugin's menu listener).
                             item.setMetaBoolean("atmosphere", true);
@@ -1157,6 +1212,9 @@ final class AtmosphereFeatures {
                                     if (a.containsAttribute("_floodId"))
                                         item.setMetaString("floodId",
                                                 a.getStringAttribute("_floodId"));
+                                    if (a.containsAttribute("_damId"))
+                                        item.setMetaString("damId",
+                                                a.getStringAttribute("_damId"));
                                     if (a.containsAttribute("_zoneId")) {
                                         item.setMetaString("zoneId",
                                                 a.getStringAttribute("_zoneId"));
@@ -1200,6 +1258,7 @@ final class AtmosphereFeatures {
             case "psps": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_psps;
             case "flood": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_flood;
             case "floodzones": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_floodzones;
+            case "damareas": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_damareas;
             case "beach": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_beach;
             case "buoys": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_buoys;
             case "avalanche": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_avalanche;

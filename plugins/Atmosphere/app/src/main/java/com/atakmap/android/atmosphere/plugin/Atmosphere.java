@@ -25,6 +25,7 @@ import com.atakmap.android.atmosphere.overlay.AvalancheOverlay;
 import com.atakmap.android.atmosphere.overlay.HighFlowOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodedGroundOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodZoneOverlay;
+import com.atakmap.android.atmosphere.overlay.DamAreaOverlay;
 import com.atakmap.android.atmosphere.overlay.SatelliteOverlay;
 import com.atakmap.android.atmosphere.overlay.WaveOverlay;
 import com.atakmap.android.atmosphere.overlay.RainOverlay;
@@ -169,6 +170,7 @@ public class Atmosphere implements IPlugin {
     private HighFlowOverlay highflow;
     private FloodedGroundOverlay floodground;
     private FloodZoneOverlay floodzones;
+    private DamAreaOverlay damareas;
     private SnowOverlay snow;
     private SatelliteOverlay satellite;
     private SstOverlay sst;
@@ -367,6 +369,8 @@ public class Atmosphere implements IPlugin {
         floodground.start();
         floodzones = new FloodZoneOverlay(mapView, pluginContext, egress);
         floodzones.start();
+        damareas = new DamAreaOverlay(mapView, pluginContext, egress);
+        damareas.start();
         highflow = new HighFlowOverlay(mapView, pluginContext, egress);
         highflow.start();
         snow = new SnowOverlay(mapView, egress);
@@ -500,6 +504,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setFloodedGround(floodground);
             if (floodzones != null)
                 atmospherePane.setFloodZones(floodzones);
+            if (damareas != null)
+                atmospherePane.setDamAreas(damareas);
             if (highflow != null)
                 atmospherePane.setHighFlow(highflow);
             if (snow != null)
@@ -578,6 +584,10 @@ public class Atmosphere implements IPlugin {
         if (floodzones != null) {
             floodzones.stop();
             floodzones = null;
+        }
+        if (damareas != null) {
+            damareas.stop();
+            damareas = null;
         }
         if (satellite != null) {
             satellite.stop();
@@ -753,6 +763,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setFloodedGround(floodground);
             if (floodzones != null)
                 atmospherePane.setFloodZones(floodzones);
+            if (damareas != null)
+                atmospherePane.setDamAreas(damareas);
             if (highflow != null)
                 atmospherePane.setHighFlow(highflow);
             if (snow != null)

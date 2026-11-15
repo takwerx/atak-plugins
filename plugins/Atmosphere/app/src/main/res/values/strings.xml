@@ -205,6 +205,14 @@
     <string name="floodzones_allow_text">Atmosphere will ask FEMA for the flood zones in the area the map shows and draw them on the map. The zones are kept on this device for a month, so they still draw with no network. The map\'s area is sent; your position is not.\n\nServer: hazards.fema.gov</string>
     <string name="floodzones_note">Where FEMA has no digital flood map, nothing is drawn and the line above says so. An area with no zone drawn is not an area with no flood risk.</string>
     <string name="credit_floodzones">Flood zones from the FEMA National Flood Hazard Layer (%1$s)</string>
+    <string name="damareas_on">Dam Failure Areas ON</string>
+    <string name="damareas_off">Dam Failure Areas OFF</string>
+    <string name="damareas_what">What would flood if a dam failed suddenly, from California\'s dam safety office. California only, and no federal dams (Bureau of Reclamation, Army Corps). Not a forecast.</string>
+    <string name="damareas_gate_heading">Draw areas at this zoom or closer</string>
+    <string name="damareas_allow_title">Show dam failure areas?</string>
+    <string name="damareas_allow_text">Atmosphere will download California\'s dam failure maps for the area the map shows and keep them on this device, so they still draw with no network. Nothing about this device or its position is sent.\n\nServer: mapdepot.takwerx.org</string>
+    <string name="damareas_note">From the state\'s July 2020 copy of these maps: dams mapped since then are not shown. An area with nothing drawn is not an area that is safe from a dam failure.</string>
+    <string name="credit_damareas">Dam failure areas from California DWR\'s Division of Safety of Dams, the State Water Board\'s 2020 copy, served from (%1$s)</string>
     <string name="highflow_on">Streams Running High ON</string>
     <string name="highflow_off">Streams Running High OFF</string>
     <string name="highflow_allow_title">Show streams running high?</string>

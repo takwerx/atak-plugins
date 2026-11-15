@@ -489,7 +489,7 @@ public final class FloodZones {
      * Whether any edge of one closed ring meets any edge of the other, touching
      * included: a hole that touches its outer ring is a polygon earcut cannot fill.
      */
-    private static boolean touches(double[] a, double[] b) {
+    static boolean touches(double[] a, double[] b) {
         for (int i = 0; i + 3 < a.length; i += 2)
             for (int j = 0; j + 3 < b.length; j += 2)
                 if (meet(a[i], a[i + 1], a[i + 2], a[i + 3], b[j], b[j + 1], b[j + 2],
@@ -498,7 +498,7 @@ public final class FloodZones {
         return false;
     }
 
-    private static boolean holds(double[] outer, double[] ring) {
+    static boolean holds(double[] outer, double[] ring) {
         for (int i = 0; i + 1 < ring.length; i += 2)
             if (!inRing(outer, ring[i], ring[i + 1]))
                 return false;

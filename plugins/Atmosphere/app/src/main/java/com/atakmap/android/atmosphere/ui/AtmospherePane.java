@@ -55,6 +55,7 @@ import com.atakmap.android.atmosphere.overlay.SnotelOverlay;
 import com.atakmap.android.atmosphere.overlay.HighFlowOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodedGroundOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodZoneOverlay;
+import com.atakmap.android.atmosphere.overlay.DamAreaOverlay;
 import com.atakmap.android.atmosphere.overlay.SatelliteOverlay;
 import com.atakmap.android.atmosphere.overlay.SnowOverlay;
 import com.atakmap.android.atmosphere.overlay.SstOverlay;
@@ -407,6 +408,16 @@ public final class AtmospherePane {
     private final TextView floodzonesGateText;
     private FloodZoneOverlay floodzones;
     private boolean floodzonesOpen = true;
+    private static final String PREF_DAMAREAS_OPEN = "weather.damareas.open";
+    private final LinearLayout damareasSettings;
+    private final ImageButton damareasExpand;
+    private final Button damareasToggle;
+    private final TextView damareasStatus;
+    private final LinearLayout damareasLegend;
+    private final LinearLayout damareasGateRow;
+    private final TextView damareasGateText;
+    private DamAreaOverlay damareas;
+    private boolean damareasOpen = true;
     private static final String PREF_SATELLITE_OPEN = "weather.satellite.open";
     private final LinearLayout satelliteSettings;
     private final ImageButton satelliteExpand;
@@ -997,6 +1008,13 @@ public final class AtmospherePane {
         floodzonesLegend = find(R.id.floodzones_legend);
         floodzonesGateRow = find(R.id.floodzones_gate_row);
         floodzonesGateText = find(R.id.floodzones_gate_text);
+        damareasSettings = find(R.id.damareas_settings);
+        damareasExpand = find(R.id.damareas_expand);
+        damareasToggle = find(R.id.damareas_toggle);
+        damareasStatus = find(R.id.damareas_status);
+        damareasLegend = find(R.id.damareas_legend);
+        damareasGateRow = find(R.id.damareas_gate_row);
+        damareasGateText = find(R.id.damareas_gate_text);
         satelliteSettings = find(R.id.satellite_settings);
         satelliteExpand = find(R.id.satellite_expand);
         satelliteToggle = find(R.id.satellite_toggle);
@@ -1196,6 +1214,15 @@ public final class AtmospherePane {
             public void onClick(View v) {
                 floodzonesOpen = !floodzonesOpen;
                 rememberFold(PREF_FLOODZONES_OPEN, floodzonesOpen);
+                updateLayerControls();
+            }
+        });
+        damareasOpen = prefs == null || prefs.getBoolean(PREF_DAMAREAS_OPEN, true);
+        damareasExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                damareasOpen = !damareasOpen;
+                rememberFold(PREF_DAMAREAS_OPEN, damareasOpen);
                 updateLayerControls();
             }
         });
@@ -1654,6 +1681,8 @@ public final class AtmospherePane {
             floodground.refresh(false);
         if (floodzones != null && floodzones.isOn())
             floodzones.refresh();
+        if (damareas != null && damareas.isOn())
+            damareas.refresh();
         if (satellite != null && satellite.isOn())
             satellite.refresh(false);
         if (snow != null && snow.isOn())
@@ -2126,6 +2155,24 @@ public final class AtmospherePane {
         floodzonesLegend.removeAllViews();
         for (String[] row : FloodZoneOverlay.LEGEND)
             floodzonesLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        updateLayerControls();
+    }
+
+    /** California's dam failure areas, owned by the plugin. California only. */
+    public void setDamAreas(DamAreaOverlay overlay) {
+        damareas = overlay;
+        if (damareas == null)
+            return;
+        damareas.setListener(new DamAreaOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                damareasStatus.setText(status);
+                damareasStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        damareasLegend.removeAllViews();
+        for (String[] row : DamAreaOverlay.LEGEND)
+            damareasLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
         updateLayerControls();
     }
 
@@ -3031,6 +3078,22 @@ public final class AtmospherePane {
                     updateLayerControls();
                 } else {
                     askToAllowFloodZones();
+                }
+            }
+        });
+        damareasToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (damareas == null)
+                    return;
+                if (damareas.isOn()) {
+                    damareas.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(DamAreaOverlay.LAYER_ID)) {
+                    damareas.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowDamAreas();
                 }
             }
         });
@@ -4653,6 +4716,10 @@ public final class AtmospherePane {
             floodzones.setOn(on);
         else if (floodzones != null && on)
             blocked++;
+        if (damareas != null && (!on || allowed(DamAreaOverlay.LAYER_ID)))
+            damareas.setOn(on);
+        else if (damareas != null && on)
+            blocked++;
         if (satellite != null && (!on || allowed(SatelliteOverlay.LAYER_ID)))
             satellite.setOn(on);
         else if (satellite != null && on)
@@ -4918,6 +4985,20 @@ public final class AtmospherePane {
             floodzonesGateText.setText(floodzonesGateText.getText()
                     + "  \u2014 hidden, the view is too wide; zones draw at "
                     + floodzones.widestBar() + " or closer");
+    }
+
+    private void buildDamAreasGateRow() {
+        gateRow(damareasGateRow, damareasGateText, "Dam failure areas", damareas.gate(),
+                new Gate() {
+                    @Override
+                    public void set(double gsd) {
+                        damareas.setGate(gsd);
+                    }
+                });
+        if (damareas.tooWide())
+            damareasGateText.setText(damareasGateText.getText()
+                    + "  \u2014 hidden, the view is too wide; areas draw at "
+                    + damareas.widestBar() + " or closer");
     }
 
     /** Feature Layer's ladder, as scale-bar readings in the operator's big unit. */
@@ -5627,6 +5708,27 @@ public final class AtmospherePane {
                                 egress.setLayerEnabled(FloodZoneOverlay.LAYER_ID, true);
                                 if (floodzones != null)
                                     floodzones.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowDamAreas() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.damareas_allow_title))
+                .setMessage(pluginContext.getString(R.string.damareas_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(DamAreaOverlay.LAYER_ID, true);
+                                if (damareas != null)
+                                    damareas.setOn(true);
                                 updateLayerControls();
                             }
                         })
@@ -6621,6 +6723,15 @@ public final class AtmospherePane {
         floodzonesSettings.setVisibility(floodzonesOn && floodzonesOpen ? View.VISIBLE : View.GONE);
         if (floodzonesOn && stationLayer != null)
             buildFloodZonesGateRow();
+        final boolean damareasOn = damareas != null && damareas.isOn();
+        damareasToggle.setText(damareasOn ? R.string.damareas_on : R.string.damareas_off);
+        damareasToggle.setTextColor(pluginContext.getResources().getColor(
+                damareasOn ? R.color.state_on : R.color.state_off));
+        damareasExpand.setVisibility(damareasOn ? View.VISIBLE : View.GONE);
+        damareasExpand.setRotation(damareasOpen ? 180f : 0f);
+        damareasSettings.setVisibility(damareasOn && damareasOpen ? View.VISIBLE : View.GONE);
+        if (damareasOn && stationLayer != null)
+            buildDamAreasGateRow();
         final boolean satelliteOn = satellite != null && satellite.isOn();
         satelliteToggle.setText(satelliteOn ? R.string.satellite_on : R.string.satellite_off);
         satelliteToggle.setTextColor(pluginContext.getResources().getColor(
@@ -6955,6 +7066,11 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_floodzones, FloodZoneOverlay.HOST));
+        }
+        if (damareas != null && damareas.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_damareas, DamAreaOverlay.HOST));
         }
         if (satellite != null && satellite.isOn()) {
             if (out.length() > 0)
