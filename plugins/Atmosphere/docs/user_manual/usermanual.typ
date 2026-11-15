@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Atmosphere",
-   plugin-version: "0.21",
+   plugin-version: "0.22",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -840,6 +840,28 @@ the same gauges.
   switch (3 mi by default) to see the zones. Where FEMA has no digital flood
   map, the status line says so; that is not the same as no flood risk. Zones
   this device has seen are kept for 30 days and draw with no network.
+]
+]
+
+#tak-slide[
+= Dam Failure Areas
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 5fr))[
+  #image("126.png", width: 100%)
+][
+  #image("127.png", width: 100%)
+][
+  *Dam Failure Areas* draws what would flood if a dam, its spillway, an outlet
+  or a saddle dam failed suddenly. The maps come from California's dam safety
+  office, so the layer is California only, and federal dams (Bureau of
+  Reclamation, Army Corps) are not in it. It is not a forecast.
+
+  The flood runs miles downstream, often into another dam's lake. Tap an area:
+  the details say where the dam is from that point, for example "16 mi east,
+  on Santa Ynez River", and which failures flood it. Zoom in to the scale bar
+  distance set under the switch (15 mi by default). The maps are from the
+  state's July 2020 copy and stay on this device for use with no network. An
+  area with nothing drawn is not safe from a dam failure.
 ]
 ]
 
