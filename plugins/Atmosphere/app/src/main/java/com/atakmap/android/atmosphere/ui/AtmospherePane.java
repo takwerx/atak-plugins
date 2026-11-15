@@ -7829,8 +7829,24 @@ public final class AtmospherePane {
                     mv.postDelayed(centerSettled, 500);
                     mv.removeCallbacks(forecastSettled);
                     mv.postDelayed(forecastSettled, FORECAST_SETTLE_MS);
+                    mv.removeCallbacks(gatesSettled);
+                    mv.postDelayed(gatesSettled, 700);
                 }
             };
+
+    /**
+     * The gate lines under each layer read the scale bar ("scale bar now 9.43 mi,
+     * hidden"), so they are redrawn when the map stops; before, they kept the reading
+     * from when the page was built while the layer drew on the map (2026-11-15).
+     */
+    private final Runnable gatesSettled = new Runnable() {
+        @Override
+        public void run() {
+            if (pager != null && pager.getCurrentItem() == LAYERS_PAGE
+                    && pages[LAYERS_PAGE].isShown())
+                updateLayerControls();
+        }
+    };
     private boolean followingMap;
 
     private void setFavorite(Favorites.Place place) {
