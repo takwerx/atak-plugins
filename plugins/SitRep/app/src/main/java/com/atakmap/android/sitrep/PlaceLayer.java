@@ -202,8 +202,16 @@ public final class PlaceLayer {
     private void write(Map<String, JSONArray> byCat, Map<JSONObject, String> owner) {
         if (store == null || stopped)
             return;
+        boolean locked = false;
         try {
+            // One transaction and one redraw for the whole write: insert by insert, the
+            // store committed each feature to the sdcard on its own, and 2,135 points
+            // were still half written after 6 minutes (Murrieta, 2026-11-14).
+            store.acquireModifyLock(true);
+            locked = true;
             details.clear();
+            final long t0 = android.os.SystemClock.elapsedRealtime();
+            int written = 0;
             for (String[] c : Places.CATEGORIES) {
                 final Long set = sets.get(c[0]);
                 if (set == null)
@@ -306,10 +314,16 @@ public final class PlaceLayer {
                     final long fid = store.insertFeature(new Feature(set, name,
                             new Point(p.optDouble("lon"), p.optDouble("lat")), style, attrs));
                     details.put(fid, new String[] { name, c[1] + "\n" + d, owner.get(p), c[0], placeKey(p) });
+                    written++;
                 }
             }
+            Log.d(TAG, "places written: " + written + " in "
+                    + (android.os.SystemClock.elapsedRealtime() - t0) + " ms");
         } catch (Throwable t) {
             Log.w(TAG, "could not write the places: " + t);
+        } finally {
+            if (locked)
+                store.releaseModifyLock();
         }
     }
 
