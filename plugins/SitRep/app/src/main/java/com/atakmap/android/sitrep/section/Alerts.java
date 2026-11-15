@@ -74,6 +74,16 @@ public final class Alerts extends Section {
             return r.line("NWS alerts cover the United States and its territories.");
         }
 
+        // The national terrorism advisory, nationwide: first, and only when one is in
+        // force. It fails alone: a dead DHS feed says so and the NWS alerts still show.
+        Ntas.Advisory ntas = null;
+        boolean ntasFailed = false;
+        try {
+            ntas = Ntas.current();
+        } catch (Exception e) {
+            ntasFailed = true;
+        }
+
         // One entry per event name; several alerts of one event (zones, offices) merge.
         final Map<String, Found> byEvent = new LinkedHashMap<>();
         for (String st : states) {
@@ -108,14 +118,30 @@ public final class Alerts extends Section {
                 return r != 0 ? r : a.event.compareTo(b.event);
             }
         });
-        if (found.isEmpty())
-            return new Result("None in effect", null).line("No active alerts touch the area.");
+        if (found.isEmpty() && ntas == null) {
+            final Result none = new Result("None in effect", null).line("No active alerts touch the area.");
+            if (ntasFailed)
+                none.line("National terrorism advisory: not available.");
+            return none;
+        }
 
         final StringBuilder head = new StringBuilder();
+        if (ntas != null)
+            head.append(ntas.kind);
         for (Found x : found)
             head.append(head.length() == 0 ? "" : ", ").append(x.event);
-        final Result r = new Result(head.toString(), found.get(0).event
-                + (found.size() > 1 ? " +" + (found.size() - 1) : ""));
+        final int count = found.size() + (ntas != null ? 1 : 0);
+        final String first = ntas != null ? ntas.kind : found.get(0).event;
+        final Result r = new Result(head.toString(), first + (count > 1 ? " +" + (count - 1) : ""));
+        if (ntas != null) {
+            r.line(GROUP + ntas.kind + (ntas.until != null ? ": until " + ntas.until : ""));
+            if (ntas.summary != null && !ntas.summary.isEmpty())
+                r.line("  " + ntas.summary);
+            if (ntas.href != null)
+                r.line(link("  Read the full advisory (DHS)", ntas.href));
+            r.line("  National Terrorism Advisory System, Department of Homeland Security. For the whole country.");
+        } else if (ntasFailed)
+            r.line("National terrorism advisory: not available.");
         for (Found x : found) {
             r.line(GROUP + x.event + (x.until > 0 ? ": until " + clock(x.until) : ""));
             if (x.headline != null)
