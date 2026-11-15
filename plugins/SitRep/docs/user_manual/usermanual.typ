@@ -50,7 +50,7 @@ the SITREP icon (a clipboard, binoculars and a radio):
 
 #v(4pt)
 
-#image("07.png", width: 100%)
+#image("07.jpg", width: 100%)
 ]
 
 #tak-slide[
@@ -111,7 +111,7 @@ boundary is a circle around its point ("town, no boundary").
 #tak-slide[
 = A new report
 
-#image("08.png", width: 74%)
+#image("08.jpg", width: 74%)
 
 The area on the map, and the report filling in: "Making sit rep: 15 of 17
 sections."
@@ -139,7 +139,7 @@ it.
 = The area on the map
 
 #toolbox.side-by-side(columns: (1fr, 1fr))[
-  #image("11.png", width: 72%)
+  #image("11.jpg", width: 72%)
 ][
 *Go to* puts the report's area in view, its outline drawn on the map.
 
@@ -189,7 +189,7 @@ The status line says when places are hidden.
 #tak-slide[
 = Places on the map
 
-#image("12.png", width: 74%)
+#image("12.jpg", width: 74%)
 
 Hospitals and Schools ON in the Corona report, at street zoom.
 ]
@@ -198,9 +198,9 @@ Hospitals and Schools ON in the Corona report, at street zoom.
 = The radial and Details
 
 #toolbox.side-by-side(columns: (1fr, 1.6fr))[
-  #image("13.png", width: 78%)
+  #image("13.jpg", width: 78%)
 ][
-#image("14.png", width: 100%)
+#image("14.jpg", width: 100%)
 
 Tap a place for its radial: *Details*, *Bloodhound*, *Range and Bearing*
 and *polar coordinates*. *Details* opens the report at that place, its row
@@ -212,7 +212,7 @@ marked: here the nearest emergency room.
 = Nuclear plants
 
 #toolbox.side-by-side(columns: (1fr, 1fr))[
-  #image("15.png", width: 72%)
+  #image("15.jpg", width: 72%)
 ][
 A nuclear plant within 50 mi of the area is listed under Places. On the map
 it carries its two NRC planning zones:
@@ -228,7 +228,7 @@ Zoom out to see the 50 mile ring.
 #tak-slide[
 = 911 calls
 
-#image("16.png", width: 74%)
+#image("16.jpg", width: 74%)
 
 Where a city or county publishes its 911 calls, the section lists the last 2
 hours inside the area, by agency. *Calls on map* puts them on the map and
