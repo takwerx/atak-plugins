@@ -38,16 +38,9 @@ public final class Astro {
      * the quarters, because the moon's orbit is not circular; this is off by an hour.
      */
     public static double moonPhase(long utcMillis) {
-        final double t = (julianDate(utcMillis) - JD_2000) / 36525d;
-        final double moonLon = 218.32 + 481267.881 * t
-                + 6.29 * sinDeg(135.0 + 477198.87 * t)
-                - 1.27 * sinDeg(259.3 - 413335.36 * t)
-                + 0.66 * sinDeg(235.7 + 890534.22 * t)
-                + 0.21 * sinDeg(269.9 + 954397.74 * t)
-                - 0.19 * sinDeg(357.5 + 35999.05 * t)
-                - 0.11 * sinDeg(186.5 + 966404.03 * t);
-        final double elongation = norm360(moonLon - sunTrueLongitude(t));
-        return elongation / 360d;
+        // Meeus' main lunar terms (Light), so the Now tile and the Light section
+        // name the same phase; the six-term longitude this replaced was an hour off.
+        return Light.elongation(utcMillis) / 360d;
     }
 
     private static double sinDeg(double deg) {
@@ -75,16 +68,21 @@ public final class Astro {
         return moonPhase(utcMillis) * SYNODIC;
     }
 
-    /** The eight names, by the conventional bands around each principal phase. */
+    /**
+     * The phase by name. New, first quarter, full and last quarter are instants, so
+     * they name only the day around them (12 degrees of elongation, about a day);
+     * between them the moon is a crescent or gibbous. The old bands gave "First
+     * quarter" from 37% lit, where every almanac says waxing crescent (2026-11-15).
+     */
     public static String moonPhaseName(long utcMillis) {
-        final double p = moonPhase(utcMillis);
-        if (p < 0.0625 || p >= 0.9375) return "New moon";
-        if (p < 0.1875) return "Waxing crescent";
-        if (p < 0.3125) return "First quarter";
-        if (p < 0.4375) return "Waxing gibbous";
-        if (p < 0.5625) return "Full moon";
-        if (p < 0.6875) return "Waning gibbous";
-        if (p < 0.8125) return "Last quarter";
+        final double e = Light.elongation(utcMillis);
+        if (e < 12 || e >= 348) return "New moon";
+        if (e < 78) return "Waxing crescent";
+        if (e < 102) return "First quarter";
+        if (e < 168) return "Waxing gibbous";
+        if (e < 192) return "Full moon";
+        if (e < 258) return "Waning gibbous";
+        if (e < 282) return "Last quarter";
         return "Waning crescent";
     }
 

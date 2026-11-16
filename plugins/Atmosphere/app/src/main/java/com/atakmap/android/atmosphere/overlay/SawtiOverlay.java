@@ -271,7 +271,7 @@ public final class SawtiOverlay extends OutlookOverlay {
     private static String issued(long millis) {
         if (millis <= 0)
             return "";
-        return new SimpleDateFormat("EEE MMM d, h:mm a", Locale.US).format(new Date(millis));
+        return com.atakmap.android.atmosphere.units.Clock.format("EEE MMM d, h:mm a").format(new Date(millis));
     }
 
     private void readZones(Context pluginContext) {

@@ -1,12 +1,12 @@
 # Atmosphere for ATAK — User Guide
 
-**Version 0.21 · takwerx**
+**Version 0.24 · takwerx**
 
-**Download Atmosphere 0.21** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.24** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.21/ATAK-Plugin-Atmosphere-0.21--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.21/ATAK-Plugin-Atmosphere-0.21--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.21/ATAK-Plugin-Atmosphere-0.21--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.24/ATAK-Plugin-Atmosphere-0.24--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.24/ATAK-Plugin-Atmosphere-0.24--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.24/ATAK-Plugin-Atmosphere-0.24--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
@@ -94,12 +94,23 @@ old the reading is.
   forecast office does not issue says so.
 - **Next hours**: the next day and a half as a line, one value at a time; the
   buttons under it pick which. **Show hourly table** opens the whole table.
+- **Show light**: the light for the point, one day at a time (the arrows step
+  the day). A bar from midnight to midnight in day, civil, nautical and
+  astronomical twilight and night, with a line where the moon is up; every
+  twilight, sunrise, sunset, moonrise and moonset with its compass direction;
+  the day length; the moon's phase and its next four phases. Computed on the
+  device, so it is there with no network. Times follow the device's 12- or
+  24-hour setting.
 - **Next days**: each day's high and low, lowest humidity, strongest wind and
   gust, and highest chance of rain.
 
 <img src="screenshots/6_now.png" width="860">
 
 <img src="screenshots/7_next_hours.png" width="420"> <img src="screenshots/10_next_days.png" width="420">
+
+<img src="screenshots/130_light_bar.png" width="420"> <img src="screenshots/131_light_times.png" width="420">
+
+<img src="screenshots/132_light_moon.png" width="420">
 
 **Refresh** at the top of this page reads the forecast again. **Forecast
 settings** beside it picks where the forecast comes from, **NWS (United
@@ -174,6 +185,8 @@ opening the plugin.
 | Rain and rivers | Flash Flood Outlook | Excessive rainfall areas for three days, marginal to high |
 | Rain and rivers | River Gauges | Gauges colored by flood category; stage, flow and hydrograph behind a tap |
 | Rain and rivers | Flooded Ground | Where the river model puts water over the banks, now or at the worst of the next 5 days (experimental) |
+| Rain and rivers | FEMA Flood Zones | FEMA's flood map, not a forecast: floodway, coastal zones with waves, the 1% (100-year) and 0.2% (500-year) flood areas, areas behind a levee and areas FEMA has not studied; the flood elevation behind a tap; kept on the device for use with no network |
+| Rain and rivers | Dam Failure Areas | California only: what would flood if a dam, its spillway or a saddle dam failed suddenly, from the state's dam safety office (no federal dams); a tap says where the dam is from that point and which failures flood it; kept on the device for use with no network |
 | Rain and rivers | Rain Totals | The rain that fell, as a picture: the NWS radar estimate for the last hour to 3 days, the gauge-corrected analysis for 7 or 30 days, since Oct 1 or Jan 1, or the radar estimate of the hours before a date and time you pick; in the NWS colors, with a transparency slider |
 | Rain and rivers | Rain Gauges | Measured rain gauges around the map (USGS, airports, NWS observers, county flood control, RAWS) with their total for the time you pick, from the last 24 hours to since Jan 1, one day, or the hours before a date and time; inches in the pill, in the Rain Totals colors |
 | Rain and rivers | Streams Running High | Stream stretches over their high-water mark, colored by how rare the flow is; the numbers behind a tap |
@@ -202,6 +215,12 @@ opening the plugin.
 <td><img src="screenshots/30_flash_flood.jpg" width="420"><br>Flash flood outlook, Day 2</td></tr>
 <tr><td><img src="screenshots/36_flooded_ground.jpg" width="420"><br>Flooded ground along a river at major flood</td>
 <td><img src="screenshots/39_streams.jpg" width="420"><br>Streams running high on the same river</td></tr>
+<tr><td><img src="screenshots/124_floodzones_row.png" width="420"><br>FEMA Flood Zones: what is in view, and the zoom it draws at</td>
+<td><img src="screenshots/125_floodzones_key.png" width="420"><br>FEMA Flood Zones: the map key</td></tr>
+<tr><td><img src="screenshots/129_floodzones_map.jpg" width="420"><br>FEMA Flood Zones at Solvang: the floodway (red), the 1% and 0.2% zones</td>
+<td><img src="screenshots/128_damareas_map.jpg" width="420"><br>Dam Failure Areas: Gibraltar's flood down the Santa Ynez River into Lake Cachuma</td></tr>
+<tr><td><img src="screenshots/126_damareas_row.png" width="420"><br>Dam Failure Areas: the dams in view, the zoom they draw at, the map key</td>
+<td><img src="screenshots/127_damareas_details.png" width="420"><br>Dam Failure Areas: a tap says where the dam is and which failures flood that point</td></tr>
 <tr><td><img src="screenshots/42_waves.jpg" width="420"><br>Waves: sea state and swell</td>
 <td><img src="screenshots/52_hurricane.jpg" width="420"><br>Hurricanes: track and cone</td></tr>
 <tr><td><img src="screenshots/48_beach.jpg" width="420"><br>Beach forecast: rip current risk</td>

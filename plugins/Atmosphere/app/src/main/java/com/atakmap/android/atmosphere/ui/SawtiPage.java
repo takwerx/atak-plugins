@@ -425,7 +425,7 @@ public final class SawtiPage {
             return error.isEmpty() ? "" : error;
         final StringBuilder b = new StringBuilder();
         if (f.issued > 0) {
-            b.append("Issued ").append(new SimpleDateFormat("EEE MMM d, h:mm a", Locale.US)
+            b.append("Issued ").append(com.atakmap.android.atmosphere.units.Clock.format("EEE MMM d, h:mm a")
                     .format(new Date(f.issued))).append(", ").append(ago(f.issued)).append('.');
             if (System.currentTimeMillis() - f.issued > STALE_MS)
                 b.append(" Over a day old: the Forest Service has not posted a newer one.");

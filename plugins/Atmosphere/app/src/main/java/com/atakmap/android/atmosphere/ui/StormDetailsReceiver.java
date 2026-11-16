@@ -198,6 +198,18 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
         final TextView attributes = view.findViewById(R.id.details_attributes);
         attributes.setText(linked(body));
         attributes.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
+        // The page is reused: without this it opens where the last one was scrolled
+        // to, and a dam's first line (where the dam is) was off the top (2026-11-15).
+        if (attributes.getParent() instanceof android.widget.ScrollView) {
+            final android.widget.ScrollView sv = (android.widget.ScrollView) attributes.getParent();
+            sv.scrollTo(0, 0);
+            sv.post(new Runnable() {
+                @Override
+                public void run() {
+                    sv.scrollTo(0, 0);
+                }
+            });
+        }
         // A fire's page carries the one action its marker is for: bring the map to the
         // burn and let the layer draw its basins.
         final android.widget.Button action = view.findViewById(R.id.details_action);

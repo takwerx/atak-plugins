@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Atmosphere",
-   plugin-version: "0.21",
+   plugin-version: "0.24",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -132,6 +132,29 @@ the forecast again.
 sunrise and sunset marked. The buttons under it pick which value the line
 shows. *Show hourly table* opens the whole table; *Hide hourly table* folds it
 away again, and it stays the way you left it.
+]
+
+#tak-slide[
+= Forecast: light
+
+#toolbox.side-by-side(columns: (5fr, 5fr, 4fr))[
+  #image("130.png", width: 100%)
+  #image("132.png", width: 100%)
+][
+  #image("131.png", width: 100%)
+][
+  *Show light* opens the light for the point, one day at a time; the arrows
+  step to the next or the day before. The bar runs midnight to midnight:
+  *day*, then *civil* twilight (work without lights), *nautical* (the horizon
+  still shows), *astronomical* and *night*. The white line is the moon above
+  the horizon, its phase drawn on it; the triangle is now.
+
+  Under the bar, every twilight, sunrise, sunset, moonrise and moonset in the
+  order they happen, with the compass direction of each rise and set, the day
+  length, and the moon's phase with its next four phases. All of it is
+  computed on the device, so it is there with no network. Times follow the
+  device's 12- or 24-hour setting.
+]
 ]
 
 #tak-slide[
@@ -818,6 +841,52 @@ the same gauges.
   The service calls it experimental. It is a model's estimate, not a survey,
   and it covers only part of the country. What you can see wins. Zoom in to a
   county-wide view or closer to see it.
+]
+]
+
+#tak-slide[
+= FEMA Flood Zones
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 5fr))[
+  #image("129.jpg", width: 100%)
+  #image("124.png", width: 100%)
+][
+  #image("125.png", width: 100%)
+][
+  *FEMA Flood Zones* draws FEMA's flood map. It is not a forecast: it does not
+  change with the weather. On top is the *floodway*, the channel and the land
+  that must stay open to carry a flood. Under it, the *coastal* zones with waves
+  (V, VE), the *1%* chance a year flood area (the 100-year flood, A zones), the
+  *0.2%* area (500-year), areas *behind a levee*, and zone *D*, not studied.
+
+  Tap a zone for what it means, with the base flood elevation or the flood
+  depth when FEMA gives one. Zoom in to the scale bar distance set under the
+  switch (3 mi by default) to see the zones. Where FEMA has no digital flood
+  map, the status line says so; that is not the same as no flood risk. Zones
+  this device has seen are kept for 30 days and draw with no network.
+]
+]
+
+#tak-slide[
+= Dam Failure Areas
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 5fr))[
+  #image("128.jpg", width: 100%)
+  #image("126.png", width: 100%)
+][
+  #image("127.png", width: 100%)
+][
+  *Dam Failure Areas* draws what would flood if a dam, its spillway, an outlet
+  or a saddle dam failed suddenly. The maps come from California's dam safety
+  office, so the layer is California only, and federal dams (Bureau of
+  Reclamation, Army Corps) are not in it. It is not a forecast.
+
+  The flood runs miles downstream, often into another dam's lake. Tap an area:
+  the details say where the dam is from that point, for example "16 mi east,
+  on Santa Ynez River", and which failures flood it. Zoom in to the scale bar
+  distance set under the switch (15 mi by default). The maps are from the
+  state's July 2020 copy and stay on this device for use with no network. An
+  area with nothing drawn is not safe from a dam failure.
 ]
 ]
 

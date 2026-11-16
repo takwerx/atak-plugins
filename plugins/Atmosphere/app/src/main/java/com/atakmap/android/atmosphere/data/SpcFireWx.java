@@ -187,7 +187,7 @@ public final class SpcFireWx {
             final SimpleDateFormat in = new SimpleDateFormat("yyyyMMddHHmm", Locale.US);
             in.setTimeZone(TimeZone.getTimeZone("UTC"));
             final Date d = in.parse(yyyymmddhhmm);
-            final SimpleDateFormat out = new SimpleDateFormat("EEE MMM d, h:mm a", Locale.US);
+            final SimpleDateFormat out = com.atakmap.android.atmosphere.units.Clock.format("EEE MMM d, h:mm a");
             out.setTimeZone(zone);
             return out.format(d);
         } catch (Exception e) {

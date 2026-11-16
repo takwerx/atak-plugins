@@ -511,11 +511,11 @@ public final class PspsOverlay extends OutlookOverlay {
     }
 
     private static String time(long millis) {
-        return new SimpleDateFormat("h:mm a", Locale.US).format(new Date(millis));
+        return com.atakmap.android.atmosphere.units.Clock.format("h:mm a").format(new Date(millis));
     }
 
     /** A shutoff runs past midnight, so its times carry the day. */
     private static String day(long millis) {
-        return new SimpleDateFormat("EEE MMM d, h:mm a", Locale.US).format(new Date(millis));
+        return com.atakmap.android.atmosphere.units.Clock.format("EEE MMM d, h:mm a").format(new Date(millis));
     }
 }

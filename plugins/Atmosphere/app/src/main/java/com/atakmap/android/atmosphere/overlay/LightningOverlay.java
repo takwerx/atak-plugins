@@ -174,7 +174,7 @@ public final class LightningOverlay extends ImageOverlay {
             return "Lightning on the map: the newest 15 minutes NOAA has.";
         final long age = Math.max(0, System.currentTimeMillis() - at);
         final StringBuilder b = new StringBuilder("Lightning on the map: the 15 minutes of ")
-                .append(new SimpleDateFormat("h:mm a", Locale.US).format(new Date(at)))
+                .append(com.atakmap.android.atmosphere.units.Clock.format("h:mm a").format(new Date(at)))
                 .append(", ").append(Math.max(1, age / 60000L)).append(" min old.");
         if (age > OLD_MS)
             b.append(" NOAA has not posted a newer frame.");

@@ -1635,6 +1635,6 @@ public final class RainGaugesOverlay extends OutlookOverlay {
     }
 
     static String when(long millis) {
-        return new SimpleDateFormat("EEE h:mm a", Locale.US).format(new Date(millis));
+        return com.atakmap.android.atmosphere.units.Clock.format("EEE h:mm a").format(new Date(millis));
     }
 }

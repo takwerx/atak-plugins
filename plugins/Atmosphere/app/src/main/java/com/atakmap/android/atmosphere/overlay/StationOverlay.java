@@ -1501,8 +1501,7 @@ public final class StationOverlay {
             ago = Math.round(hours) + " hours ago";
         else
             ago = Math.round(hours / 24) + " days ago";
-        return ago + ", " + new java.text.SimpleDateFormat("EEE MMM d, h:mm a",
-                Locale.US).format(new java.util.Date(s.observedAt));
+        return ago + ", " + com.atakmap.android.atmosphere.units.Clock.format("EEE MMM d, h:mm a").format(new java.util.Date(s.observedAt));
     }
 
     private void clearOffMain() {

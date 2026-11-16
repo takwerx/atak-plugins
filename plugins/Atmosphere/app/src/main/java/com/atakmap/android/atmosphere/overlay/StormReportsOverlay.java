@@ -271,7 +271,7 @@ public final class StormReportsOverlay extends OutlookOverlay {
 
     static String when(long millis) {
         return millis <= 0 ? "unknown"
-                : new SimpleDateFormat("MMM d, h:mm a", Locale.US).format(new Date(millis));
+                : com.atakmap.android.atmosphere.units.Clock.format("MMM d, h:mm a").format(new Date(millis));
     }
 
     static String ago(long millis) {
