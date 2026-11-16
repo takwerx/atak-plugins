@@ -385,8 +385,7 @@ public final class GaugePage {
         if (chart.forecast.isEmpty())
             b.append(" (none issued)");
         else if (chart.forecastIssued > 0)
-            b.append(", issued ").append(new java.text.SimpleDateFormat("EEE h:mm a",
-                    java.util.Locale.US).format(new java.util.Date(chart.forecastIssued)));
+            b.append(", issued ").append(com.atakmap.android.atmosphere.units.Clock.format("EEE h:mm a").format(new java.util.Date(chart.forecastIssued)));
         b.append(". ");
         b.append(chartStages.any() ? "Bands: action, minor, moderate, major flood stages."
                 : "This gauge has no flood stages defined.");

@@ -850,6 +850,7 @@ public final class AtmospherePane {
         trendChips = find(R.id.trend_chips);
         trend = new TrendStripView(pluginContext);
         trendHost.addView(trend);
+        com.atakmap.android.atmosphere.units.Clock.refresh(pluginContext);
         lightContainer = find(R.id.light_container);
         lightDay = find(R.id.light_day);
         final Button lightButton = find(R.id.light_button);
@@ -3038,7 +3039,7 @@ public final class AtmospherePane {
 
     /** "Tue 6 pm": the day and hour, with a lower-case meridiem. */
     private static String clock(long when) {
-        return new SimpleDateFormat("EEE h a", Locale.US).format(new Date(when))
+        return com.atakmap.android.atmosphere.units.Clock.format("EEE h a").format(new Date(when))
                 .replace("AM", "am").replace("PM", "pm");
     }
 
@@ -7556,7 +7557,7 @@ public final class AtmospherePane {
         final long t = com.atakmap.android.atmosphere.data.IsoTime.parse(time);
         if (t <= 0)
             return time;
-        final String when = new SimpleDateFormat("h:mm a", Locale.US).format(new Date(t))
+        final String when = com.atakmap.android.atmosphere.units.Clock.format("h:mm a").format(new Date(t))
                 .replace("AM", "am").replace("PM", "pm");
         final boolean latest = index == radarFrames.size() - 1;
         return (latest ? "Latest" : capitalize(relativeTime(t))) + ", " + when;
@@ -8132,6 +8133,7 @@ public final class AtmospherePane {
         // is a fact about the feed, not about the weather, so the heading stays "Now".
         currentHeading.setText(pluginContext.getString(R.string.heading_now));
 
+        com.atakmap.android.atmosphere.units.Clock.refresh(MapCompat.atakContext());
         renderNow(now);
         renderSunMoon();
 
@@ -8425,7 +8427,7 @@ public final class AtmospherePane {
             labels.add(shortLabel(r));
         hoursLegend.addView(column("", labels, true));
         final SimpleDateFormat day = new SimpleDateFormat("EEE", Locale.US);
-        final SimpleDateFormat hour = new SimpleDateFormat("ha", Locale.US);
+        final SimpleDateFormat hour = com.atakmap.android.atmosphere.units.Clock.format("ha");
         int shown = 0;
         for (SeriesEntry entry : snapshot.series) {
             if (shown++ >= HOURS_SHOWN)
@@ -8490,10 +8492,10 @@ public final class AtmospherePane {
             if (kind(r) == Kind.SKY) skyKey = r.key;
         }
         final long now = System.currentTimeMillis();
-        final SimpleDateFormat hourFmt = new SimpleDateFormat("ha", Locale.US);
+        final SimpleDateFormat hourFmt = com.atakmap.android.atmosphere.units.Clock.format("ha");
         final SimpleDateFormat dayFmt = new SimpleDateFormat("EEE", Locale.US);
         final SimpleDateFormat dayKey = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
-        final SimpleDateFormat clock = new SimpleDateFormat("h:mm", Locale.US);
+        final SimpleDateFormat clock = com.atakmap.android.atmosphere.units.Clock.format("h:mm");
         final Map<String, long[]> sunByDay = new LinkedHashMap<>();
         String lastDay = null;
         int shown = 0;
@@ -8569,6 +8571,7 @@ public final class AtmospherePane {
         // Closed, nothing is computed; opening the fold renders it.
         if (snapshot == null || !lightOpen)
             return;
+        com.atakmap.android.atmosphere.units.Clock.refresh(pluginContext);
         final TimeZone tz = TimeZone.getDefault();
         final long now = System.currentTimeMillis();
         final Calendar c = Calendar.getInstance(tz);
@@ -8604,7 +8607,7 @@ public final class AtmospherePane {
         lightContainer.addView(legend);
 
         // Every event of the day in the order it happens.
-        final SimpleDateFormat clock = new SimpleDateFormat("h:mm a", Locale.US);
+        final SimpleDateFormat clock = com.atakmap.android.atmosphere.units.Clock.format("h:mm a");
         clock.setTimeZone(tz);
         final List<Object[]> rows = new ArrayList<>();
         addEvents(rows, d.astroDawn, LightBarView.BAND_COLORS[1], "Astronomical twilight begins", false);
@@ -8678,7 +8681,7 @@ public final class AtmospherePane {
                 + String.format(Locale.US, "%.1f", elong / 360d * 29.530588853) + " days old");
         moon.addView(mt);
         lightContainer.addView(moon);
-        final SimpleDateFormat phaseFmt = new SimpleDateFormat("EEE MMM d, h:mm a", Locale.US);
+        final SimpleDateFormat phaseFmt = com.atakmap.android.atmosphere.units.Clock.format("EEE MMM d, h:mm a");
         phaseFmt.setTimeZone(tz);
         for (Light.Phase ph : Light.nextPhases(moonAt, 4))
             lightContainer.addView(note(Light.PHASE_NAMES[ph.kind] + "   "
@@ -8732,7 +8735,7 @@ public final class AtmospherePane {
         final long now = System.currentTimeMillis();
         final long[] sun = Astro.sunRiseSet(now, TimeZone.getDefault(), snapshot.latitude,
                 snapshot.longitude);
-        final SimpleDateFormat clock = new SimpleDateFormat("h:mm a", Locale.US);
+        final SimpleDateFormat clock = com.atakmap.android.atmosphere.units.Clock.format("h:mm a");
         final LinearLayout row = new LinearLayout(pluginContext);
         row.setOrientation(LinearLayout.HORIZONTAL);
         if (sun != null) {

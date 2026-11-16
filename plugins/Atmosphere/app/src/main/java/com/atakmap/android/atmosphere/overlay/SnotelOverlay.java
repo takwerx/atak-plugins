@@ -505,7 +505,7 @@ public final class SnotelOverlay {
         final double hours = (now - at) / 3_600_000.0;
         final String ago = hours < 1.5 ? Math.max(1, Math.round(hours * 60)) + " minutes ago"
                 : hours < 48 ? Math.round(hours) + " hours ago" : Math.round(hours / 24) + " days ago";
-        return ago + ", " + new java.text.SimpleDateFormat("EEE MMM d, h:mm a", Locale.US)
+        return ago + ", " + com.atakmap.android.atmosphere.units.Clock.format("EEE MMM d, h:mm a")
                 .format(new java.util.Date(at));
     }
 

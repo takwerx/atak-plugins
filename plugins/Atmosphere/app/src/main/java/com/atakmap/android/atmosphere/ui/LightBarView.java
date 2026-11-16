@@ -132,6 +132,8 @@ public final class LightBarView extends View {
     }
 
     private static String hourLabel(int h) {
+        if (com.atakmap.android.atmosphere.units.Clock.is24())
+            return String.valueOf(h);
         if (h == 0) return "12a";
         if (h == 12) return "12p";
         return h < 12 ? h + "a" : (h - 12) + "p";

@@ -248,7 +248,7 @@ public final class HighFlow {
             final SimpleDateFormat in = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
             in.setTimeZone(TimeZone.getTimeZone("UTC"));
             final Date d = in.parse(t);
-            return new SimpleDateFormat("EEE MMM d, h:mm a", Locale.US).format(d);
+            return com.atakmap.android.atmosphere.units.Clock.format("EEE MMM d, h:mm a").format(d);
         } catch (Exception e) {
             return serviceTime;
         }

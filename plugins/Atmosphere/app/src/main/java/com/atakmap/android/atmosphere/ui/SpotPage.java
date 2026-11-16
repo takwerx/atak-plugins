@@ -1831,7 +1831,7 @@ public final class SpotPage {
         if (when <= 0)
             return "at an unknown time";
         final SimpleDateFormat key = new SimpleDateFormat("yyyyMMdd", Locale.US);
-        final String time = new SimpleDateFormat("h:mm a", Locale.US)
+        final String time = com.atakmap.android.atmosphere.units.Clock.format("h:mm a")
                 .format(new Date(when)).replace("AM", "am").replace("PM", "pm");
         final String on = key.format(new Date(when));
         if (on.equals(key.format(new Date())))
