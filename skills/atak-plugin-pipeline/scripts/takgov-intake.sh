@@ -141,7 +141,7 @@ for Z in "${ZIPS[@]}"; do
     trap 'rm -rf "$TMP"' EXIT
     unzip -q "$Z" -d "$TMP" || { echo "could not unzip $Z" >&2; FAIL=1; rm -rf "$TMP"; continue; }
 
-    APK="$(ls "$TMP"/ATAK-Plugin-*.apk 2>/dev/null | head -1)"
+    APK="$(find "$TMP" -type f -name 'ATAK-Plugin-*.apk' 2>/dev/null | head -1)"
     [ -n "$APK" ] || { echo "no ATAK-Plugin-*.apk inside $(basename "$Z") -- is this a tak.gov return zip?" >&2; FAIL=1; rm -rf "$TMP"; continue; }
     BASE="$(basename "$APK")"
     PLUGIN="$(echo "$BASE" | sed -E 's/^ATAK-Plugin-([A-Za-z0-9]+)-.*/\1/')"
@@ -152,14 +152,23 @@ for Z in "${ZIPS[@]}"; do
 
     DEST="$DIST/scans/$PLUGIN/$VERSION/$TARGET"
     mkdir -p "$DEST" "$DIST/signed"
+    # Found by name anywhere in the zip, never by one fixed layout: in November
+    # 2026 tak.gov moved the scans into reports/ (bom.json beside them, no sbom/
+    # folder, no Dependency-Check), and a top-level-only lookup passed builds
+    # whose Fortify scan it never read.
+    found() { find "$TMP" -type f -name "$1" 2>/dev/null | head -1; }
     for f in build.log civRelease-app-mapping.txt dependency-check-report.html \
              fortify_analyze.log fortify_analyze_FortifySupport.log fortify_scan.txt \
              fortify_scan_FortifySupport.txt fortify_scan_results.pdf scan_results.fpr; do
-        [ -f "$TMP/$f" ] && cp "$TMP/$f" "$DEST/"
+        src="$(found "$f")"
+        [ -n "$src" ] && cp "$src" "$DEST/"
     done
-    [ -d "$TMP/sbom" ] && { mkdir -p "$DEST/sbom"; cp "$TMP"/sbom/* "$DEST/sbom/" 2>/dev/null; }
+    for f in bom.json bom.xml; do
+        src="$(found "$f")"
+        [ -n "$src" ] && { mkdir -p "$DEST/sbom"; cp "$src" "$DEST/sbom/"; }
+    done
     cp "$APK" "$DIST/signed/"
-    for b in "$TMP"/ATAK-Plugin-*.aab; do [ -f "$b" ] && cp "$b" "$DIST/signed/"; done
+    find "$TMP" -type f -name 'ATAK-Plugin-*.aab' -exec cp {} "$DIST/signed/" \;
     ok "filed: signed/$BASE and scans/$PLUGIN/$VERSION/$TARGET/"
 
     # ---- the APK is what it claims to be ------------------------------------
@@ -223,7 +232,9 @@ for Z in "${ZIPS[@]}"; do
             fi
         fi
     else
-        note "no Fortify report in this zip"
+        # Never a note: every tak.gov build is scanned, so a missing scan means
+        # this script could not find it, and a gate that cannot see is not a pass.
+        bad "no Fortify scan found anywhere in this zip -- open it and find fortify_scan.txt before publishing"
     fi
 
     # ---- Dependency-Check: libraries, and its habit of guessing --------------
@@ -262,7 +273,7 @@ PY
             done
         fi
     else
-        note "no Dependency-Check report in this zip"
+        note "no Dependency-Check report: tak.gov stopped sending one in November 2026; the SBOM is filed under sbom/"
     fi
 
     [ "$KEEP" -eq 1 ] || { mkdir -p "$INBOX/done"; mv "$Z" "$INBOX/done/"; }
