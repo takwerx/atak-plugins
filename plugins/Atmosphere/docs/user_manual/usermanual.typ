@@ -135,6 +135,29 @@ away again, and it stays the way you left it.
 ]
 
 #tak-slide[
+= Forecast: light
+
+#toolbox.side-by-side(columns: (5fr, 5fr, 4fr))[
+  #image("130.png", width: 100%)
+  #image("132.png", width: 100%)
+][
+  #image("131.png", width: 100%)
+][
+  *Show light* opens the light for the point, one day at a time; the arrows
+  step to the next or the day before. The bar runs midnight to midnight:
+  *day*, then *civil* twilight (work without lights), *nautical* (the horizon
+  still shows), *astronomical* and *night*. The white line is the moon above
+  the horizon, its phase drawn on it; the triangle is now.
+
+  Under the bar, every twilight, sunrise, sunset, moonrise and moonset in the
+  order they happen, with the compass direction of each rise and set, the day
+  length, and the moon's phase with its next four phases. All of it is
+  computed on the device, so it is there with no network. Times follow the
+  device's 12- or 24-hour setting.
+]
+]
+
+#tak-slide[
 = Forecast: the days ahead
 
 #toolbox.side-by-side(columns: (7fr, 5fr))[

@@ -94,12 +94,23 @@ old the reading is.
   forecast office does not issue says so.
 - **Next hours**: the next day and a half as a line, one value at a time; the
   buttons under it pick which. **Show hourly table** opens the whole table.
+- **Show light**: the light for the point, one day at a time (the arrows step
+  the day). A bar from midnight to midnight in day, civil, nautical and
+  astronomical twilight and night, with a line where the moon is up; every
+  twilight, sunrise, sunset, moonrise and moonset with its compass direction;
+  the day length; the moon's phase and its next four phases. Computed on the
+  device, so it is there with no network. Times follow the device's 12- or
+  24-hour setting.
 - **Next days**: each day's high and low, lowest humidity, strongest wind and
   gust, and highest chance of rain.
 
 <img src="screenshots/6_now.png" width="860">
 
 <img src="screenshots/7_next_hours.png" width="420"> <img src="screenshots/10_next_days.png" width="420">
+
+<img src="screenshots/130_light_bar.png" width="420"> <img src="screenshots/131_light_times.png" width="420">
+
+<img src="screenshots/132_light_moon.png" width="420">
 
 **Refresh** at the top of this page reads the forecast again. **Forecast
 settings** beside it picks where the forecast comes from, **NWS (United
