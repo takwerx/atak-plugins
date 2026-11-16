@@ -221,6 +221,9 @@ public final class AtmospherePane {
     private final TextView lightDay;
     /** Days from today the Light section shows; the stepper moves it. */
     private int lightOffset;
+    private static final String PREF_LIGHT_OPEN = "weather.light.open";
+    /** The Light section opens under its button, as the hourly table does; closed until opened, then remembered. */
+    private boolean lightOpen;
     private Kind trendKind = Kind.TEMP;
     private final Button hoursTableButton;
     private final View hoursTable;
@@ -849,6 +852,28 @@ public final class AtmospherePane {
         trendHost.addView(trend);
         lightContainer = find(R.id.light_container);
         lightDay = find(R.id.light_day);
+        final Button lightButton = find(R.id.light_button);
+        final View lightBody = find(R.id.light_body);
+        final SharedPreferences lightPrefs = MapCompat.prefs();
+        lightOpen = lightPrefs != null && lightPrefs.getBoolean(PREF_LIGHT_OPEN, false);
+        final Runnable showLightFold = new Runnable() {
+            @Override
+            public void run() {
+                lightButton.setText(lightOpen ? R.string.hide_light : R.string.show_light);
+                lightBody.setVisibility(lightOpen ? View.VISIBLE : View.GONE);
+            }
+        };
+        showLightFold.run();
+        lightButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                lightOpen = !lightOpen;
+                rememberFold(PREF_LIGHT_OPEN, lightOpen);
+                showLightFold.run();
+                if (lightOpen)
+                    renderLight();
+            }
+        });
         ((Button) find(R.id.light_prev)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -8541,7 +8566,8 @@ public final class AtmospherePane {
      */
     private void renderLight() {
         lightContainer.removeAllViews();
-        if (snapshot == null)
+        // Closed, nothing is computed; opening the fold renders it.
+        if (snapshot == null || !lightOpen)
             return;
         final TimeZone tz = TimeZone.getDefault();
         final long now = System.currentTimeMillis();

@@ -154,12 +154,20 @@
         <!-- Light: the sun's twilights and the moon for the point, one local day at a
              time, computed on the device. Asked for by a crew that pastes a light bar
              into worksheets and IAPs (2026-11-15). -->
-        <TextView
-            style="@style/TakwerxSectionHeading"
-            android:id="@+id/light_heading"
+        <Button
+            android:id="@+id/light_button"
+            style="@style/TakwerxButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/heading_light" />
+            android:layout_marginTop="6dp"
+            android:text="@string/show_light" />
+
+        <LinearLayout
+            android:id="@+id/light_body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -197,6 +205,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical" />
+        </LinearLayout>
 
         <TextView
             style="@style/TakwerxSectionHeading"
