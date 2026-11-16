@@ -112,7 +112,20 @@ Capabilities:
 _________________________________________________________________
 STATUS
 
-0.21, for ATAK-CIV 5.6, 5.7 and 5.8: Wind draws in 3D. Tilt the map and the
+0.24, for ATAK-CIV 5.6, 5.7 and 5.8: the Forecast page has a Show light
+button under the hourly table. It opens a bar of the day's light from midnight
+to midnight (night, the three twilights and day, the hours the moon is up, and
+now), the twilight, sun and moon times in the order they happen with the sun's
+and moon's bearing, how long the day is against the day before, the moon's
+phase and the next four phases, for any day from 30 days back to 60 days ahead. It is
+worked out on the device, so it needs no network. Every time in Atmosphere
+follows the device's 12 or 24-hour setting. It carries 0.22 and 0.23, which
+were built but never released: Dam Failure Areas (the state inundation maps of
+what floods if a dam fails, with a tap that names the dam and where it is from
+the point tapped), FEMA Flood Zones, Fire Danger areas outlined so their edges
+read on any map, a details page that opens at its top, and the zoom line on the
+Layers page that follows the map as it moves.
+0.21: Wind draws in 3D. Tilt the map and the
 streaks lie on the ground, over ridges and down into valleys, around the point
 the map looks at; the flat map is as it was. It carries 0.20, which was built
 but never released: Storm Reports and the Spot Weather Forecast page put their
