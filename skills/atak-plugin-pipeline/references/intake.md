@@ -9,6 +9,8 @@ it. The zip also carries:
 | `fortify_scan.txt`, `fortify_scan_results.pdf`, `scan_results.fpr` | a Fortify static analysis of **your own source** |
 | `dependency-check-report.html` | an OWASP Dependency-Check of every archive in the build |
 | `sbom/bom.json` | a CycloneDX SBOM |
+
+Since November 2026 tak.gov puts the scans in a `reports/` folder inside the zip, with `bom.json` and `bom.xml` beside them and no Dependency-Check report. The intake finds every file by name wherever it is, and a zip with no Fortify scan fails the gate instead of passing with a note.
 | `build.log`, `civRelease-app-mapping.txt` | the build log and the proguard mapping |
 
 Every file has the same name whatever the ATAK target, so two targets unpacked
