@@ -32,6 +32,7 @@ import androidx.viewpager.widget.PagerAdapter;
 import androidx.viewpager.widget.ViewPager;
 
 import com.atakmap.android.atmosphere.astro.Astro;
+import com.atakmap.android.atmosphere.astro.Light;
 import com.atakmap.android.atmosphere.compat.MapCompat;
 import com.atakmap.android.atmosphere.data.Favorites;
 import com.atakmap.android.atmosphere.data.Nhc;
@@ -215,6 +216,11 @@ public final class AtmospherePane {
     private final LinearLayout trendHost;
     private final LinearLayout trendChips;
     private final TrendStripView trend;
+    /** The Light section: one local day of twilight and moon for the point. */
+    private final LinearLayout lightContainer;
+    private final TextView lightDay;
+    /** Days from today the Light section shows; the stepper moves it. */
+    private int lightOffset;
     private Kind trendKind = Kind.TEMP;
     private final Button hoursTableButton;
     private final View hoursTable;
@@ -841,6 +847,22 @@ public final class AtmospherePane {
         trendChips = find(R.id.trend_chips);
         trend = new TrendStripView(pluginContext);
         trendHost.addView(trend);
+        lightContainer = find(R.id.light_container);
+        lightDay = find(R.id.light_day);
+        ((Button) find(R.id.light_prev)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                lightOffset = Math.max(-30, lightOffset - 1);
+                renderLight();
+            }
+        });
+        ((Button) find(R.id.light_next)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                lightOffset = Math.min(60, lightOffset + 1);
+                renderLight();
+            }
+        });
         hoursTableButton = find(R.id.hours_table_button);
         hoursTable = find(R.id.hours_table);
         hoursLegend = find(R.id.hours_legend);
@@ -8090,6 +8112,7 @@ public final class AtmospherePane {
 
         renderTrend(wanted);
         renderHours(wanted);
+        renderLight();
         renderDays(wanted);
         attributionText.setText(snapshot.attribution == null ? "" : snapshot.attribution);
         discussion.refresh(false);
@@ -8508,6 +8531,172 @@ public final class AtmospherePane {
             prevTime = e.timeMillis;
         }
         return cols;
+    }
+
+    /**
+     * The Light section for the point and the day the stepper is on: the light bar,
+     * the twilights, sun and moon rise and set with azimuths, day length, and the
+     * moon's phase and next phases. All computed on the device, so it is there with
+     * no network. Times on this device's clock, as the hourly strip above uses.
+     */
+    private void renderLight() {
+        lightContainer.removeAllViews();
+        if (snapshot == null)
+            return;
+        final TimeZone tz = TimeZone.getDefault();
+        final long now = System.currentTimeMillis();
+        final Calendar c = Calendar.getInstance(tz);
+        c.setTimeInMillis(now);
+        c.add(Calendar.DAY_OF_MONTH, lightOffset);
+        c.set(Calendar.HOUR_OF_DAY, 12);
+        c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        final long noon = c.getTimeInMillis();
+        final double lat = snapshot.latitude, lon = snapshot.longitude;
+        final Light.Day d = Light.day(noon, tz, lat, lon);
+        final Light.Day before = Light.day(noon - 86_400_000L, tz, lat, lon);
+
+        final SimpleDateFormat dayFmt = new SimpleDateFormat("EEE MMM d", Locale.US);
+        dayFmt.setTimeZone(tz);
+        final String date = dayFmt.format(new Date(noon));
+        lightDay.setText(lightOffset == 0 ? "Today, " + date
+                : lightOffset == 1 ? "Tomorrow, " + date
+                : lightOffset == -1 ? "Yesterday, " + date : date);
+
+        // The moon is drawn as it is now when now is in the day, else at noon.
+        final long moonAt = now >= d.start && now < d.end ? now : noon;
+        final LightBarView bar = new LightBarView(pluginContext);
+        bar.setDay(d, tz, now, Light.elongation(moonAt));
+        lightContainer.addView(bar);
+
+        final LinearLayout legend = new LinearLayout(pluginContext);
+        legend.setOrientation(LinearLayout.HORIZONTAL);
+        legend.setPadding(dp(4), 0, dp(4), dp(6));
+        for (int i = LightBarView.BAND_COLORS.length - 1; i >= 0; i--)
+            legend.addView(swatchLabel(LightBarView.BAND_COLORS[i], LightBarView.BAND_NAMES[i], 11));
+        lightContainer.addView(legend);
+
+        // Every event of the day in the order it happens.
+        final SimpleDateFormat clock = new SimpleDateFormat("h:mm a", Locale.US);
+        clock.setTimeZone(tz);
+        final List<Object[]> rows = new ArrayList<>();
+        addEvents(rows, d.astroDawn, LightBarView.BAND_COLORS[1], "Astronomical twilight begins", false);
+        addEvents(rows, d.nauticalDawn, LightBarView.BAND_COLORS[2], "Nautical twilight begins", false);
+        addEvents(rows, d.civilDawn, LightBarView.BAND_COLORS[3], "Civil twilight begins", false);
+        addEvents(rows, d.sunrise, LightBarView.BAND_COLORS[4], "Sunrise", true);
+        addEvents(rows, d.sunset, LightBarView.BAND_COLORS[4], "Sunset", true);
+        addEvents(rows, d.civilDusk, LightBarView.BAND_COLORS[3], "Civil twilight ends", false);
+        addEvents(rows, d.nauticalDusk, LightBarView.BAND_COLORS[2], "Nautical twilight ends", false);
+        addEvents(rows, d.astroDusk, LightBarView.BAND_COLORS[1], "Astronomical twilight ends", false);
+        addEvents(rows, d.moonrise, 0xFFD8D8D8, "Moonrise", true);
+        addEvents(rows, d.moonset, 0xFFD8D8D8, "Moonset", true);
+        java.util.Collections.sort(rows, new java.util.Comparator<Object[]>() {
+            @Override
+            public int compare(Object[] a, Object[] b) {
+                return Long.compare((Long) a[0], (Long) b[0]);
+            }
+        });
+        for (Object[] r : rows) {
+            // Rounded to the minute, not cut: 05:31:50 is 5:32.
+            final String t = clock.format(new Date((Long) r[0] + 30_000L)).toLowerCase(Locale.US);
+            final LinearLayout row = (LinearLayout) swatchLabel((Integer) r[1], (String) r[2], 14);
+            // The time in its own column, so "11:50 am" and "5:04 am" line up.
+            final TextView tv = new TextView(pluginContext);
+            tv.setText(t);
+            tv.setTextSize(14);
+            tv.setTextColor(Color.WHITE);
+            tv.setSingleLine(true);
+            tv.setLayoutParams(new LinearLayout.LayoutParams(dp(78),
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+            row.addView(tv, 1);
+            lightContainer.addView(row);
+        }
+        if (d.sunAlwaysUp)
+            lightContainer.addView(note("The sun does not set this day."));
+        else if (d.sunAlwaysDown)
+            lightContainer.addView(note("The sun does not rise this day."));
+        if (d.moonrise.isEmpty())
+            lightContainer.addView(note("No moonrise this day."));
+        if (d.moonset.isEmpty())
+            lightContainer.addView(note("No moonset this day."));
+
+        final int diff = d.daylightMinutes - before.daylightMinutes;
+        lightContainer.addView(note("Daylight " + (d.daylightMinutes / 60) + " h "
+                + (d.daylightMinutes % 60) + " min"
+                + (diff == 0 ? ", the same as the day before"
+                        : ", " + Math.abs(diff) + " min " + (diff < 0 ? "shorter" : "longer")
+                                + " than the day before")));
+
+        // The moon: phase as drawn on the bar, then the next four principal phases.
+        final double elong = Light.elongation(moonAt);
+        final LinearLayout moon = new LinearLayout(pluginContext);
+        moon.setOrientation(LinearLayout.HORIZONTAL);
+        moon.setGravity(Gravity.CENTER_VERTICAL);
+        moon.setPadding(dp(4), dp(8), dp(4), dp(4));
+        final View glyph = new View(pluginContext) {
+            @Override
+            protected void onDraw(android.graphics.Canvas cv) {
+                LightBarView.drawMoon(cv, getWidth() / 2f, getHeight() / 2f,
+                        Math.min(getWidth(), getHeight()) / 2f - 2, elong);
+            }
+        };
+        glyph.setLayoutParams(new LinearLayout.LayoutParams(dp(44), dp(44)));
+        moon.addView(glyph);
+        final TextView mt = new TextView(pluginContext);
+        mt.setTextColor(Color.WHITE);
+        mt.setTextSize(15);
+        mt.setPadding(dp(10), 0, 0, 0);
+        mt.setText(Astro.moonPhaseName(moonAt) + ", "
+                + Math.round(Light.illumination(moonAt) * 100) + "% lit, "
+                + String.format(Locale.US, "%.1f", elong / 360d * 29.530588853) + " days old");
+        moon.addView(mt);
+        lightContainer.addView(moon);
+        final SimpleDateFormat phaseFmt = new SimpleDateFormat("EEE MMM d, h:mm a", Locale.US);
+        phaseFmt.setTimeZone(tz);
+        for (Light.Phase ph : Light.nextPhases(moonAt, 4))
+            lightContainer.addView(note(Light.PHASE_NAMES[ph.kind] + "   "
+                    + phaseFmt.format(new Date(ph.time + 30_000L)).replace("AM", "am")
+                            .replace("PM", "pm")));
+        lightContainer.addView(note("Times in " + tz.getDisplayName(
+                tz.inDaylightTime(new Date(noon)), TimeZone.SHORT, Locale.US) + "."));
+    }
+
+    private static void addEvents(List<Object[]> rows, List<Light.Event> events, int color,
+            String name, boolean withAzimuth) {
+        for (Light.Event e : events)
+            rows.add(new Object[] { e.time, color,
+                    withAzimuth ? name + ", " + Math.round(e.azimuth) + "\u00b0" : name });
+    }
+
+    /** A line of text with a small color square before it. */
+    private View swatchLabel(int color, String text, int sp) {
+        final LinearLayout row = new LinearLayout(pluginContext);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(4), dp(2), dp(8), dp(2));
+        final View sw = new View(pluginContext);
+        sw.setBackgroundColor(color);
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(10), dp(10));
+        lp.rightMargin = dp(6);
+        sw.setLayoutParams(lp);
+        row.addView(sw);
+        final TextView t = new TextView(pluginContext);
+        t.setText(text);
+        t.setTextSize(sp);
+        t.setTextColor(Color.WHITE);
+        t.setSingleLine(true);
+        row.addView(t);
+        return row;
+    }
+
+    private TextView note(String text) {
+        final TextView t = new TextView(pluginContext);
+        t.setText(text);
+        t.setTextSize(14);
+        t.setTextColor(Color.WHITE);
+        t.setPadding(dp(4), dp(3), dp(4), dp(3));
+        return t;
     }
 
     /** Sunrise, sunset and the moon for the point, computed on the device. */

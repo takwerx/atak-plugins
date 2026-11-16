@@ -151,6 +151,53 @@
             </HorizontalScrollView>
         </LinearLayout>
 
+        <!-- Light: the sun's twilights and the moon for the point, one local day at a
+             time, computed on the device. Asked for by a crew that pastes a light bar
+             into worksheets and IAPs (2026-11-15). -->
+        <TextView
+            style="@style/TakwerxSectionHeading"
+            android:id="@+id/light_heading"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/heading_light" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/light_prev"
+                style="@style/TakwerxButton"
+                android:layout_width="56dp"
+                android:layout_height="wrap_content"
+                android:text="\u2039" />
+
+            <TextView
+                android:id="@+id/light_day"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:textColor="@color/white"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/light_next"
+                style="@style/TakwerxButton"
+                android:layout_width="56dp"
+                android:layout_height="wrap_content"
+                android:text="\u203A" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/light_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
         <TextView
             style="@style/TakwerxSectionHeading"
             android:id="@+id/days_heading"
