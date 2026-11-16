@@ -206,6 +206,8 @@ opening the plugin.
 <td><img src="screenshots/39_streams.jpg" width="420"><br>Streams running high on the same river</td></tr>
 <tr><td><img src="screenshots/124_floodzones_row.png" width="420"><br>FEMA Flood Zones: what is in view, and the zoom it draws at</td>
 <td><img src="screenshots/125_floodzones_key.png" width="420"><br>FEMA Flood Zones: the map key</td></tr>
+<tr><td><img src="screenshots/129_floodzones_map.jpg" width="420"><br>FEMA Flood Zones at Solvang: the floodway (red), the 1% and 0.2% zones</td>
+<td><img src="screenshots/128_damareas_map.jpg" width="420"><br>Dam Failure Areas: Gibraltar's flood down the Santa Ynez River into Lake Cachuma</td></tr>
 <tr><td><img src="screenshots/126_damareas_row.png" width="420"><br>Dam Failure Areas: the dams in view, the zoom they draw at, the map key</td>
 <td><img src="screenshots/127_damareas_details.png" width="420"><br>Dam Failure Areas: a tap says where the dam is and which failures flood that point</td></tr>
 <tr><td><img src="screenshots/42_waves.jpg" width="420"><br>Waves: sea state and swell</td>

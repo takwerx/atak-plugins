@@ -825,6 +825,7 @@ the same gauges.
 = FEMA Flood Zones
 
 #toolbox.side-by-side(columns: (4fr, 4fr, 5fr))[
+  #image("129.jpg", width: 100%)
   #image("124.png", width: 100%)
 ][
   #image("125.png", width: 100%)
@@ -847,6 +848,7 @@ the same gauges.
 = Dam Failure Areas
 
 #toolbox.side-by-side(columns: (4fr, 4fr, 5fr))[
+  #image("128.jpg", width: 100%)
   #image("126.png", width: 100%)
 ][
   #image("127.png", width: 100%)
