@@ -3,6 +3,7 @@ package com.atakmap.android.sitrep.section;
 import com.atakmap.android.sitrep.Area;
 import com.atakmap.android.sitrep.net.Esri;
 import com.atakmap.android.sitrep.net.Http;
+import com.atakmap.android.sitrep.net.Socrata;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -33,6 +34,8 @@ public final class Calls extends Section {
     static final String CATALOG = "https://mapdepot.takwerx.org/sitrep/calls/catalog.json";
     /** The window the report counts: calls received in the last two hours. */
     static final long WINDOW_MS = 2L * 3600 * 1000;
+    /** The longest window a catalog row may ask for (hours). */
+    static final int MAX_WINDOW_HOURS = 72;
     private static final int SHOW_PER_AGENCY = 15;
 
     /** Call types cut to the block (house number to its hundred). */
@@ -74,10 +77,13 @@ public final class Calls extends Section {
         final List<String> lines = new ArrayList<>();
         final List<String> failed = new ArrayList<>();
         int total = 0;
+        boolean late = false;
         for (JSONObject f : here) {
             final List<Call> calls;
+            final long window = windowMs(f);
             try {
-                calls = "socrata".equals(f.optString("adapter")) ? socrata(f, area, now) : arcgis(f, area, now);
+                calls = "socrata".equals(f.optString("adapter")) ? socrata(f, area, now, window)
+                        : arcgis(f, area, now, window);
             } catch (Exception e) {
                 failed.add(f.optString("agency"));
                 continue;
@@ -88,8 +94,14 @@ public final class Calls extends Section {
                     return Long.compare(b.time, a.time);
                 }
             });
-            total += calls.size();
-            lines.add(GROUP + f.optString("agency") + " (" + f.optString("kind") + "): " + calls.size());
+            // A feed that publishes hours to days late (Chicago crashes) names its own window
+            // and is not part of the "last 2 h" count: it would read as "none" every time.
+            final boolean slow = window > WINDOW_MS;
+            late |= slow;
+            if (!slow)
+                total += calls.size();
+            lines.add(GROUP + f.optString("agency") + " (" + f.optString("kind") + "): " + calls.size()
+                    + (slow ? " in the last " + (window / 3_600_000L) + " h" : ""));
             for (int i = 0; i < calls.size() && i < SHOW_PER_AGENCY; i++)
                 lines.add("  " + calls.get(i).describe(now));
             for (Call c : calls)
@@ -107,18 +119,20 @@ public final class Calls extends Section {
             r.line(a + ": did not answer.");
         r.line("Calls the agencies publish, received in the last 2 hours, inside the area. "
                 + "Agencies leave out some calls; medical calls are shown to the block.");
+        if (late)
+            r.line("Some agencies publish hours to days late. Those are listed with their own time window and are not in the count above.");
         return r;
     }
 
     // ------------------------------------------------------------------ adapters
 
     /** A Socrata dataset: a box around the area and the time window, in SoQL. */
-    private static List<Call> socrata(JSONObject f, Area area, long now) throws Exception {
+    private static List<Call> socrata(JSONObject f, Area area, long now, long window) throws Exception {
         final String point = f.optString("point"), time = f.optString("time");
         final boolean utc = "utc".equals(f.optString("time_kind"));
         final SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
         fmt.setTimeZone(TimeZone.getTimeZone(utc ? "UTC" : f.optString("tz", "UTC")));
-        final String since = fmt.format(new Date(now - WINDOW_MS));
+        final String since = fmt.format(new Date(now - window));
         String where = String.format(Locale.US, "within_box(%s, %.6f, %.6f, %.6f, %.6f) AND %s > '%s'",
                 field(point), area.north, area.west, area.south, area.east, field(time), since);
         if (!f.optString("where", "").isEmpty())
@@ -129,15 +143,15 @@ public final class Calls extends Section {
         final List<Call> out = new ArrayList<>();
         for (int i = 0; i < rows.length(); i++) {
             final JSONObject a = rows.optJSONObject(i);
-            final JSONObject p = a == null ? null : a.optJSONObject(point);
-            final JSONArray c = p == null ? null : p.optJSONArray("coordinates");
-            if (c == null || c.length() < 2)
+            // GeoJSON point, legacy location, or latitude and longitude columns.
+            final double[] at = Socrata.latLon(a, point);
+            if (at == null)
                 continue;
-            final double lon = c.optDouble(0), lat = c.optDouble(1);
+            final double lat = at[0], lon = at[1];
             if (!area.contains(lat, lon))
                 continue;
             final long t = parse(a.optString(time, ""), fmt);
-            if (t <= 0 || now - t > WINDOW_MS)
+            if (t <= 0 || now - t > window)
                 continue;
             out.add(new Call(t, text(a, f.optString("type")), text(a, f.optString("address")),
                     text(a, f.optString("place", "")), lat, lon));
@@ -146,7 +160,7 @@ public final class Calls extends Section {
     }
 
     /** An ArcGIS layer: the area's outline, newest first, the window checked here. */
-    private static List<Call> arcgis(JSONObject f, Area area, long now) throws Exception {
+    private static List<Call> arcgis(JSONObject f, Area area, long now, long window) throws Exception {
         final String time = f.optString("time");
         final String where = f.optString("where", "").isEmpty() ? "1=1" : f.optString("where");
         final String form = "where=" + Esri.enc(where) + "&f=json&outFields=*&returnGeometry=true&outSR=4326"
@@ -177,7 +191,7 @@ public final class Calls extends Section {
                 else
                     t = 0;
             }
-            if (t <= 0 || now - t > WINDOW_MS)
+            if (t <= 0 || now - t > window)
                 continue;
             out.add(new Call(t, text(a, f.optString("type")), text(a, f.optString("address")),
                     text(a, f.optString("place", "")), lat, lon));
@@ -186,6 +200,12 @@ public final class Calls extends Section {
     }
 
     // ------------------------------------------------------------------ helpers
+
+    /** A row's time window: {@code window_hours} (1 to 72), else the live 2 hours. */
+    static long windowMs(JSONObject f) {
+        final int h = f.optInt("window_hours", 0);
+        return h <= 0 ? WINDOW_MS : Math.min(h, MAX_WINDOW_HOURS) * 3_600_000L;
+    }
 
     /** A catalog field name, letters, digits and underscores only, so it can sit in a query. */
     private static String field(String name) throws java.io.IOException {
