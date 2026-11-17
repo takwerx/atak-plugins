@@ -47,8 +47,9 @@ used with a finger.
   pace however fast you swipe or spin the wheel.
 - **Back:** the ‹ button on the left edge of the screen, or the Escape key on
   the keyboard, closes what a phone's Back button would close.
-- **Text fields take the click.** Click into any field, in ATAK's own settings
-  or in a plugin pane, and type. Web pages inside plugin panes, such as an
+- **Text fields take the click.** Click into any field and type: in a plugin
+  pane, in ATAK's own settings and server editor, and in dialogs such as Go To
+  and its MGRS boxes. Web pages inside plugin panes, such as an
   Esri sign-in, take clicks too.
 
 ## 3. On an emulator

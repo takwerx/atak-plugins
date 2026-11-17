@@ -38,11 +38,12 @@ In panes and menus:
     map behind it. A two-finger swipe moves a list a few rows and a mouse
     click about a row, at the same pace however fast you swipe or spin.
   - A Back button on the left edge, and the Escape key, are Back.
-  - Clicks land in text fields, so you can type; on an emulator whose pointer
-    reaches Android as a tablet (mouse and stylus sources at once), presses
-    are re-issued the way a finger would deliver them, which is what an
-    EditText or a WebView needs to take focus. Esri and other web sign-in pages
-    inside plugins work.
+  - Clicks land in text fields, so you can type, in every ATAK window: the
+    map, ATAK's own screens (Settings, the server editor) and dialogs (Go To
+    and its MGRS boxes). On an emulator whose pointer reaches Android as a
+    tablet (mouse and stylus sources at once), presses are re-issued the way a
+    finger would deliver them, which is what an EditText or a WebView needs to
+    take focus. Esri and other web sign-in pages inside plugins work.
   - The emulator's second, guest-drawn pointer is hidden so there is one
     cursor on screen.
 
@@ -81,6 +82,18 @@ the one that matches your ATAK.
 
 _________________________________________________________________
 STATUS
+
+Version 0.5: a click lands in a text field in every ATAK window, not only on
+the map. Up to 0.4 the click repair covered the main window alone, so a click
+into "Add Streaming CoT Endpoint", Go To and its MGRS boxes, or any other
+dialog or ATAK screen left the cursor where it was and only Tab moved it. The
+cause is Android's, not ATAK's: a mouse press with the button held does not
+focus a text field, in Android's own Settings app as well. Cursorwerx now
+re-issues those presses in every window of ATAK's process. Verified on
+ATAK-CIV 5.8.0.3 in Google's Android Emulator 37.1.11 on Android 15, debug and
+release builds, with clicks written to the emulator's own pointer device:
+both fields of the server editor, all four MGRS boxes and Elevation in Go To,
+and the Markers pane fields on the map.
 
 Version 0.4: lists keep their pace however fast the wheel turns. Android
 multiplies wheel input by up to four when it comes quickly, and a Mac trackpad
@@ -160,8 +173,10 @@ COMPILATION
 _________________________________________________________________
 DEVELOPER NOTES
 
-  The plugin wraps the ATAK activity's Window.Callback so it sees every input
-  event before ATAK does (ClickRepair), and installs a touch and generic-motion
+  The plugin wraps the Window.Callback of every window in ATAK's process (the
+  map activity, ATAK's other activities through the application's lifecycle
+  callbacks, and dialogs, found with WindowInspector when a wrapped window
+  loses focus) so it sees every input event before ATAK does (ClickRepair), and installs a touch and generic-motion
   router on the map view (PointerRouter, PanControl). Wheel events over a solid
   view are handed to that view's nearest scrollable ancestor and vetoed for the
   map; over the map they become paced zoom steps at the cursor. Mouse presses
