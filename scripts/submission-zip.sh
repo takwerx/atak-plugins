@@ -319,7 +319,9 @@ echo "==> clean-extract build test (a zip that fails here fails on tak.gov)"
             "$TMP/$NAME/app/build.gradle" | head -1)"
     BUILD_SDK="$ATAK_SDK"
     if [ -n "$WANT" ]; then
-        MATCH="$(ls -d "$HOME"/atak-sdk/ATAK-CIV-"$WANT"* 2>/dev/null | sort -V | tail -1)"
+        # Folders holding main.jar only: a downloaded ATAK-CIV-<v>-SDK.zip beside
+        # them sorts last and was picked as the SDK (2026-11-18).
+        MATCH="$(for d in "$HOME/atak-sdk"/ATAK-CIV-"$WANT"*/; do [ -f "$d/main.jar" ] && echo "${d%/}"; done | sort -V | tail -1)"
         if [ -n "$MATCH" ]; then
             BUILD_SDK="$MATCH"
         else

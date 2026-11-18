@@ -46,7 +46,7 @@ export PATH="${JAVA_HOME:+$JAVA_HOME/bin:}${ANDROID_HOME:+$ANDROID_HOME/platform
 # plugin reaches the SDK through sdk.path in its gitignored local.properties.
 export ATAK_SDK_ROOT="${ATAK_SDK_ROOT:-$HOME/atak-sdk}"
 if [ -z "${ATAK_SDK:-}" ]; then
-    ATAK_SDK="$(ls -d "$ATAK_SDK_ROOT"/ATAK-CIV-* 2>/dev/null | sort -V | tail -1)"
+    ATAK_SDK="$(for d in "$ATAK_SDK_ROOT"/ATAK-CIV-*/; do [ -f "$d/main.jar" ] && echo "${d%/}"; done | sort -V | tail -1)"
 fi
 export ATAK_SDK="${ATAK_SDK:-}"
 
@@ -127,7 +127,8 @@ target_version_code() {
 
 # sdk_for <5.8.0> -> the newest unpacked SDK matching that ATAK version
 sdk_for() {
-    ls -d "$ATAK_SDK_ROOT"/ATAK-CIV-"$1"* 2>/dev/null | sort -V | tail -1
+    # Folders holding main.jar only, never a downloaded ATAK-CIV-<v>-SDK.zip.
+    for d in "$ATAK_SDK_ROOT"/ATAK-CIV-"$1"*/; do [ -f "$d/main.jar" ] && echo "${d%/}"; done | sort -V | tail -1
 }
 
 # aapt / keytool, wherever this machine keeps them

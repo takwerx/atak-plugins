@@ -23,7 +23,7 @@ if [ -e "$OUT" ]; then
 fi
 if [ -z "$SDK" ]; then
     WANT="$(sed -n "s/.*ext\.ATAK_VERSION *= *['\"]\([^'\"]*\)['\"].*/\1/p" "$DIR/app/build.gradle" | head -1)"
-    [ -n "$WANT" ] && SDK="$(ls -d "$HOME"/atak-sdk/ATAK-CIV-"$WANT"* 2>/dev/null | sort -V | tail -1)" || true
+    [ -n "$WANT" ] && SDK="$(for d in "$HOME/atak-sdk"/ATAK-CIV-"$WANT"*/; do [ -f "$d/main.jar" ] && echo "${d%/}"; done | sort -V | tail -1)" || true
     [ -n "$SDK" ] || SDK="$ATAK_SDK"
 fi
 [ -d "$SDK" ] || { echo "error: no ATAK SDK at $SDK" >&2; exit 1; }
