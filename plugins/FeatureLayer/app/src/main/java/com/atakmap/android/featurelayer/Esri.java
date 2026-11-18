@@ -10,8 +10,6 @@ import com.atakmap.map.layer.feature.geometry.Polygon;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -712,33 +710,11 @@ public final class Esri {
         return get(url, null);
     }
 
+    private static final String USER_AGENT = "FeatureLayer/0.1 (ATAK plugin)";
+
     /** GET over https only; a token travels in the Esri authorization header, never in the URL. */
     public static String get(String url, String token) throws Exception {
-        if (!url.startsWith("https://"))
-            throw new IllegalStateException("not https: " + hostOf(url));
-        final HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-        c.setConnectTimeout(20000);
-        c.setReadTimeout(60000);
-        c.setRequestProperty("User-Agent", "FeatureLayer/0.1 (ATAK plugin)");
-        if (token != null)
-            c.setRequestProperty("X-Esri-Authorization", "Bearer " + token);
-        try {
-            final int code = c.getResponseCode();
-            if (code != 200) {
-                final int q = url.indexOf('?');
-                throw new IllegalStateException("HTTP " + code + " for " + (q > 0 ? url.substring(0, q) : url));
-            }
-            final StringBuilder sb = new StringBuilder();
-            try (BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), "UTF-8"))) {
-                final char[] buf = new char[16384];
-                int n;
-                while ((n = r.read(buf)) > 0)
-                    sb.append(buf, 0, n);
-            }
-            return sb.toString();
-        } finally {
-            c.disconnect();
-        }
+        return new String(fetch(url, null, token), "UTF-8");
     }
 
     /**
@@ -747,72 +723,82 @@ public final class Esri {
      * server access log.
      */
     public static String post(String url, String body, String token) throws Exception {
+        return new String(fetch(url, body, token), "UTF-8");
+    }
+
+    /** {@link #post} returning the body's bytes: a PBF answer is not text. */
+    public static byte[] postBytes(String url, String body, String token) throws Exception {
+        return fetch(url, body, token);
+    }
+
+    /**
+     * One request, GET when {@code form} is null. On FirstNet a host that rejects or
+     * ignores the device's IPv6 address is asked again over IPv4 ({@link FirstNet}):
+     * TIGERweb answers FirstNet IPv6 with a "Request Rejected" page, HTTP 200.
+     */
+    private static byte[] fetch(String url, String form, String token) throws Exception {
         if (!url.startsWith("https://"))
             throw new IllegalStateException("not https: " + hostOf(url));
-        final HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        final URL parsed = new URL(url);
+        if (FirstNet.useIpv4(parsed))
+            return overIpv4(parsed, url, form, token);
+        final byte[] body = connection(parsed, url, form, token);
+        if (!FirstNet.rejected(body))
+            return body;
+        final byte[] again;
+        try {
+            again = overIpv4(parsed, url, form, token);
+        } catch (Exception e) {
+            com.atakmap.coremap.log.Log.w("FeatureLayer", parsed.getHost()
+                    + " rejected the request; IPv4 failed too: " + e);
+            throw new IllegalStateException(parsed.getHost() + " rejected the request (Request Rejected page)");
+        }
+        if (!FirstNet.rejected(again))
+            FirstNet.rememberIpv4(parsed);
+        return again;
+    }
+
+    /** {@link FirstNet#overIpv4}, with a non-200 reported the way the normal path reports it. */
+    private static byte[] overIpv4(URL parsed, String url, String form, String token) throws Exception {
+        try {
+            return FirstNet.overIpv4(parsed, form, token, USER_AGENT);
+        } catch (FirstNet.StatusException e) {
+            throw new IllegalStateException("HTTP " + e.status + " for " + (form != null ? "POST " : "") + noQuery(url));
+        }
+    }
+
+    private static byte[] connection(URL parsed, String url, String form, String token) throws Exception {
+        final HttpURLConnection c = (HttpURLConnection) parsed.openConnection();
         c.setConnectTimeout(20000);
         c.setReadTimeout(60000);
-        c.setRequestMethod("POST");
-        c.setDoOutput(true);
-        c.setRequestProperty("User-Agent", "FeatureLayer/0.1 (ATAK plugin)");
-        c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+        c.setRequestProperty("User-Agent", USER_AGENT);
         if (token != null)
             c.setRequestProperty("X-Esri-Authorization", "Bearer " + token);
         try {
-            final byte[] out = body.getBytes("UTF-8");
-            c.setFixedLengthStreamingMode(out.length);
-            try (java.io.OutputStream os = c.getOutputStream()) {
-                os.write(out);
+            if (form != null) {
+                c.setRequestMethod("POST");
+                c.setDoOutput(true);
+                c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+                final byte[] out = form.getBytes("UTF-8");
+                c.setFixedLengthStreamingMode(out.length);
+                try (java.io.OutputStream os = c.getOutputStream()) {
+                    os.write(out);
+                }
             }
             final int code = c.getResponseCode();
             if (code != 200)
-                throw new IllegalStateException("HTTP " + code + " for POST " + url);
-            final StringBuilder sb = new StringBuilder();
-            try (BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), "UTF-8"))) {
-                final char[] buf = new char[16384];
-                int n;
-                while ((n = r.read(buf)) > 0)
-                    sb.append(buf, 0, n);
+                throw new IllegalStateException("HTTP " + code + " for " + (form != null ? "POST " : "") + noQuery(url));
+            try (java.io.InputStream in = c.getInputStream()) {
+                return FirstNet.read(in);
             }
-            return sb.toString();
         } finally {
             c.disconnect();
         }
     }
 
-    /** {@link #post} returning the body's bytes: a PBF answer is not text. */
-    public static byte[] postBytes(String url, String body, String token) throws Exception {
-        if (!url.startsWith("https://"))
-            throw new IllegalStateException("not https: " + hostOf(url));
-        final HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-        c.setConnectTimeout(20000);
-        c.setReadTimeout(60000);
-        c.setRequestMethod("POST");
-        c.setDoOutput(true);
-        c.setRequestProperty("User-Agent", "FeatureLayer/0.1 (ATAK plugin)");
-        c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-        if (token != null)
-            c.setRequestProperty("X-Esri-Authorization", "Bearer " + token);
-        try {
-            final byte[] out = body.getBytes("UTF-8");
-            c.setFixedLengthStreamingMode(out.length);
-            try (java.io.OutputStream os = c.getOutputStream()) {
-                os.write(out);
-            }
-            final int code = c.getResponseCode();
-            if (code != 200)
-                throw new IllegalStateException("HTTP " + code + " for POST " + url);
-            final java.io.ByteArrayOutputStream sb = new java.io.ByteArrayOutputStream(65536);
-            try (java.io.InputStream in = c.getInputStream()) {
-                final byte[] buf = new byte[16384];
-                int n;
-                while ((n = in.read(buf)) > 0)
-                    sb.write(buf, 0, n);
-            }
-            return sb.toByteArray();
-        } finally {
-            c.disconnect();
-        }
+    private static String noQuery(String url) {
+        final int q = url.indexOf('?');
+        return q > 0 ? url.substring(0, q) : url;
     }
 
     public static String hostOf(String url) {
