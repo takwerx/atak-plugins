@@ -985,6 +985,40 @@ never runs the plugin's `onStop`, an install or upgrade does, and UAS Flight
 Plan passed the kill while every reinstall lost the plan. Where every plugin stood on 2026-10-06, with the
 fix for each: `../atak-plugins-notes/docs/AUDIT-2026-10-06-offline-after-restart.md`.
 
+## Every plugin works on FirstNet
+
+The crews are on FirstNet LTE, and FirstNet gives the device an IPv6 address
+that Android tries first. Some agency firewalls block that address. On
+2026-11-17 Sit Rep showed "no census data" in Arlington VA on a Note 20: the
+Census Bureau's firewall answered every FirstNet IPv6 request with a
+`Request Rejected` page (HTTP 200, HTML) and the same request over IPv4 with
+data. EPA's `geodata.epa.gov` never answers FirstNet IPv6 at all, so each
+request waited out the 15 s connect timeout. Every one of those hosts works
+from the Studio, so no desk test finds this. The operator made it a rule the
+next day: whatever caused this is addressed across the whole fleet.
+
+- **Every host a plugin calls has a probe result from a FirstNet device.**
+  `scripts/check-firstnet.sh --probe <Plugin>` runs curl on the device over
+  IPv6 and IPv4 and records each host in
+  `../atak-plugins-notes/firstnet-hosts.txt` (commit it there by name). A
+  device on a FirstNet phone's hotspot counts: its egress is rejected the
+  same way (s10-dev-3 on the Note 20's hotspot, 2026-11-18).
+- **A host that fails on FirstNet needs the IPv4 fallback.** Copy Sit Rep's
+  `net/Http.java`: it retries a `Request Rejected` page over the host's IPv4
+  address on a TLS socket that still checks the certificate, and
+  `ipv6Dead()` sends a host whose IPv6 address does not take a connection in
+  3 s to IPv4 for the session.
+- **The gate:** `scripts/check-firstnet.sh <Plugin>` needs no device. It fails
+  on a host never probed or probed more than 120 days ago, and on a bad host
+  in a plugin with no fallback. `submission-zip.sh` runs it before zipping
+  and `/ship` runs it again.
+
+Status on 2026-11-18 (all 116 hosts on `main` plus FireView probed): bad on
+FirstNet are `tigerweb.geo.census.gov` and `geocoding.geo.census.gov`
+(rejected) and `geodata.epa.gov` (silent). Sit Rep 0.3 handles all three;
+Feature Layer (TIGERweb) and FireCast (Census geocoder) need the fallback in
+their next release.
+
 ## Anything that keeps running after the tap
 
 ATAK runs one tool at a time and ends the active tool whenever another starts,
