@@ -49,6 +49,12 @@ and others), with an Open or Get button.
 _________________________________________________________________
 STATUS
 
+Version 0.4: Sit Rep works on FirstNet. Some agency servers block the IPv6
+address that FirstNet gives a device. The Census Bureau answers it with a
+"Request Rejected" page, and EPA never answers it. Sit Rep now retries those
+requests over IPv4, so census data and power plants load on FirstNet.
+0.3 went to tak.gov with the Census fix only and was not published.
+
 Version 0.2: first public release. 0.1 went to tak.gov once for ATAK 5.8 as
 the build the manual's map pictures were taken on, and was not published.
 0.2 makes the Search and Rename boxes readable in landscape on phones with a
@@ -56,7 +62,9 @@ taller keyboard (Galaxy S22), and finds a city's boundary through a typo in
 Search.
 
 Tested on hardware: Samsung Galaxy S10 (ATAK-CIV 5.8, release build) and
-Samsung Galaxy S22 Ultra (official ATAK-CIV 5.8, tak.gov-signed 0.1), with
+Samsung Galaxy S22 Ultra (official ATAK-CIV 5.8, tak.gov-signed 0.1),
+Samsung Galaxy S9+ (official ATAK-CIV 5.6, 5.7 and 5.8, tak.gov-signed 0.4,
+on FirstNet), with
 report areas in California (Corona, Murrieta), Idaho (Bayview) and Colorado
 (Pagosa Springs). Release builds compile against ATAK-CIV 5.6, 5.7 and 5.8.
 
