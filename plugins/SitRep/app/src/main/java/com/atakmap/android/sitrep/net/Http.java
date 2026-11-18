@@ -74,7 +74,7 @@ public final class Http {
         if (!"https".equalsIgnoreCase(parsed.getProtocol()))
             throw new IOException("refusing a non-https request");
         final String host = parsed.getHost().toLowerCase(java.util.Locale.US);
-        if (IPV4_ONLY.contains(host))
+        if (IPV4_ONLY.contains(host) || ipv6Dead(host, parsed.getPort() < 0 ? 443 : parsed.getPort()))
             return overIpv4(parsed, form);
         final byte[] body = connection(parsed, form);
         if (!rejected(body))
@@ -95,6 +95,57 @@ public final class Http {
             com.atakmap.coremap.log.Log.w("SitRep", host + " rejected this device's IPv6 address; using IPv4");
         }
         return again;
+    }
+
+    /** Hosts whose IPv6 address was already tried this session. */
+    private static final java.util.Set<String> IPV6_CHECKED =
+            java.util.Collections.synchronizedSet(new java.util.HashSet<String>());
+
+    private static final int IPV6_PROBE_MS = 3_000;
+
+    /**
+     * True when the host has an IPv4 address and its IPv6 address does not take a
+     * TCP connection within 3 s. Checked once per host per session. EPA's geodata
+     * answers nothing on IPv6 from FirstNet LTE (2026-11-18, dev 3 on a Note 20
+     * hotspot: 20 s timeout, IPv4 0.5 s), and HttpsURLConnection moves on to IPv4
+     * only after the full connect timeout, on every request.
+     */
+    static boolean ipv6Dead(String host, int port) {
+        if (!IPV6_CHECKED.add(host))
+            return false;
+        java.net.InetAddress v6 = null;
+        boolean hasV4 = false;
+        try {
+            for (java.net.InetAddress a : java.net.InetAddress.getAllByName(host)) {
+                if (a instanceof java.net.Inet6Address && v6 == null)
+                    v6 = a;
+                else if (a instanceof java.net.Inet4Address)
+                    hasV4 = true;
+            }
+        } catch (IOException e) {
+            return false; // Let the real request report it.
+        }
+        if (v6 == null || !hasV4)
+            return false;
+        final java.net.Socket s = new java.net.Socket();
+        try {
+            s.connect(new java.net.InetSocketAddress(v6, port), IPV6_PROBE_MS);
+            return false;
+        } catch (java.net.SocketTimeoutException e) {
+            // Only a silent address costs the full connect timeout. A network with
+            // no IPv6 refuses at once, and Android moves to IPv4 at once by itself.
+            IPV4_ONLY.add(host);
+            com.atakmap.coremap.log.Log.w("SitRep", host + " does not answer on IPv6; using IPv4");
+            return true;
+        } catch (IOException e) {
+            return false;
+        } finally {
+            try {
+                s.close();
+            } catch (IOException ignored) {
+                // Probe only.
+            }
+        }
     }
 
     /** A firewall's rejection page (F5): HTTP 200 with a short HTML body. */
