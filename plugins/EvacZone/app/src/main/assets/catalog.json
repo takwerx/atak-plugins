@@ -1,24 +1,24 @@
 {
  "format": 1,
- "generated": "2026-10-26T07:21:33Z",
+ "generated": "2026-11-19T13:30:47Z",
  "sources": [
   {
    "id": "us-ca-statewide",
    "title": "California",
-   "publisher": "Cal OES",
+   "publisher": "Genasys",
    "st": "CA",
    "co": "",
    "kind": "live",
-   "url": "https://services.arcgis.com/BLN4oKB0N1YSgvY8/arcgis/rest/services/CA_EVACUATIONS_CalOESHosted_view/FeatureServer",
+   "url": "https://cams.takwerx.org/evaczone/genasys/FeatureServer",
    "layer": 0,
-   "layer_name": "CA_EVACUATIONS",
+   "layer_name": "evacuation_zones<>_Normal",
    "geometry": "polygon",
-   "where": "1=1",
-   "status_field": "STATUS",
-   "name_field": "ZONE_ID",
-   "county_field": "COUNTY",
+   "where": "state_abbr = 'CA'",
+   "status_field": "zone_status",
+   "name_field": "zone_id",
+   "county_field": "",
    "refresh_min": 5,
-   "features": 8,
+   "features": 102,
    "simplify": 0.0001,
    "bounds": [
     32.5,
@@ -26,10 +26,20 @@
     42.0,
     -114.1
    ],
-   "note": "Every live California feed in one: Cal OES orders and warnings, CAL FIRE's reason, population and lifted zones, and the county and city feeds, de-duplicated.",
-   "last_edit": "2026-10-23",
-   "checked": "2026-10-26T07:21:33Z",
+   "note": "Every live California feed in one: Genasys Protect zones as the agencies issue them, Cal OES orders and warnings, CAL FIRE's reason, population and lifted zones, and the county and city feeds, de-duplicated.",
+   "last_edit": null,
+   "checked": "2026-11-19T13:30:47Z",
    "also": [
+    {
+     "url": "https://services.arcgis.com/BLN4oKB0N1YSgvY8/arcgis/rest/services/CA_EVACUATIONS_CalOESHosted_view/FeatureServer",
+     "layer": 0,
+     "publisher": "Cal OES",
+     "county": "",
+     "where": "1=1",
+     "status_field": "STATUS",
+     "name_field": "ZONE_ID",
+     "county_field": "COUNTY"
+    },
     {
      "url": "https://services1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/Combined_Statewide_Evacuation_Public_View/FeatureServer",
      "layer": 0,
@@ -105,20 +115,20 @@
   {
    "id": "us-or-statewide",
    "title": "Oregon",
-   "publisher": "Oregon OEM",
+   "publisher": "Genasys",
    "st": "OR",
    "co": "",
    "kind": "live",
-   "url": "https://services.arcgis.com/uUvqNMGPm7axC2dD/arcgis/rest/services/Fire_Evacuation_Areas_Public/FeatureServer",
+   "url": "https://cams.takwerx.org/evaczone/genasys/FeatureServer",
    "layer": 0,
-   "layer_name": "Fire_Evacuation_Areas",
+   "layer_name": "evacuation_zones<>_Normal",
    "geometry": "polygon",
-   "where": "1=1",
-   "status_field": "Fire_Evacuation_Level",
-   "name_field": "Evac_Area_Name",
-   "county_field": "County",
+   "where": "state_abbr = 'OR'",
+   "status_field": "zone_status",
+   "name_field": "zone_id",
+   "county_field": "",
    "refresh_min": 5,
-   "features": 1,
+   "features": 0,
    "simplify": 0.0001,
    "bounds": [
     41.99,
@@ -126,10 +136,20 @@
     46.3,
     -116.45
    ],
-   "note": "Level 1 Be Ready, 2 Be Set, 3 Go Now. Oregon OEM with the county feeds folded in, de-duplicated.",
-   "last_edit": "2026-10-26",
-   "checked": "2026-10-26T07:21:33Z",
+   "note": "Level 1 Be Ready, 2 Be Set, 3 Go Now. Genasys Protect and Oregon OEM with the county feeds folded in, de-duplicated.",
+   "last_edit": null,
+   "checked": "2026-11-19T13:30:47Z",
    "also": [
+    {
+     "url": "https://services.arcgis.com/uUvqNMGPm7axC2dD/arcgis/rest/services/Fire_Evacuation_Areas_Public/FeatureServer",
+     "layer": 0,
+     "publisher": "Oregon OEM",
+     "county": "",
+     "where": "1=1",
+     "status_field": "Fire_Evacuation_Level",
+     "name_field": "Evac_Area_Name",
+     "county_field": "County"
+    },
     {
      "url": "https://services1.arcgis.com/znO8Hz1SuVVohYhZ/arcgis/rest/services/Emergency_Response_OEM_Public/FeatureServer",
      "layer": 4,
@@ -158,7 +178,7 @@
    "name_field": "ORDER_ALERT_NAME",
    "county_field": "",
    "refresh_min": 10,
-   "features": 11,
+   "features": 15,
    "simplify": 0.0001,
    "bounds": [
     48.3,
@@ -167,8 +187,8 @@
     -114.0
    ],
    "note": "Order, Alert (be ready to leave), Tactical Evacuation, All Clear.",
-   "last_edit": "2026-10-26",
-   "checked": "2026-10-26T07:21:33Z"
+   "last_edit": "2026-11-19",
+   "checked": "2026-11-19T13:30:47Z"
   },
   {
    "id": "us-fl-hillsborough",
@@ -196,7 +216,7 @@
    ],
    "note": "Pre-drawn surge zones, A goes first. No live status here; the county calls zones by letter.",
    "last_edit": "2024-09-26",
-   "checked": "2026-10-26T07:21:33Z"
+   "checked": "2026-11-19T13:30:47Z"
   },
   {
    "id": "us-fl-lee",
@@ -224,7 +244,7 @@
    ],
    "note": "Pre-drawn surge zones, A goes first. No live status here; the county calls zones by letter.",
    "last_edit": "2021-07-03",
-   "checked": "2026-10-26T07:21:33Z"
+   "checked": "2026-11-19T13:30:47Z"
   },
   {
    "id": "us-nc-statewide",
@@ -252,7 +272,35 @@
    ],
    "note": "Know Your Zone for the 21 coastal counties, pre-drawn, A goes first. No live status here; NCEM and the counties call zones by letter.",
    "last_edit": "2026-06-05",
-   "checked": "2026-10-26T07:21:33Z"
+   "checked": "2026-11-19T13:30:47Z"
+  },
+  {
+   "id": "us-genasys-other",
+   "title": "Other states",
+   "publisher": "Genasys",
+   "st": "US",
+   "co": "",
+   "kind": "live",
+   "url": "https://cams.takwerx.org/evaczone/genasys/FeatureServer",
+   "layer": 0,
+   "layer_name": "evacuation_zones<>_Normal",
+   "geometry": "polygon",
+   "where": "state_abbr NOT IN ('CA','OR')",
+   "status_field": "zone_status",
+   "name_field": "zone_id",
+   "county_field": "",
+   "refresh_min": 5,
+   "features": 26,
+   "simplify": 0.0001,
+   "bounds": [
+    17.5,
+    -179.2,
+    71.5,
+    -64.5
+   ],
+   "note": "Genasys Protect zones in every state without a feed of its own here, as the agencies issue them.",
+   "last_edit": null,
+   "checked": "2026-11-19T13:30:47Z"
   }
  ],
  "counties": {
