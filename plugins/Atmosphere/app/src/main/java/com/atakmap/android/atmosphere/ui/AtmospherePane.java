@@ -32,6 +32,7 @@ import androidx.viewpager.widget.PagerAdapter;
 import androidx.viewpager.widget.ViewPager;
 
 import com.atakmap.android.atmosphere.astro.Astro;
+import com.atakmap.android.atmosphere.astro.Light;
 import com.atakmap.android.atmosphere.compat.MapCompat;
 import com.atakmap.android.atmosphere.data.Favorites;
 import com.atakmap.android.atmosphere.data.Nhc;
@@ -54,6 +55,8 @@ import com.atakmap.android.atmosphere.overlay.BeachOverlay;
 import com.atakmap.android.atmosphere.overlay.SnotelOverlay;
 import com.atakmap.android.atmosphere.overlay.HighFlowOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodedGroundOverlay;
+import com.atakmap.android.atmosphere.overlay.FloodZoneOverlay;
+import com.atakmap.android.atmosphere.overlay.DamAreaOverlay;
 import com.atakmap.android.atmosphere.overlay.SatelliteOverlay;
 import com.atakmap.android.atmosphere.overlay.SnowOverlay;
 import com.atakmap.android.atmosphere.overlay.SstOverlay;
@@ -213,6 +216,14 @@ public final class AtmospherePane {
     private final LinearLayout trendHost;
     private final LinearLayout trendChips;
     private final TrendStripView trend;
+    /** The Light section: one local day of twilight and moon for the point. */
+    private final LinearLayout lightContainer;
+    private final TextView lightDay;
+    /** Days from today the Light section shows; the stepper moves it. */
+    private int lightOffset;
+    private static final String PREF_LIGHT_OPEN = "weather.light.open";
+    /** The Light section opens under its button, as the hourly table does; closed until opened, then remembered. */
+    private boolean lightOpen;
     private Kind trendKind = Kind.TEMP;
     private final Button hoursTableButton;
     private final View hoursTable;
@@ -396,6 +407,26 @@ public final class AtmospherePane {
     private final LinearLayout floodgroundWhenRow;
     private FloodedGroundOverlay floodground;
     private boolean floodgroundOpen = true;
+    private static final String PREF_FLOODZONES_OPEN = "weather.floodzones.open";
+    private final LinearLayout floodzonesSettings;
+    private final ImageButton floodzonesExpand;
+    private final Button floodzonesToggle;
+    private final TextView floodzonesStatus;
+    private final LinearLayout floodzonesLegend;
+    private final LinearLayout floodzonesGateRow;
+    private final TextView floodzonesGateText;
+    private FloodZoneOverlay floodzones;
+    private boolean floodzonesOpen = true;
+    private static final String PREF_DAMAREAS_OPEN = "weather.damareas.open";
+    private final LinearLayout damareasSettings;
+    private final ImageButton damareasExpand;
+    private final Button damareasToggle;
+    private final TextView damareasStatus;
+    private final LinearLayout damareasLegend;
+    private final LinearLayout damareasGateRow;
+    private final TextView damareasGateText;
+    private DamAreaOverlay damareas;
+    private boolean damareasOpen = true;
     private static final String PREF_SATELLITE_OPEN = "weather.satellite.open";
     private final LinearLayout satelliteSettings;
     private final ImageButton satelliteExpand;
@@ -819,6 +850,45 @@ public final class AtmospherePane {
         trendChips = find(R.id.trend_chips);
         trend = new TrendStripView(pluginContext);
         trendHost.addView(trend);
+        com.atakmap.android.atmosphere.units.Clock.refresh(pluginContext);
+        lightContainer = find(R.id.light_container);
+        lightDay = find(R.id.light_day);
+        final Button lightButton = find(R.id.light_button);
+        final View lightBody = find(R.id.light_body);
+        final SharedPreferences lightPrefs = MapCompat.prefs();
+        lightOpen = lightPrefs != null && lightPrefs.getBoolean(PREF_LIGHT_OPEN, false);
+        final Runnable showLightFold = new Runnable() {
+            @Override
+            public void run() {
+                lightButton.setText(lightOpen ? R.string.hide_light : R.string.show_light);
+                lightBody.setVisibility(lightOpen ? View.VISIBLE : View.GONE);
+            }
+        };
+        showLightFold.run();
+        lightButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                lightOpen = !lightOpen;
+                rememberFold(PREF_LIGHT_OPEN, lightOpen);
+                showLightFold.run();
+                if (lightOpen)
+                    renderLight();
+            }
+        });
+        ((Button) find(R.id.light_prev)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                lightOffset = Math.max(-30, lightOffset - 1);
+                renderLight();
+            }
+        });
+        ((Button) find(R.id.light_next)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                lightOffset = Math.min(60, lightOffset + 1);
+                renderLight();
+            }
+        });
         hoursTableButton = find(R.id.hours_table_button);
         hoursTable = find(R.id.hours_table);
         hoursLegend = find(R.id.hours_legend);
@@ -979,6 +1049,20 @@ public final class AtmospherePane {
         floodgroundStatus = find(R.id.floodground_status);
         floodgroundLegend = find(R.id.floodground_legend);
         floodgroundWhenRow = find(R.id.floodground_when_row);
+        floodzonesSettings = find(R.id.floodzones_settings);
+        floodzonesExpand = find(R.id.floodzones_expand);
+        floodzonesToggle = find(R.id.floodzones_toggle);
+        floodzonesStatus = find(R.id.floodzones_status);
+        floodzonesLegend = find(R.id.floodzones_legend);
+        floodzonesGateRow = find(R.id.floodzones_gate_row);
+        floodzonesGateText = find(R.id.floodzones_gate_text);
+        damareasSettings = find(R.id.damareas_settings);
+        damareasExpand = find(R.id.damareas_expand);
+        damareasToggle = find(R.id.damareas_toggle);
+        damareasStatus = find(R.id.damareas_status);
+        damareasLegend = find(R.id.damareas_legend);
+        damareasGateRow = find(R.id.damareas_gate_row);
+        damareasGateText = find(R.id.damareas_gate_text);
         satelliteSettings = find(R.id.satellite_settings);
         satelliteExpand = find(R.id.satellite_expand);
         satelliteToggle = find(R.id.satellite_toggle);
@@ -1169,6 +1253,24 @@ public final class AtmospherePane {
             public void onClick(View v) {
                 floodgroundOpen = !floodgroundOpen;
                 rememberFold(PREF_FLOODGROUND_OPEN, floodgroundOpen);
+                updateLayerControls();
+            }
+        });
+        floodzonesOpen = prefs == null || prefs.getBoolean(PREF_FLOODZONES_OPEN, true);
+        floodzonesExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                floodzonesOpen = !floodzonesOpen;
+                rememberFold(PREF_FLOODZONES_OPEN, floodzonesOpen);
+                updateLayerControls();
+            }
+        });
+        damareasOpen = prefs == null || prefs.getBoolean(PREF_DAMAREAS_OPEN, true);
+        damareasExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                damareasOpen = !damareasOpen;
+                rememberFold(PREF_DAMAREAS_OPEN, damareasOpen);
                 updateLayerControls();
             }
         });
@@ -1625,6 +1727,10 @@ public final class AtmospherePane {
             highflow.refresh(false);
         if (floodground != null && floodground.isOn())
             floodground.refresh(false);
+        if (floodzones != null && floodzones.isOn())
+            floodzones.refresh();
+        if (damareas != null && damareas.isOn())
+            damareas.refresh();
         if (satellite != null && satellite.isOn())
             satellite.refresh(false);
         if (snow != null && snow.isOn())
@@ -2079,6 +2185,42 @@ public final class AtmospherePane {
         snotelLegend.removeAllViews();
         for (String[] row : SnotelOverlay.LEGEND)
             snotelLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        updateLayerControls();
+    }
+
+    /** FEMA's flood zones, owned by the plugin. The regulatory map, not a forecast. */
+    public void setFloodZones(FloodZoneOverlay overlay) {
+        floodzones = overlay;
+        if (floodzones == null)
+            return;
+        floodzones.setListener(new FloodZoneOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                floodzonesStatus.setText(status);
+                floodzonesStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        floodzonesLegend.removeAllViews();
+        for (String[] row : FloodZoneOverlay.LEGEND)
+            floodzonesLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        updateLayerControls();
+    }
+
+    /** California's dam failure areas, owned by the plugin. California only. */
+    public void setDamAreas(DamAreaOverlay overlay) {
+        damareas = overlay;
+        if (damareas == null)
+            return;
+        damareas.setListener(new DamAreaOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                damareasStatus.setText(status);
+                damareasStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        damareasLegend.removeAllViews();
+        for (String[] row : DamAreaOverlay.LEGEND)
+            damareasLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
         updateLayerControls();
     }
 
@@ -2897,7 +3039,7 @@ public final class AtmospherePane {
 
     /** "Tue 6 pm": the day and hour, with a lower-case meridiem. */
     private static String clock(long when) {
-        return new SimpleDateFormat("EEE h a", Locale.US).format(new Date(when))
+        return com.atakmap.android.atmosphere.units.Clock.format("EEE h a").format(new Date(when))
                 .replace("AM", "am").replace("PM", "pm");
     }
 
@@ -2968,6 +3110,38 @@ public final class AtmospherePane {
                     updateLayerControls();
                 } else {
                     askToAllowFloodedGround();
+                }
+            }
+        });
+        floodzonesToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (floodzones == null)
+                    return;
+                if (floodzones.isOn()) {
+                    floodzones.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(FloodZoneOverlay.LAYER_ID)) {
+                    floodzones.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowFloodZones();
+                }
+            }
+        });
+        damareasToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (damareas == null)
+                    return;
+                if (damareas.isOn()) {
+                    damareas.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(DamAreaOverlay.LAYER_ID)) {
+                    damareas.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowDamAreas();
                 }
             }
         });
@@ -4586,6 +4760,14 @@ public final class AtmospherePane {
             floodground.setOn(on);
         else if (floodground != null && on)
             blocked++;
+        if (floodzones != null && (!on || allowed(FloodZoneOverlay.LAYER_ID)))
+            floodzones.setOn(on);
+        else if (floodzones != null && on)
+            blocked++;
+        if (damareas != null && (!on || allowed(DamAreaOverlay.LAYER_ID)))
+            damareas.setOn(on);
+        else if (damareas != null && on)
+            blocked++;
         if (satellite != null && (!on || allowed(SatelliteOverlay.LAYER_ID)))
             satellite.setOn(on);
         else if (satellite != null && on)
@@ -4837,6 +5019,34 @@ public final class AtmospherePane {
                         fireZones.setLabelGate(gsd);
                     }
                 });
+    }
+
+    private void buildFloodZonesGateRow() {
+        gateRow(floodzonesGateRow, floodzonesGateText, "Flood zones", floodzones.gate(),
+                new Gate() {
+                    @Override
+                    public void set(double gsd) {
+                        floodzones.setGate(gsd);
+                    }
+                });
+        if (floodzones.tooWide())
+            floodzonesGateText.setText(floodzonesGateText.getText()
+                    + "  \u2014 hidden, the view is too wide; zones draw at "
+                    + floodzones.widestBar() + " or closer");
+    }
+
+    private void buildDamAreasGateRow() {
+        gateRow(damareasGateRow, damareasGateText, "Dam failure areas", damareas.gate(),
+                new Gate() {
+                    @Override
+                    public void set(double gsd) {
+                        damareas.setGate(gsd);
+                    }
+                });
+        if (damareas.tooWide())
+            damareasGateText.setText(damareasGateText.getText()
+                    + "  \u2014 hidden, the view is too wide; areas draw at "
+                    + damareas.widestBar() + " or closer");
     }
 
     /** Feature Layer's ladder, as scale-bar readings in the operator's big unit. */
@@ -5525,6 +5735,48 @@ public final class AtmospherePane {
                                 egress.setLayerEnabled(FloodedGroundOverlay.LAYER_ID, true);
                                 if (floodground != null)
                                     floodground.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowFloodZones() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.floodzones_allow_title))
+                .setMessage(pluginContext.getString(R.string.floodzones_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(FloodZoneOverlay.LAYER_ID, true);
+                                if (floodzones != null)
+                                    floodzones.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowDamAreas() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.damareas_allow_title))
+                .setMessage(pluginContext.getString(R.string.damareas_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(DamAreaOverlay.LAYER_ID, true);
+                                if (damareas != null)
+                                    damareas.setOn(true);
                                 updateLayerControls();
                             }
                         })
@@ -6510,6 +6762,24 @@ public final class AtmospherePane {
         floodgroundExpand.setVisibility(floodgroundOn ? View.VISIBLE : View.GONE);
         floodgroundExpand.setRotation(floodgroundOpen ? 180f : 0f);
         floodgroundSettings.setVisibility(floodgroundOn && floodgroundOpen ? View.VISIBLE : View.GONE);
+        final boolean floodzonesOn = floodzones != null && floodzones.isOn();
+        floodzonesToggle.setText(floodzonesOn ? R.string.floodzones_on : R.string.floodzones_off);
+        floodzonesToggle.setTextColor(pluginContext.getResources().getColor(
+                floodzonesOn ? R.color.state_on : R.color.state_off));
+        floodzonesExpand.setVisibility(floodzonesOn ? View.VISIBLE : View.GONE);
+        floodzonesExpand.setRotation(floodzonesOpen ? 180f : 0f);
+        floodzonesSettings.setVisibility(floodzonesOn && floodzonesOpen ? View.VISIBLE : View.GONE);
+        if (floodzonesOn && stationLayer != null)
+            buildFloodZonesGateRow();
+        final boolean damareasOn = damareas != null && damareas.isOn();
+        damareasToggle.setText(damareasOn ? R.string.damareas_on : R.string.damareas_off);
+        damareasToggle.setTextColor(pluginContext.getResources().getColor(
+                damareasOn ? R.color.state_on : R.color.state_off));
+        damareasExpand.setVisibility(damareasOn ? View.VISIBLE : View.GONE);
+        damareasExpand.setRotation(damareasOpen ? 180f : 0f);
+        damareasSettings.setVisibility(damareasOn && damareasOpen ? View.VISIBLE : View.GONE);
+        if (damareasOn && stationLayer != null)
+            buildDamAreasGateRow();
         final boolean satelliteOn = satellite != null && satellite.isOn();
         satelliteToggle.setText(satelliteOn ? R.string.satellite_on : R.string.satellite_off);
         satelliteToggle.setTextColor(pluginContext.getResources().getColor(
@@ -6839,6 +7109,16 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_floodground, FloodedGroundOverlay.HOST));
+        }
+        if (floodzones != null && floodzones.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_floodzones, FloodZoneOverlay.HOST));
+        }
+        if (damareas != null && damareas.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_damareas, DamAreaOverlay.HOST));
         }
         if (satellite != null && satellite.isOn()) {
             if (out.length() > 0)
@@ -7277,7 +7557,7 @@ public final class AtmospherePane {
         final long t = com.atakmap.android.atmosphere.data.IsoTime.parse(time);
         if (t <= 0)
             return time;
-        final String when = new SimpleDateFormat("h:mm a", Locale.US).format(new Date(t))
+        final String when = com.atakmap.android.atmosphere.units.Clock.format("h:mm a").format(new Date(t))
                 .replace("AM", "am").replace("PM", "pm");
         final boolean latest = index == radarFrames.size() - 1;
         return (latest ? "Latest" : capitalize(relativeTime(t))) + ", " + when;
@@ -7597,8 +7877,24 @@ public final class AtmospherePane {
                     mv.postDelayed(centerSettled, 500);
                     mv.removeCallbacks(forecastSettled);
                     mv.postDelayed(forecastSettled, FORECAST_SETTLE_MS);
+                    mv.removeCallbacks(gatesSettled);
+                    mv.postDelayed(gatesSettled, 700);
                 }
             };
+
+    /**
+     * The gate lines under each layer read the scale bar ("scale bar now 9.43 mi,
+     * hidden"), so they are redrawn when the map stops; before, they kept the reading
+     * from when the page was built while the layer drew on the map (2026-11-15).
+     */
+    private final Runnable gatesSettled = new Runnable() {
+        @Override
+        public void run() {
+            if (pager != null && pager.getCurrentItem() == LAYERS_PAGE
+                    && pages[LAYERS_PAGE].isShown())
+                updateLayerControls();
+        }
+    };
     private boolean followingMap;
 
     private void setFavorite(Favorites.Place place) {
@@ -7837,11 +8133,13 @@ public final class AtmospherePane {
         // is a fact about the feed, not about the weather, so the heading stays "Now".
         currentHeading.setText(pluginContext.getString(R.string.heading_now));
 
+        com.atakmap.android.atmosphere.units.Clock.refresh(MapCompat.atakContext());
         renderNow(now);
         renderSunMoon();
 
         renderTrend(wanted);
         renderHours(wanted);
+        renderLight();
         renderDays(wanted);
         attributionText.setText(snapshot.attribution == null ? "" : snapshot.attribution);
         discussion.refresh(false);
@@ -8129,7 +8427,7 @@ public final class AtmospherePane {
             labels.add(shortLabel(r));
         hoursLegend.addView(column("", labels, true));
         final SimpleDateFormat day = new SimpleDateFormat("EEE", Locale.US);
-        final SimpleDateFormat hour = new SimpleDateFormat("ha", Locale.US);
+        final SimpleDateFormat hour = com.atakmap.android.atmosphere.units.Clock.format("ha");
         int shown = 0;
         for (SeriesEntry entry : snapshot.series) {
             if (shown++ >= HOURS_SHOWN)
@@ -8194,10 +8492,10 @@ public final class AtmospherePane {
             if (kind(r) == Kind.SKY) skyKey = r.key;
         }
         final long now = System.currentTimeMillis();
-        final SimpleDateFormat hourFmt = new SimpleDateFormat("ha", Locale.US);
+        final SimpleDateFormat hourFmt = com.atakmap.android.atmosphere.units.Clock.format("ha");
         final SimpleDateFormat dayFmt = new SimpleDateFormat("EEE", Locale.US);
         final SimpleDateFormat dayKey = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
-        final SimpleDateFormat clock = new SimpleDateFormat("h:mm", Locale.US);
+        final SimpleDateFormat clock = com.atakmap.android.atmosphere.units.Clock.format("h:mm");
         final Map<String, long[]> sunByDay = new LinkedHashMap<>();
         String lastDay = null;
         int shown = 0;
@@ -8262,6 +8560,174 @@ public final class AtmospherePane {
         return cols;
     }
 
+    /**
+     * The Light section for the point and the day the stepper is on: the light bar,
+     * the twilights, sun and moon rise and set with azimuths, day length, and the
+     * moon's phase and next phases. All computed on the device, so it is there with
+     * no network. Times on this device's clock, as the hourly strip above uses.
+     */
+    private void renderLight() {
+        lightContainer.removeAllViews();
+        // Closed, nothing is computed; opening the fold renders it.
+        if (snapshot == null || !lightOpen)
+            return;
+        com.atakmap.android.atmosphere.units.Clock.refresh(pluginContext);
+        final TimeZone tz = TimeZone.getDefault();
+        final long now = System.currentTimeMillis();
+        final Calendar c = Calendar.getInstance(tz);
+        c.setTimeInMillis(now);
+        c.add(Calendar.DAY_OF_MONTH, lightOffset);
+        c.set(Calendar.HOUR_OF_DAY, 12);
+        c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        final long noon = c.getTimeInMillis();
+        final double lat = snapshot.latitude, lon = snapshot.longitude;
+        final Light.Day d = Light.day(noon, tz, lat, lon);
+        final Light.Day before = Light.day(noon - 86_400_000L, tz, lat, lon);
+
+        final SimpleDateFormat dayFmt = new SimpleDateFormat("EEE MMM d", Locale.US);
+        dayFmt.setTimeZone(tz);
+        final String date = dayFmt.format(new Date(noon));
+        lightDay.setText(lightOffset == 0 ? "Today, " + date
+                : lightOffset == 1 ? "Tomorrow, " + date
+                : lightOffset == -1 ? "Yesterday, " + date : date);
+
+        // The moon is drawn as it is now when now is in the day, else at noon.
+        final long moonAt = now >= d.start && now < d.end ? now : noon;
+        final LightBarView bar = new LightBarView(pluginContext);
+        bar.setDay(d, tz, now, Light.elongation(moonAt));
+        lightContainer.addView(bar);
+
+        final LinearLayout legend = new LinearLayout(pluginContext);
+        legend.setOrientation(LinearLayout.HORIZONTAL);
+        legend.setPadding(dp(4), 0, dp(4), dp(6));
+        for (int i = LightBarView.BAND_COLORS.length - 1; i >= 0; i--)
+            legend.addView(swatchLabel(LightBarView.BAND_COLORS[i], LightBarView.BAND_NAMES[i], 11));
+        lightContainer.addView(legend);
+
+        // Every event of the day in the order it happens.
+        final SimpleDateFormat clock = com.atakmap.android.atmosphere.units.Clock.format("h:mm a");
+        clock.setTimeZone(tz);
+        final List<Object[]> rows = new ArrayList<>();
+        addEvents(rows, d.astroDawn, LightBarView.BAND_COLORS[1], "Astronomical twilight begins", false);
+        addEvents(rows, d.nauticalDawn, LightBarView.BAND_COLORS[2], "Nautical twilight begins", false);
+        addEvents(rows, d.civilDawn, LightBarView.BAND_COLORS[3], "Civil twilight begins", false);
+        addEvents(rows, d.sunrise, LightBarView.BAND_COLORS[4], "Sunrise", true);
+        addEvents(rows, d.sunset, LightBarView.BAND_COLORS[4], "Sunset", true);
+        addEvents(rows, d.civilDusk, LightBarView.BAND_COLORS[3], "Civil twilight ends", false);
+        addEvents(rows, d.nauticalDusk, LightBarView.BAND_COLORS[2], "Nautical twilight ends", false);
+        addEvents(rows, d.astroDusk, LightBarView.BAND_COLORS[1], "Astronomical twilight ends", false);
+        addEvents(rows, d.moonrise, 0xFFD8D8D8, "Moonrise", true);
+        addEvents(rows, d.moonset, 0xFFD8D8D8, "Moonset", true);
+        java.util.Collections.sort(rows, new java.util.Comparator<Object[]>() {
+            @Override
+            public int compare(Object[] a, Object[] b) {
+                return Long.compare((Long) a[0], (Long) b[0]);
+            }
+        });
+        for (Object[] r : rows) {
+            // Rounded to the minute, not cut: 05:31:50 is 5:32.
+            final String t = clock.format(new Date((Long) r[0] + 30_000L)).toLowerCase(Locale.US);
+            final LinearLayout row = (LinearLayout) swatchLabel((Integer) r[1], (String) r[2], 14);
+            // The time in its own column, so "11:50 am" and "5:04 am" line up.
+            final TextView tv = new TextView(pluginContext);
+            tv.setText(t);
+            tv.setTextSize(14);
+            tv.setTextColor(Color.WHITE);
+            tv.setSingleLine(true);
+            tv.setLayoutParams(new LinearLayout.LayoutParams(dp(78),
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+            row.addView(tv, 1);
+            lightContainer.addView(row);
+        }
+        if (d.sunAlwaysUp)
+            lightContainer.addView(note("The sun does not set this day."));
+        else if (d.sunAlwaysDown)
+            lightContainer.addView(note("The sun does not rise this day."));
+        if (d.moonrise.isEmpty())
+            lightContainer.addView(note("No moonrise this day."));
+        if (d.moonset.isEmpty())
+            lightContainer.addView(note("No moonset this day."));
+
+        final int diff = d.daylightMinutes - before.daylightMinutes;
+        lightContainer.addView(note("Daylight " + (d.daylightMinutes / 60) + " h "
+                + (d.daylightMinutes % 60) + " min"
+                + (diff == 0 ? ", the same as the day before"
+                        : ", " + Math.abs(diff) + " min " + (diff < 0 ? "shorter" : "longer")
+                                + " than the day before")));
+
+        // The moon: phase as drawn on the bar, then the next four principal phases.
+        final double elong = Light.elongation(moonAt);
+        final LinearLayout moon = new LinearLayout(pluginContext);
+        moon.setOrientation(LinearLayout.HORIZONTAL);
+        moon.setGravity(Gravity.CENTER_VERTICAL);
+        moon.setPadding(dp(4), dp(8), dp(4), dp(4));
+        final View glyph = new View(pluginContext) {
+            @Override
+            protected void onDraw(android.graphics.Canvas cv) {
+                LightBarView.drawMoon(cv, getWidth() / 2f, getHeight() / 2f,
+                        Math.min(getWidth(), getHeight()) / 2f - 2, elong);
+            }
+        };
+        glyph.setLayoutParams(new LinearLayout.LayoutParams(dp(44), dp(44)));
+        moon.addView(glyph);
+        final TextView mt = new TextView(pluginContext);
+        mt.setTextColor(Color.WHITE);
+        mt.setTextSize(15);
+        mt.setPadding(dp(10), 0, 0, 0);
+        mt.setText(Astro.moonPhaseName(moonAt) + ", "
+                + Math.round(Light.illumination(moonAt) * 100) + "% lit, "
+                + String.format(Locale.US, "%.1f", elong / 360d * 29.530588853) + " days old");
+        moon.addView(mt);
+        lightContainer.addView(moon);
+        final SimpleDateFormat phaseFmt = com.atakmap.android.atmosphere.units.Clock.format("EEE MMM d, h:mm a");
+        phaseFmt.setTimeZone(tz);
+        for (Light.Phase ph : Light.nextPhases(moonAt, 4))
+            lightContainer.addView(note(Light.PHASE_NAMES[ph.kind] + "   "
+                    + phaseFmt.format(new Date(ph.time + 30_000L)).replace("AM", "am")
+                            .replace("PM", "pm")));
+        lightContainer.addView(note("Times in " + tz.getDisplayName(
+                tz.inDaylightTime(new Date(noon)), TimeZone.SHORT, Locale.US) + "."));
+    }
+
+    private static void addEvents(List<Object[]> rows, List<Light.Event> events, int color,
+            String name, boolean withAzimuth) {
+        for (Light.Event e : events)
+            rows.add(new Object[] { e.time, color,
+                    withAzimuth ? name + ", " + Math.round(e.azimuth) + "\u00b0" : name });
+    }
+
+    /** A line of text with a small color square before it. */
+    private View swatchLabel(int color, String text, int sp) {
+        final LinearLayout row = new LinearLayout(pluginContext);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(4), dp(2), dp(8), dp(2));
+        final View sw = new View(pluginContext);
+        sw.setBackgroundColor(color);
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(10), dp(10));
+        lp.rightMargin = dp(6);
+        sw.setLayoutParams(lp);
+        row.addView(sw);
+        final TextView t = new TextView(pluginContext);
+        t.setText(text);
+        t.setTextSize(sp);
+        t.setTextColor(Color.WHITE);
+        t.setSingleLine(true);
+        row.addView(t);
+        return row;
+    }
+
+    private TextView note(String text) {
+        final TextView t = new TextView(pluginContext);
+        t.setText(text);
+        t.setTextSize(14);
+        t.setTextColor(Color.WHITE);
+        t.setPadding(dp(4), dp(3), dp(4), dp(3));
+        return t;
+    }
+
     /** Sunrise, sunset and the moon for the point, computed on the device. */
     private void renderSunMoon() {
         if (snapshot == null)
@@ -8269,7 +8735,7 @@ public final class AtmospherePane {
         final long now = System.currentTimeMillis();
         final long[] sun = Astro.sunRiseSet(now, TimeZone.getDefault(), snapshot.latitude,
                 snapshot.longitude);
-        final SimpleDateFormat clock = new SimpleDateFormat("h:mm a", Locale.US);
+        final SimpleDateFormat clock = com.atakmap.android.atmosphere.units.Clock.format("h:mm a");
         final LinearLayout row = new LinearLayout(pluginContext);
         row.setOrientation(LinearLayout.HORIZONTAL);
         if (sun != null) {

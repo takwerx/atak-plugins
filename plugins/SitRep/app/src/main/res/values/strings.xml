@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App -->
+    <string name="app_name">Sit Rep</string>
+    <!-- description -->
+    <string name="app_desc">Sit Rep</string>
+
+    <string name="draw_area">New area</string>
+    <string name="new_draw">Draw an area</string>
+    <string name="new_name">Search</string>
+    <string name="new_here">Tap on map</string>
+    <string name="new_shape">Use a shape</string>
+    <string name="settings">Settings</string>
+    <string name="back">Back</string>
+    <string name="refresh">Refresh</string>
+    <string name="delete">Delete</string>
+    <string name="rename">Rename</string>
+    <string name="wide">Wide or half width</string>
+    <string name="go_to">Go to</string>
+    <string name="heading_reports">Reports</string>
+    <string name="show_settings">Open or close</string>
+    <string name="prefs_summary">The Sit Rep user guide</string>
+    <string name="manual_title">Plugin Documentation</string>
+    <string name="manual_summary">Open the Sit Rep user guide: making a report, reading each section, places on the map</string>
+    <string name="status_start">Draw an area to make a sit rep.</string>
+</resources>

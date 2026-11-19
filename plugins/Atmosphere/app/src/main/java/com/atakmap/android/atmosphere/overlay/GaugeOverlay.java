@@ -599,7 +599,7 @@ public final class GaugeOverlay {
     }
 
     private static String clock(long at) {
-        return new java.text.SimpleDateFormat("EEE MMM d, h:mm a", Locale.US)
+        return com.atakmap.android.atmosphere.units.Clock.format("EEE MMM d, h:mm a")
                 .format(new java.util.Date(at));
     }
 

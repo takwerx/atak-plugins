@@ -55,6 +55,14 @@ echo "==> version code (the MDM must see this as an update)"
 "$REPO_ROOT/scripts/check-version-code.sh" "$NAME" --target "$ATAK_VERSION" || {
     echo "error: not zipping a version an MDM could not push as an update — bump PLUGIN_VERSION" >&2; exit 1; }
 
+# FirstNet gives the device IPv6, and some agency firewalls reject FirstNet's
+# IPv6 or never answer it (Census, EPA; Sit Rep in Arlington VA, 2026-11-17).
+# No desk test sees it, so every host the plugin calls has a probe result from a
+# FirstNet device, and a host that fails there needs the IPv4 fallback.
+echo "==> FirstNet (every server the plugin calls works from FirstNet LTE)"
+"$REPO_ROOT/scripts/check-firstnet.sh" "$NAME" || {
+    echo "error: probe new hosts with check-firstnet.sh --probe $NAME on a FirstNet device, or add the IPv4 fallback" >&2; exit 1; }
+
 PF="${ATAK_PREFLIGHT:-$HOME/atak-plugin-preflight}"
 # Josh Fuller's preflight scans the source the way the pipeline's reviewers
 # will: semgrep rules, secrets, dependencies. It is his tool and moves fast, so
@@ -319,7 +327,9 @@ echo "==> clean-extract build test (a zip that fails here fails on tak.gov)"
             "$TMP/$NAME/app/build.gradle" | head -1)"
     BUILD_SDK="$ATAK_SDK"
     if [ -n "$WANT" ]; then
-        MATCH="$(ls -d "$HOME"/atak-sdk/ATAK-CIV-"$WANT"* 2>/dev/null | sort -V | tail -1)"
+        # Folders holding main.jar only: a downloaded ATAK-CIV-<v>-SDK.zip beside
+        # them sorts last and was picked as the SDK (2026-11-18).
+        MATCH="$(for d in "$HOME/atak-sdk"/ATAK-CIV-"$WANT"*/; do [ -f "$d/main.jar" ] && echo "${d%/}"; done | sort -V | tail -1)"
         if [ -n "$MATCH" ]; then
             BUILD_SDK="$MATCH"
         else

@@ -29,7 +29,7 @@ public final class ErcOverlay extends OutlookOverlay {
     private static final String TAG = "AtmosphereErc";
     private static final long POLL_MS = 3L * 60 * 60 * 1000;
     /** A PSA with no station reporting: an outline, and a fill too faint to see so it still answers a tap. */
-    private static final int NO_READING_EDGE = 0xFF9E9E9E;
+    private static final int NO_READING_EDGE = 0xFFE0E0E0;
 
     /** The key: the agency's classes, then what an empty outline means. */
     public static final String[][] LEGEND;
@@ -111,9 +111,14 @@ public final class ErcOverlay extends OutlookOverlay {
         return a.label.isEmpty() ? 0x01 : 0x40;
     }
 
+    /**
+     * The edge in the area's own class color, at full strength; light grey for an area
+     * with no reading. It was a dark grey (#5A5A5A) on every area, which sank into the
+     * satellite map (operator, 2026-11-14: "the grey border is hard to see").
+     */
     @Override
     protected int strokeColor(Area a) {
-        return a.label.isEmpty() ? NO_READING_EDGE : 0xFF5A5A5A;
+        return a.label.isEmpty() ? NO_READING_EDGE : 0xFF000000 | a.color;
     }
 
     /** Each area's label is a tile in its class color, dark text on the light classes. */

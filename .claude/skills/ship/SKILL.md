@@ -119,6 +119,11 @@ main checkout; `git -C ~/GitHub/atak-plugins branch --show-current` must print
     again. A FAIL lists the commits: `--merge` brings them in on this branch
     (it commits; on a conflict it writes nothing and names the files),
     then re-run the publish scrub, since what came in is now tracked.
+14. **FirstNet (MANDATORY):** `./scripts/check-firstnet.sh <Plugin>` → PASS.
+    Every server the plugin calls has a probe result from a FirstNet device,
+    and one that rejects FirstNet's IPv6 or never answers it is handled by
+    the IPv4 fallback (Sit Rep's `net/Http.java`). `submission-zip.sh` ran it
+    already; run it again, because a probe result can change in between.
 
 ## Step 1 — The ship prompt (HARD STOP)
 
@@ -131,6 +136,7 @@ Present exactly this via AskUserQuestion and wait:
 > - open issues: `<count surfaced / none>` · commit scan: `<clean / acknowledged>`
 > - download links: `check-download-links PASS (<Plugin> <version>)`
 > - version code: `check-version-code PASS (<Plugin> <version> -> <code>)`, signed APKs for every target
+> - FirstNet: `check-firstnet PASS (<Plugin>: N hosts)`
 > - public repo: `sync-public-repo PASS (push is a fast-forward)`
 > - manual pictures: `<current / UI retaken on the dev build / map shots pending: which>`
 > - this will: merge the branch into `main` (merge commit), push main, subtree-push

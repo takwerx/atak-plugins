@@ -374,8 +374,66 @@ final class AtmosphereFeatures {
     }
 
     private volatile HitFilter hitFilter;
+
+    /**
+     * A layer's say in what a tap's details read, from where the tap was. Dam failure
+     * areas say where the dam is from the tap: the flood runs miles downstream, and
+     * an area over another dam's lake read as that lake's dam (operator, 2026-11-15).
+     */
+    interface TapNote {
+        void note(MapItem item, com.atakmap.coremap.maps.coords.GeoPoint tap);
+    }
+
+    private volatile TapNote tapNote;
+
+    void setTapNote(TapNote n) {
+        tapNote = n;
+    }
+
+    /** Let the layer write its tap-dependent text onto every hit it kept. */
+    private void noteTap(java.util.SortedSet<MapItem> hits,
+            com.atakmap.coremap.maps.coords.GeoPoint tap) {
+        final TapNote n = tapNote;
+        if (n == null || hits == null || tap == null)
+            return;
+        // The details pane finds the item again by uid, which builds a new copy from
+        // the store; the last tap's text is kept by feature id and put on that copy.
+        final java.util.Map<Long, String[]> notes = new java.util.HashMap<>();
+        for (MapItem m : hits)
+            try {
+                final String before = m.getMetaString("remarks", "");
+                final String titleBefore = m.getMetaString("title", "");
+                n.note(m, tap);
+                final String after = m.getMetaString("remarks", "");
+                final String title = m.getMetaString("title", "");
+                if ((!after.equals(before) || !title.equals(titleBefore))
+                        && m.hasMetaValue("featureid"))
+                    notes.put(m.getMetaLong("featureid", -1), new String[] { after, title });
+            } catch (RuntimeException e) {
+                // a note that fails leaves the details as they were
+            }
+        tapNotes = notes;
+    }
+
+    /** The last tap's notes, by feature id; see {@link #noteTap}. */
+    private volatile java.util.Map<Long, String[]> tapNotes = java.util.Collections.emptyMap();
     /** A rating's label as an exact-color pill; see {@link ZonePills#pill(String, int, int)}. */
     private ZonePills ratingPills;
+
+    /**
+     * Rhumb lines for this layer's features: the renderer then fills a polygon flat
+     * instead of cutting its edges along the earth's curve, which adds points to every
+     * edge. Turned on for the FEMA flood zones while their missing fills were chased
+     * (s10-dev-2, 2026-11-14); the cause turned out to be rings that touch themselves,
+     * on which earcut loops forever (FloodZones.repair), but flat fills were kept: at
+     * the few miles the zones are drawn at, a straight edge and a curved one are the
+     * same pixels, and fewer points is less for earcut to cut.
+     */
+    private volatile boolean rhumb;
+
+    void setRhumb(boolean value) {
+        rhumb = value;
+    }
 
     void setHitFilter(HitFilter f) {
         hitFilter = f;
@@ -962,6 +1020,7 @@ final class AtmosphereFeatures {
                             onePerPlace(hits, params == null ? null : params.geo);
                             narrow(hits, params == null ? null : params.geo);
                             atLabelOnly(hits, view, params == null ? null : params.geo);
+                            noteTap(hits, params == null ? null : params.geo);
                             Log.d(tag, "deepHitTest: " + (controls == null ? -1 : controls.size())
                                     + " controls, " + raw + " hits"
                                     + (hits != null && hits.size() != raw ? ", " + hits.size() + " kept" : ""));
@@ -977,6 +1036,7 @@ final class AtmosphereFeatures {
                             onePerPlace(hits, point);
                             narrow(hits, point);
                             atLabelOnly(hits, view, point);
+                            noteTap(hits, point);
                             Log.d(tag, "deepHitTestItems: " + raw + " hits"
                                     + (hits != null && hits.size() != raw ? ", " + hits.size() + " kept" : ""));
                             return hits;
@@ -1098,6 +1158,7 @@ final class AtmosphereFeatures {
                                 item.setMetaString("remarks",
                                         com.atakmap.android.atmosphere.ui
                                                 .StormDetailsReceiver.render(a));
+
                             // What the details pane shows as its heading and subtitle.
                             String title = feature.getName();
                             if ((title == null || title.isEmpty()) && a != null)
@@ -1111,6 +1172,15 @@ final class AtmosphereFeatures {
                             item.setMetaString("title", title);
                             item.setMetaString("callsign", title);
                             item.setMetaString("storm_set", setOf(feature.getId()));
+                            final String[] noted = tapNotes.get(feature.getId());
+                            if (noted != null) {
+                                item.setMetaString("remarks", noted[0]);
+                                if (!noted[1].isEmpty()) {
+                                    item.setMetaString("title", noted[1]);
+                                    item.setMetaString("callsign", noted[1]);
+                                    item.setTitle(noted[1]);
+                                }
+                            }
                             // Marks it as ours, so a tap opens its page or its details
                             // instead of ATAK's radial (the plugin's menu listener).
                             item.setMetaBoolean("atmosphere", true);
@@ -1139,6 +1209,12 @@ final class AtmosphereFeatures {
                                                 a.getStringAttribute("_ref"));
                                         item.setMetaString("atmosphereLayer", type);
                                     }
+                                    if (a.containsAttribute("_floodId"))
+                                        item.setMetaString("floodId",
+                                                a.getStringAttribute("_floodId"));
+                                    if (a.containsAttribute("_damId"))
+                                        item.setMetaString("damId",
+                                                a.getStringAttribute("_damId"));
                                     if (a.containsAttribute("_zoneId")) {
                                         item.setMetaString("zoneId",
                                                 a.getStringAttribute("_zoneId"));
@@ -1181,6 +1257,8 @@ final class AtmosphereFeatures {
             case "sawti": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_sawti;
             case "psps": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_psps;
             case "flood": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_flood;
+            case "floodzones": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_floodzones;
+            case "damareas": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_damareas;
             case "beach": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_beach;
             case "buoys": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_buoys;
             case "avalanche": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_avalanche;
@@ -1558,9 +1636,20 @@ final class AtmosphereFeatures {
                             }
                         }
                     }
-                    store.insertFeature(new Feature(fsid, d.name, d.geometry,
-                            centered == null ? d.style : withoutLabel(d.style),
-                            d.attrs, Feature.AltitudeMode.ClampToGround, 0d));
+                    final Style st = centered == null ? d.style : withoutLabel(d.style);
+                    if (rhumb) {
+                        final Feature.Traits traits = new Feature.Traits();
+                        traits.altitudeMode = Feature.AltitudeMode.ClampToGround;
+                        traits.extrude = 0d;
+                        traits.lineMode = Feature.LineMode.Rhumb;
+                        store.insertFeature(new Feature(fsid,
+                                FeatureDataStore2.FEATURE_ID_NONE, d.name, d.geometry, st,
+                                d.attrs, traits, FeatureDataStore2.TIMESTAMP_NONE,
+                                FeatureDataStore2.FEATURE_VERSION_NONE));
+                    } else {
+                        store.insertFeature(new Feature(fsid, d.name, d.geometry, st,
+                                d.attrs, Feature.AltitudeMode.ClampToGround, 0d));
+                    }
                 }
                 // One at a time. deleteFeatureSets(params) is a silent no-op on this
                 // store -- the file held sixty sets before and sixty after, every
