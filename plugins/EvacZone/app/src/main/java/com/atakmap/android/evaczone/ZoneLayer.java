@@ -720,12 +720,27 @@ public class ZoneLayer {
         } catch (Exception e) {
             Log.w(TAG, source.id + " refresh failed", e);
             stale = true;
-            status = "no update: " + e.getMessage();
+            status = plainReason(e);
         } finally {
             refreshing = false;
             if (progress != null)
                 progress.run();
         }
+    }
+
+    /**
+     * Why a refresh failed, in words a crew can act on. The exception itself goes to
+     * the log only: "Unable to resolve host cams.takwerx.org" on the status line read
+     * as a fault in the plugin when it was a device with no signal.
+     */
+    static String plainReason(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof java.net.UnknownHostException || t instanceof java.net.ConnectException
+                    || t instanceof java.net.NoRouteToHostException || t instanceof java.net.SocketTimeoutException
+                    || t instanceof javax.net.ssl.SSLException)
+                return "No network";
+        }
+        return "Source not answering";
     }
 
     /**

@@ -170,7 +170,7 @@ map view, and follows the map as you pan.
 
 - "Map is off. Press ON to draw the zones." The big switch is off.
 - "Zoom in to see the zones." You are zoomed out past your threshold.
-- A row reading **STALE** kept its last fetch after a failed refresh; the reason
-  is on the row. The next refresh tries again.
+- A row reading **No network** or **Source not answering** kept its last fetch
+  after a failed refresh, and says how old it is. The next refresh tries again.
 - A state that shows 0 zones between incidents is telling the truth.
 - Report a problem at https://github.com/takwerx/evac-zone/issues

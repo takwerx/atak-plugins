@@ -1102,7 +1102,7 @@ public class EvacZone implements IPlugin {
 
     /**
      * What the row promises before it is on (publisher, kind, count at catalog time) and
-     * what it holds once it is (count, age, STALE with the reason).
+     * what it holds once it is (count, age, and why it is old when a refresh failed).
      */
     private static String statusLine(Catalog.Source s, ZoneLayer l) {
         final StringBuilder sb = new StringBuilder();
@@ -1134,7 +1134,7 @@ public class EvacZone implements IPlugin {
         else
             sb.append(" · never refreshed");
         if (l.stale)
-            sb.append(" · STALE: ").append(l.status);
+            sb.append("\n").append(l.status).append(l.count > 0 ? ", showing what this device saved." : ".");
         else if (l.status.startsWith("capped"))
             sb.append(" · ").append(l.status);
         return sb.toString();

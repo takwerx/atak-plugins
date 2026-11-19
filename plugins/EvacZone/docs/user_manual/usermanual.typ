@@ -298,8 +298,9 @@ British Columbia is its orders and alerts.
 *"Zoom in to see the zones."* You are zoomed out past your threshold. Zoom in,
 or set the threshold to *Always draw them*.
 
-*A row reading STALE* kept its last zones after a refresh that failed, and says
-why. Nothing is taken off the map because a server did not answer; the next
+*A row reading "No network" or "Source not answering"* kept its last zones after
+a refresh that failed, and says how old they are ("showing what this device
+saved"). Nothing is taken off the map because a server did not answer; the next
 refresh tries again.
 
 *A feed that shows 0 zones* between incidents is telling the truth. Most feeds
