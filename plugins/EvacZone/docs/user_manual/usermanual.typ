@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Evac Zone",
-   plugin-version: "0.6",
+   plugin-version: "0.7",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -348,7 +348,7 @@ words.
 #v(6pt)
 // The Tool Preferences shot (shot list #20) goes beside this once a build
 // carries the manual; 0.3 has no preferences entry to photograph.
-*This guide, on the device.* Settings > Tool Preferences > Evac Zone →
+*This guide, on the device.* Settings > Tool Preferences > Evac Zone >
 *User manual* opens this guide as a PDF on the phone. It is the copy that
 matches the plugin you have installed.
 
