@@ -14,9 +14,9 @@ All releases: https://github.com/takwerx/evac-zone/releases
 _________________________________________________________________
 PURPOSE AND CAPABILITIES
 
-Evacuation zones on the ATAK map, from the services that publish them: state
-emergency management agencies, CAL FIRE, and the counties and cities that run
-their own zone maps. Browsed by state, then by county, the way Cam Depot
+Evacuation zones on the ATAK map, from the services that publish them:
+Genasys Protect (licensed to TAKWERX), state emergency management agencies,
+CAL FIRE, and the counties and cities that run their own zone maps. Browsed by state, then by county, the way Cam Depot
 browses cameras, and drawn in one color language whatever the source calls a
 status: Order red, Warning yellow, Advisory blue, Shelter in Place purple,
 Lifted green, Normal faint.
@@ -55,6 +55,15 @@ A step-by-step user guide lives at docs/USER_GUIDE.md in the repository
 _________________________________________________________________
 STATUS
 
+Version 0.7: Genasys Protect zones, under a data license between Genasys and
+TAKWERX. Genasys is the first source for California and Oregon, with the state
+and county feeds adding what Genasys does not have, and a new "Other states"
+entry carries Genasys zones in every other state, so a zone shows the day an
+agency issues it. The zones reach devices through the takwerx server, which
+holds the Genasys login; the plugin itself carries none. The same change
+reached 0.6 through the catalog on 2026-11-19; 0.7 carries it in the built-in
+copy used when the catalog cannot be read.
+
 Version 0.6: North Carolina's coastal evacuation zones (21 counties, zones A to E),
 and a drawing fix: zones made of several separate parts now draw every part, and
 static maps keep every piece of a zone letter (Hillsborough County, Florida draws
@@ -69,9 +78,10 @@ and push each one as an update. Nothing else changed.
 Version 0.4. Verified on ATAK-CIV 5.8.0.3 (Samsung Galaxy XCover Pro), release
 build with proguard. Compiles against the 5.6, 5.7 and 5.8 SDKs.
 
-Feeds at release: California (Cal OES with CAL FIRE and the county feeds folded in), Oregon (OEM with Deschutes), British
-Columbia, and hurricane zones for two
-Florida counties. More states arrive through the catalog, by request.
+Feeds at release: California (Genasys with Cal OES, CAL FIRE and the county
+feeds folded in), Oregon (Genasys with OEM and Deschutes), every other US state
+Genasys covers, British Columbia, hurricane zones for two Florida counties, and
+North Carolina's coastal zones. More states arrive through the catalog, by request.
 
 Prepared for tak.gov third-party submission.
 
@@ -94,6 +104,9 @@ PORTS REQUIRED
 
   - mapdepot.takwerx.org, for the catalog (one small JSON file, read at
     plugin start). If it is unreachable the copy built into the APK is used.
+  - cams.takwerx.org, for Genasys Protect zones (path /evaczone/genasys/).
+    The takwerx server holds the Genasys login and answers like a public
+    ArcGIS FeatureServer; the device sends no credentials.
   - The public ArcGIS FeatureServers the catalog lists, only for sources the
     operator turns on: services.arcgis.com and services1 through services9
     .arcgis.com (state and county ArcGIS Online organizations), and
@@ -160,10 +173,14 @@ DEVELOPER NOTES
   has moved a tenth of the radius, coalesced off the GL-thread map-moved
   callback (never touch a view or a map item there).
 
-  Genasys Protect is not a source. Its public WFS answers anonymously but its
-  terms forbid automated use; live status for Genasys counties comes through
-  the state aggregations (Cal OES, CAL FIRE, Oregon OEM), which carry every
-  Genasys county.
+  Genasys Protect is a source under a data license with TAKWERX (2026-11).
+  Its ArcGIS service needs a login, and this source tree is public, so the
+  login stays on the takwerx server: a relay at
+  https://cams.takwerx.org/evaczone/genasys/FeatureServer/0 adds the token,
+  allows only a state filter, drops test and Training zones, and caches one
+  answer a minute for every device. The plugin reads it like any other
+  catalog entry. Genasys's public WFS is still not used; its terms forbid
+  automated access.
 
 LICENSE
 

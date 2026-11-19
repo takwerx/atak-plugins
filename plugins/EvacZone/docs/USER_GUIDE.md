@@ -23,10 +23,11 @@ go to it.
 - The plugin needs internet access to fetch zones. Once a state has been
   fetched it keeps drawing without a connection and tells you how old it is.
 - Nothing is sent from your phone: no location, no callsign.
-- Built and tested in California. Other states are there where public data
-  was found: Oregon, British Columbia, hurricane zones for two Florida
-  counties, and North Carolina's coastal zones for 21 counties (lettered A to
-  E, no live status; the county calls zones by letter).
+- Built and tested in California. Live zones for every US state Genasys
+  Protect covers are under **US** ("Other states"). Beyond that, other places
+  are there where public data was found: Oregon, British Columbia, hurricane
+  zones for two Florida counties, and North Carolina's coastal zones for 21
+  counties (lettered A to E, no live status; the county calls zones by letter).
   If your state publishes evacuation zones and they are not here, point us at
   the data: https://github.com/takwerx/evac-zone/issues
 
@@ -63,9 +64,10 @@ Just the states. Pick one and the pane shows that state's feed and counties.
 One row per state. **ON** loads it and draws it; the row then shows how many
 zones it holds and how long ago it refreshed. **Refresh** fetches now.
 
-California is Cal OES's orders and warnings with CAL FIRE's reason, population
-and lifted zones and the county feeds folded in, one zone drawn once. Oregon is
-OEM's levels: 1 Be Ready, 2 Be Set, 3 Go Now. British Columbia is its orders
+California is Genasys Protect's zones as the agencies issue them, with Cal
+OES, CAL FIRE and the county feeds folded in, one zone drawn once. Oregon is
+Genasys with OEM's levels: 1 Be Ready, 2 Be Set, 3 Go Now. **US** ("Other
+states") is Genasys zones in every other state. British Columbia is its orders
 and alerts.
 
 ## 5. Counties
