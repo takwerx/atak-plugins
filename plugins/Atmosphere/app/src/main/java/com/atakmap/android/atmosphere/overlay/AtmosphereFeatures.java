@@ -1268,6 +1268,7 @@ final class AtmosphereFeatures {
             case "tornado": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_tornado;
             case "debrisflow": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_debrisflow;
             case "quakes": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_quakes;
+            case "temperature": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_sst;
             default: return com.atakmap.android.atmosphere.plugin.R.drawable.ic_toolbar;
         }
     }

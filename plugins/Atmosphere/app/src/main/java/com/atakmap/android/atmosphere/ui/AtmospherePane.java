@@ -451,6 +451,17 @@ public final class AtmospherePane {
     private final LinearLayout sstLegend;
     private SstOverlay sst;
     private boolean sstOpen = true;
+    private static final String PREF_TEMPERATURE_OPEN = "weather.temperature.open";
+    private final LinearLayout temperatureSettings, temperatureLegend;
+    private final WindScaleView temperatureScale;
+    private final LinearLayout temperatureLevelRows;
+    private final android.widget.SeekBar temperatureTransparency;
+    private final TextView temperatureTransparencyLabel;
+    private final ImageButton temperatureExpand;
+    private final Button temperatureToggle;
+    private final TextView temperatureStatus;
+    private RainOverlay temperature;
+    private boolean temperatureOpen = true;
     private static final String PREF_SNOTEL_OPEN = "weather.snotel.open";
     private final LinearLayout snotelSettings;
     private final ImageButton snotelExpand;
@@ -1078,6 +1089,16 @@ public final class AtmospherePane {
         sstToggle = find(R.id.sst_toggle);
         sstStatus = find(R.id.sst_status);
         sstLegend = find(R.id.sst_legend);
+        temperatureSettings = find(R.id.temperature_settings);
+        temperatureExpand = find(R.id.temperature_expand);
+        temperatureToggle = find(R.id.temperature_toggle);
+        temperatureStatus = find(R.id.temperature_status);
+        temperatureLegend = find(R.id.temperature_legend);
+        temperatureScale = new WindScaleView(pluginContext);
+        temperatureLegend.addView(temperatureScale);
+        temperatureLevelRows = find(R.id.temperature_level_rows);
+        temperatureTransparency = find(R.id.temperature_transparency);
+        temperatureTransparencyLabel = find(R.id.temperature_transparency_label);
         snotelSettings = find(R.id.snotel_settings);
         snotelExpand = find(R.id.snotel_expand);
         snotelToggle = find(R.id.snotel_toggle);
@@ -1298,6 +1319,15 @@ public final class AtmospherePane {
             public void onClick(View v) {
                 sstOpen = !sstOpen;
                 rememberFold(PREF_SST_OPEN, sstOpen);
+                updateLayerControls();
+            }
+        });
+        temperatureOpen = prefs == null || prefs.getBoolean(PREF_TEMPERATURE_OPEN, true);
+        temperatureExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                temperatureOpen = !temperatureOpen;
+                rememberFold(PREF_TEMPERATURE_OPEN, temperatureOpen);
                 updateLayerControls();
             }
         });
@@ -2402,6 +2432,184 @@ public final class AtmospherePane {
         updateLayerControls();
     }
 
+    public void setTemperature(RainOverlay overlay) {
+        temperature = overlay;
+        if (temperature == null)
+            return;
+        temperature.setFahrenheit(units != UnitSystem.METRIC);
+        updateTemperatureScale();
+        if (temperatureLevelRows.getChildCount() == 0)
+            buildTemperatureLevelRows();
+        updateTemperatureLevel();
+        temperatureTransparency.setMax(RainOverlay.MAX_TRANSPARENCY);
+        temperatureTransparency.setProgress(temperature.transparency());
+        temperatureTransparencyLabel.setText(pluginContext.getString(R.string.raintotals_opacity_heading)
+                + " " + temperature.transparency() + "%");
+        // The bar owns the touch from down to up, or the pager takes a sideways drag
+        // as a page turn (the radar's slider, takwerx/atmosphere#7).
+        temperatureTransparency.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, android.view.MotionEvent e) {
+                final int a = e.getActionMasked();
+                if (a == android.view.MotionEvent.ACTION_DOWN)
+                    v.getParent().requestDisallowInterceptTouchEvent(true);
+                else if (a == android.view.MotionEvent.ACTION_UP
+                        || a == android.view.MotionEvent.ACTION_CANCEL)
+                    v.getParent().requestDisallowInterceptTouchEvent(false);
+                return false;
+            }
+        });
+        temperatureTransparency.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(android.widget.SeekBar bar, int progress, boolean fromUser) {
+                temperatureTransparencyLabel.setText(pluginContext.getString(
+                        R.string.raintotals_opacity_heading) + " " + progress + "%");
+                if (fromUser && temperature != null)
+                    temperature.setTransparency(progress);
+            }
+
+            @Override
+            public void onStartTrackingTouch(android.widget.SeekBar bar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(android.widget.SeekBar bar) {
+            }
+        });
+        temperature.setListener(new RainOverlay.Listener() {
+            @Override
+            public void onFrames(List<String> labels, int shown) {
+            }
+
+            @Override
+            public void onFrameShown(int index, long validTime) {
+                updateTemperatureScale();
+                if (validTime == 0)
+                    return;
+                final String time = new SimpleDateFormat("MMM d, h:mm a z", Locale.getDefault())
+                        .format(new Date(validTime));
+                final NomadsWind.Level level = temperature.level();
+                final String where = level.surface ? "near the ground"
+                        : "at " + level.label(units == UnitSystem.METRIC, units == UnitSystem.AVIATION);
+                temperatureStatus.setText("NOAA GFS estimate " + where + ", valid " + time
+                        + (temperature.isCropped() ? " (center of map only; zoom in)" : ""));
+            }
+
+            @Override
+            public void onStatus(String status) {
+                if (!status.isEmpty())
+                    temperatureStatus.setText(status);
+            }
+        });
+        updateLayerControls();
+    }
+
+    /**
+     * The heights the temperature is drawn at, as preset buttons four to a row,
+     * the wind's ladder less its 80 m rung (see {@code buildWindLevelRows} for why
+     * buttons and not a slider). The ground is the 2 m temperature.
+     */
+    private void buildTemperatureLevelRows() {
+        final NomadsWind.Level[] all = com.atakmap.android.atmosphere.rain.NomadsTemperature.LEVELS;
+        final int perRow = 4;
+        LinearLayout row = null;
+        for (int i = 0; i < all.length; i++) {
+            if (i % perRow == 0) {
+                row = new LinearLayout(pluginContext);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                temperatureLevelRows.addView(row, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT));
+            }
+            final int index = i;
+            final Button b = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, row, false);
+            b.setText(all[i].shortLabel(units == UnitSystem.METRIC));
+            b.setContentDescription(all[i].surface ? "2 m above ground"
+                    : all[i].label(units == UnitSystem.METRIC, units == UnitSystem.AVIATION));
+            b.setTextSize(13);
+            b.setTag(index);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (temperature == null)
+                        return;
+                    temperature.setLevelIndex(index);
+                    updateTemperatureLevel();
+                }
+            });
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = dp(4);
+            lp.topMargin = dp(4);
+            b.setLayoutParams(lp);
+            row.addView(b);
+        }
+        // Seven rungs on two rows of four: a blank cell keeps the last row's widths.
+        if (row != null && all.length % perRow != 0) {
+            for (int i = all.length % perRow; i < perRow; i++) {
+                final View filler = new View(pluginContext);
+                final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, 1, 1f);
+                lp.rightMargin = dp(4);
+                row.addView(filler, lp);
+            }
+        }
+    }
+
+    /** Light the height being drawn, and relabel the rungs in the operator's unit. */
+    private void updateTemperatureLevel() {
+        if (temperature == null)
+            return;
+        final NomadsWind.Level[] all = com.atakmap.android.atmosphere.rain.NomadsTemperature.LEVELS;
+        final int picked = temperature.levelIndex();
+        for (int i = 0; i < temperatureLevelRows.getChildCount(); i++) {
+            final View r = temperatureLevelRows.getChildAt(i);
+            if (!(r instanceof LinearLayout))
+                continue;
+            final LinearLayout cells = (LinearLayout) r;
+            for (int j = 0; j < cells.getChildCount(); j++) {
+                final View cell = cells.getChildAt(j);
+                if (!(cell instanceof Button) || !(cell.getTag() instanceof Integer))
+                    continue;
+                final int index = (Integer) cell.getTag();
+                if (index >= 0 && index < all.length) {
+                    ((Button) cell).setText(all[index].shortLabel(units == UnitSystem.METRIC));
+                    cell.setContentDescription(all[index].surface ? "2 m above ground"
+                            : all[index].label(units == UnitSystem.METRIC, units == UnitSystem.AVIATION));
+                }
+                ((Button) cell).setTextColor(index == picked
+                        ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+            }
+        }
+    }
+
+    /**
+     * The legend for the temperature on the map: only the five-degree bands the
+     * picture holds, coldest to warmest, the edge under each join in the operator's
+     * unit. Rebuilt with every frame, because a pan to the mountains or the desert
+     * changes which bands are there.
+     */
+    private void updateTemperatureScale() {
+        final boolean fahrenheit = units != UnitSystem.METRIC;
+        final com.atakmap.android.atmosphere.rain.RainGrid grid =
+                temperature == null ? null : temperature.shownGrid();
+        final float[] edges = grid == null ? null
+                : com.atakmap.android.atmosphere.rain.NomadsTemperature.bandEdges(grid, fahrenheit);
+        if (edges == null) {
+            temperatureLegend.setVisibility(View.GONE);
+            return;
+        }
+        temperatureLegend.setVisibility(View.VISIBLE);
+        // Joins sit between bands: the edges after the first, the last one with the unit.
+        final float[] joins = new float[edges.length - 1];
+        for (int i = 0; i < joins.length; i++)
+            joins[i] = edges[i + 1];
+        temperatureScale.setBands(
+                com.atakmap.android.atmosphere.rain.NomadsTemperature.bandColors(edges, fahrenheit),
+                joins, fahrenheit ? "°F" : "°C");
+        temperatureScale.setEnds(null, null);
+    }
+
     private boolean sstLegendAsked;
 
     /** The legend graphic is asked for once the layer is allowed, never before. */
@@ -3190,6 +3398,22 @@ public final class AtmospherePane {
                     updateLayerControls();
                 } else {
                     askToAllowSst();
+                }
+            }
+        });
+        temperatureToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (temperature == null)
+                    return;
+                if (temperature.isOn()) {
+                    temperature.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(RainOverlay.TEMPERATURE_LAYER_ID)) {
+                    temperature.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowTemperature();
                 }
             }
         });
@@ -4732,6 +4956,10 @@ public final class AtmospherePane {
             rain.setOn(on);
         else if (rain != null && on)
             blocked++;
+        if (temperature != null && (!on || allowed(RainOverlay.TEMPERATURE_LAYER_ID)))
+            temperature.setOn(on);
+        else if (temperature != null && on)
+            blocked++;
         if (smoke != null && (!on || allowed(SmokeOverlay.LAYER_ID)))
             smoke.setOn(on);
         else if (smoke != null && on)
@@ -5826,6 +6054,27 @@ public final class AtmospherePane {
                 .show();
     }
 
+    private void askToAllowTemperature() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.temperature_allow_title))
+                .setMessage(pluginContext.getString(R.string.temperature_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(RainOverlay.TEMPERATURE_LAYER_ID, true);
+                                if (temperature != null)
+                                    temperature.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
     private void askToAllowSst() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
@@ -6803,6 +7052,13 @@ public final class AtmospherePane {
         sstSettings.setVisibility(sstOn && sstOpen ? View.VISIBLE : View.GONE);
         if (sstOn)
             ensureSstLegend();
+        final boolean temperatureOn = temperature != null && temperature.isOn();
+        temperatureToggle.setText(temperatureOn ? R.string.temperature_on : R.string.temperature_off);
+        temperatureToggle.setTextColor(pluginContext.getResources().getColor(
+            temperatureOn ? R.color.state_on : R.color.state_off));
+        temperatureExpand.setVisibility(temperatureOn ? View.VISIBLE : View.GONE);
+        temperatureExpand.setRotation(temperatureOpen ? 180f : 0f);
+        temperatureSettings.setVisibility(temperatureOn && temperatureOpen ? View.VISIBLE : View.GONE);
         final boolean beachOn = beach != null && beach.isOn();
         beachToggle.setText(beachOn ? R.string.beach_on : R.string.beach_off);
         beachToggle.setTextColor(pluginContext.getResources().getColor(
@@ -7140,6 +7396,11 @@ public final class AtmospherePane {
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_sst, SstOverlay.HOST));
         }
+        if (temperature != null && temperature.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_temperature, RainOverlay.HOST));
+        }
         if (avalanche != null && avalanche.isOn()) {
             if (out.length() > 0)
                 out.append('\n');
@@ -7225,6 +7486,11 @@ public final class AtmospherePane {
         updateWindUnitRow();
         relabelWindLevelRows();
         updateWindLevel();
+        // The temperature bands step in the unit shown, so the picture is recolored.
+        if (temperature != null)
+            temperature.setFahrenheit(units != UnitSystem.METRIC);
+        updateTemperatureScale();
+        updateTemperatureLevel();
         // A unit change is a display change: re-render, never re-fetch.
         render();
         // The Here lines too: the wind said km/h beside a mph legend after the
