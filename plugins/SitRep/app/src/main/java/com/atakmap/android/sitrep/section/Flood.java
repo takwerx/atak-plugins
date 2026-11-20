@@ -32,7 +32,15 @@ public final class Flood extends Section {
 
     @Override
     public Result fetch(Area area) throws Exception {
-        final List<JSONObject> rows = zones(area);
+        // hazards.fema.gov resets a TLS connection now and then, from any network
+        // (0.4 release record): one more try before the section says it did not answer.
+        List<JSONObject> rows;
+        try {
+            rows = zones(area);
+        } catch (java.io.IOException e) {
+            Thread.sleep(1_500);
+            rows = zones(area);
+        }
         if (rows.isEmpty()) {
             final Result r = new Result("No FEMA flood map here", null);
             r.notPublishedHere = true;
