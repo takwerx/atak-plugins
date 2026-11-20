@@ -4,6 +4,7 @@
 #   ./scripts/check-firstnet.sh <Plugin>             # gate, no device needed
 #   ./scripts/check-firstnet.sh --probe <Plugin>     # test its hosts from a FirstNet device
 #   ./scripts/check-firstnet.sh --probe --all        # every plugin's hosts
+#   ./scripts/check-firstnet.sh --list <Plugin|--all> # print the hosts it finds, nothing else
 #
 # Why (2026-11-17/18): FirstNet LTE gives the device an IPv6 address, and Android
 # tries IPv6 first. The Census Bureau's firewall answers FirstNet IPv6 with a
@@ -30,23 +31,39 @@ NOTES="${NOTES_DIR:-$REPO_ROOT/../atak-plugins-notes}"
 DB="$NOTES/firstnet-hosts.txt"
 MAX_AGE_DAYS=120
 
-PROBE=0; ALL=0; NAME=""
+PROBE=0; ALL=0; LIST=0; NAME=""
 for a in "$@"; do
     case "$a" in
         --probe) PROBE=1 ;;
         --all) ALL=1 ;;
-        -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
+        --list) LIST=1 ;;
+        -h|--help) sed -n '2,26p' "$0"; exit 0 ;;
         *) NAME="$a" ;;
     esac
 done
 [ -n "$NAME" ] || [ "$ALL" = 1 ] || { echo "usage: $0 [--probe] <Plugin> | --probe --all" >&2; exit 2; }
 
-# The hosts a plugin's shipped code and assets name. Same extraction as the
-# 2026-11-18 fleet probe; schema and doc links are not fetched.
+# The hosts a plugin's shipped code and assets name. Two sources:
+#  1. an "https://host" literal anywhere under app/src/main (same extraction as
+#     the 2026-11-18 fleet probe);
+#  2. a Java/Kotlin constant that holds a bare host name and is joined to the
+#     scheme in code, e.g. HOST = "nomads.ncep.noaa.gov" with "https://" + HOST
+#     (ops #991: Atmosphere's NomadsWind.HOST was never probed, because no
+#     "https://nomads..." text exists). The constant's name has "host" or "domain"
+#     in it, any case; preference keys ("signaldf.host"), file names ("hosts.json") and
+#     the .local names of a device on the same network are not internet hosts and are skipped.
+# Schema and doc links are not fetched.
 hosts_of() {
-    grep -rhoE 'https://[A-Za-z0-9.-]+\.[a-z]{2,}' "$1/app/src/main" 2>/dev/null \
-        | sed 's#https://##' | tr 'A-Z' 'a-z' | sort -u \
-        | grep -vE '(^|\.)(w3\.org|schemas\.android\.com|android\.com|doi\.org|play\.google\.com)$|^github\.com$|^www\.apache\.org$|^opensource\.org$' || true
+    {
+        grep -rhoE 'https://[A-Za-z0-9.-]+\.[a-z]{2,}' "$1/app/src/main" 2>/dev/null | sed 's#https://##'
+        grep -rhoiE --include='*.java' --include='*.kt' \
+            '[A-Za-z_]*(host|domain)[A-Za-z_]*[[:space:]]*(:[[:space:]]*String[[:space:]]*)?=[[:space:]]*"[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}"' \
+            "$1/app/src/main" 2>/dev/null \
+            | grep -viE '(^|[^A-Za-z])(pref|key|action|extra|tag|file|path|dir)[A-Za-z_]*[[:space:]]*(:|=)' \
+            | sed -E 's/.*"([^"]+)"$/\1/' \
+            | grep -viE '\.(json|xml|txt|csv|png|jpe?g|html?|js|css|zip|apk|db|gz|kml|kmz|geojson|properties|java|kt)$'
+    } | tr 'A-Z' 'a-z' | sort -u \
+        | grep -vE '\.local$|(^|\.)(w3\.org|schemas\.android\.com|android\.com|doi\.org|play\.google\.com)$|^github\.com$|^www\.apache\.org$|^opensource\.org$' || true
 }
 
 if [ "$ALL" = 1 ]; then
@@ -56,6 +73,7 @@ else
     [ -d "$DIRS" ] || { echo "error: no plugin at $DIRS" >&2; exit 2; }
 fi
 HOSTS="$(for d in $DIRS; do hosts_of "$d"; done | sort -u)"
+if [ "$LIST" = 1 ]; then echo "$HOSTS"; exit 0; fi
 [ -n "$HOSTS" ] || { echo "check-firstnet: PASS (${NAME:-all}: calls no https host)"; exit 0; }
 
 if [ "$PROBE" = 1 ]; then
