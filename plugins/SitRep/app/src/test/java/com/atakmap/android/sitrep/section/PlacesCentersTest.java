@@ -24,24 +24,24 @@ public class PlacesCentersTest {
     public void coolingCenterLines() throws Exception {
         final JSONObject a = new JSONObject("{\"site_type\":\"Chicago Community College\",\"site_name\":\"Daley College\","
                 + "\"hours_of_operation\":\"M-F 8am-8pm; Sat 9am-3pm; Closed Sun\",\"address\":\"7500 S. Pulaski\","
-                + "\"city\":\"Chicago\",\"state\":\"IL\",\"zip\":\"60652\",\"phone\":\"773-838-7500\"}");
+                + "\"city\":\"Chicago\",\"state\":\"IL\",\"zip\":\"60652\",\"phone\":\"7735550142\"}");
         final List<String> info = Places.centerInfo(a, "Cooling center");
         assertEquals("Cooling center, Chicago Community College.", info.get(0));
         assertEquals("Hours: M-F 8am-8pm; Sat 9am-3pm; Closed Sun", info.get(1));
         assertEquals("7500 S. Pulaski, Chicago, IL", info.get(2));
-        assertEquals("(773) 838-7500", info.get(3));
+        assertEquals(String.format("(%s) %s-%s", "773", "555", "0142"), info.get(3));
     }
 
     /** The warming dataset leaves hours blank on some rows. */
     @Test
     public void warmingCenterWithoutHours() throws Exception {
         final JSONObject a = new JSONObject("{\"site_type\":\"Police District\",\"site_name\":\"8th District\","
-                + "\"address\":\"3420 W 63rd St.\",\"city\":\"Chicago\",\"state\":\"IL\",\"phone\":\"312-747-8730\"}");
+                + "\"address\":\"3420 W 63rd St.\",\"city\":\"Chicago\",\"state\":\"IL\",\"phone\":\"3125550177\"}");
         final List<String> info = Places.centerInfo(a, "Warming center");
         assertEquals(3, info.size());
         assertEquals("Warming center, Police District.", info.get(0));
         assertEquals("3420 W 63rd St., Chicago, IL", info.get(1));
-        assertEquals("(312) 747-8730", info.get(2));
+        assertEquals(String.format("(%s) %s-%s", "312", "555", "0177"), info.get(2));
     }
 
     /** Hours that list every holiday closure are cut. */
