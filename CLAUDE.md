@@ -1011,7 +1011,11 @@ next day: whatever caused this is addressed across the whole fleet.
 - **The gate:** `scripts/check-firstnet.sh <Plugin>` needs no device. It fails
   on a host never probed or probed more than 120 days ago, and on a bad host
   in a plugin with no fallback. `submission-zip.sh` runs it before zipping
-  and `/ship` runs it again.
+  and `/ship` runs it again. It finds hosts written as `https://host` and hosts
+  held in a Java or Kotlin constant whose name has `host` or `domain` in it
+  (`HOST = "nomads.ncep.noaa.gov"` joined as `"https://" + HOST`); before
+  2026-11-19 it saw only the first kind. `scripts/check-firstnet.sh --list
+  <Plugin>` prints what it found, and `scripts/test-check-firstnet.sh` tests it.
 
 Status on 2026-11-18 (all 116 hosts on `main` plus FireView probed): bad on
 FirstNet are `tigerweb.geo.census.gov` and `geocoding.geo.census.gov`
