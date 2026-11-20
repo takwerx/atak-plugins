@@ -301,8 +301,8 @@ public final class Http {
         return requestBytes(url, userAgent, headers, READ_TIMEOUT_MS);
     }
 
-    private static byte[] requestBytes(String url, String userAgent,
-            Map<String, String> headers, int readTimeoutMs) throws IOException {
+    private static byte[] requestBytes(final String url, final String userAgent,
+            final Map<String, String> headers, final int readTimeoutMs) throws IOException {
 
         // Said at the start, so a request that never answers is still in the log.
         Log.d(TAG, "GET " + safeUrl(url));
@@ -310,6 +310,33 @@ public final class Http {
         if (!"https".equalsIgnoreCase(parsed.getProtocol()))
             throw new IOException("refusing a non-https request");
 
+        // A host that FirstNet's IPv6 does not work with (the Census geocoder) is asked
+        // over IPv4 when IPv6 is rejected or silent. Every other host is untouched.
+        final String host = parsed.getHost();
+        if (!Ipv4Fallback.appliesTo(host))
+            return connect(parsed, userAgent, headers, readTimeoutMs);
+        final boolean wasIpv4 = Ipv4Fallback.isIpv4Only(host);
+        final byte[] body = Ipv4Fallback.fetch(host,
+                new Ipv4Fallback.Transport() {
+                    @Override
+                    public byte[] get() throws IOException {
+                        return connect(parsed, userAgent, headers, readTimeoutMs);
+                    }
+                },
+                new Ipv4Fallback.Transport() {
+                    @Override
+                    public byte[] get() throws IOException {
+                        return Ipv4Fallback.overIpv4(parsed, userAgent, headers, readTimeoutMs);
+                    }
+                },
+                Ipv4Fallback.socketProbe(host, parsed.getPort() < 0 ? 443 : parsed.getPort()));
+        if (!wasIpv4 && Ipv4Fallback.isIpv4Only(host))
+            Log.w(TAG, host + " refused or ignored this device's IPv6 address; using IPv4");
+        return body;
+    }
+
+    private static byte[] connect(URL parsed, String userAgent,
+            Map<String, String> headers, int readTimeoutMs) throws IOException {
         HttpsURLConnection conn = null;
         InputStream in = null;
         try {
