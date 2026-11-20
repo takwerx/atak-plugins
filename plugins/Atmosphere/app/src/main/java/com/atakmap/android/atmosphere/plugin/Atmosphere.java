@@ -180,6 +180,7 @@ public class Atmosphere implements IPlugin {
     private SmokeOverlay smoke;
     private WaveOverlay waves;
     private RainOverlay rain;
+    private RainOverlay temperature;
     private AirQualityOverlay air;
     private SpotOverlay spotLayer;
     private StationOverlay stations;
@@ -321,6 +322,8 @@ public class Atmosphere implements IPlugin {
         waves.start();
         rain = new RainOverlay(mapView, egress);
         rain.start();
+        temperature = new RainOverlay(mapView, pluginContext, egress, true);
+        temperature.start();
         air = new AirQualityOverlay(mapView, pluginContext, egress);
         air.start();
         spotLayer = new SpotOverlay(mapView, pluginContext, egress);
@@ -467,6 +470,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setWaves(waves);
             if (rain != null)
                 atmospherePane.setRain(rain);
+            if (temperature != null)
+                atmospherePane.setTemperature(temperature);
             atmospherePane.setAirQuality(air);
             if (avalanche != null)
                 atmospherePane.setAvalanche(avalanche);
@@ -673,6 +678,10 @@ public class Atmosphere implements IPlugin {
             rain.stop();
             rain = null;
         }
+        if (temperature != null) {
+            temperature.stop();
+            temperature = null;
+        }
         if (smoke != null) {
             smoke.stop();
             smoke = null;
@@ -725,6 +734,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setWaves(waves);
             if (rain != null)
                 atmospherePane.setRain(rain);
+            if (temperature != null)
+                atmospherePane.setTemperature(temperature);
             if (air != null)
                 atmospherePane.setAirQuality(air);
             if (avalanche != null)

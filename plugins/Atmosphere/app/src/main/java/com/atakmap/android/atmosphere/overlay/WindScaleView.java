@@ -103,9 +103,17 @@ public final class WindScaleView extends View {
             }
             canvas.drawRect(box, fill);
         }
-        // A number under every join, and the unit after the last one.
+        // A number under every join, and the unit after the last one. When the joins
+        // are closer than a number is wide, thin them out, keeping the last.
         final float baseline = barH + dp(13);
-        for (int i = 0; i < breaks.length && i < bands - 1; i++) {
+        final int joins = Math.min(breaks.length, bands - 1);
+        float widest = 0;
+        for (int i = 0; i < joins; i++)
+            widest = Math.max(widest, text.measureText(format(breaks[i])));
+        final int step = Math.max(1, (int) Math.ceil(widest * 1.4f / seg));
+        for (int i = 0; i < joins; i++) {
+            if ((joins - 1 - i) % step != 0)
+                continue;
             final String label = format(breaks[i]) + (i == breaks.length - 1 ? " " + unit : "");
             canvas.drawText(label, (i + 1) * seg, baseline, text);
         }

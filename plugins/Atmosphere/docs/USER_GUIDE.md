@@ -170,6 +170,7 @@ opening the plugin.
 | Wind | Radar | The NWS radar mosaics over the US, Environment Canada's over Canada, and RainViewer's composite of the world's public radars everywhere else, whichever the map is over, with a time scrubber, Play to loop the last two hours and see which way the cells move, and a transparency slider |
 | Wind | Satellite | The newest GOES picture, infrared (day and night) or visible; reaches the open ocean where no radar does |
 | Wind | Rain | The model's rain rate, light to violent, hour by hour for five days with the rate "Here"; a forecast, not radar |
+| Wind | Air Temperature | NOAA GFS estimated air temperature for the current model hour, near the ground or at a height you pick (2,500 ft to 34,000 ft, the standard pressure surfaces, so the freezing level is a tap away), shaded in five-degree bands (°F or °C, whichever the units are set to); each patch of a band in view carries a pill in its color naming the band ("65–70 °F"), so the key is on the map; a transparency slider; works anywhere on the globe, a continent at a time |
 | Wind | Wind | The forecast wind as moving streaks colored by speed, or as a heat map under them in the same colors, with a time scrubber, heights to the jet stream, and the wind "Here". Runs together with Radar; the heat map and Radar take turns |
 | Storms | Storm Reports | Every report the NWS offices logged in the last 24, 48 or 72 hours: tornado, wind, hail, flood, rain, snow and ice, landslide; the type and size in the pill, the remarks behind a tap |
 | Storms | Tornado Paths | The tracks NWS survey teams walked in the last 2 days, 7 days, 30 days or year, each line in its EF rating's color with a pill at the touchdown; length, width, peak wind, injuries, deaths and the survey behind a tap |
@@ -211,6 +212,8 @@ opening the plugin.
 <td><img src="screenshots/22_wind.jpg" width="420"><br>Wind around the same hurricane</td></tr>
 <tr><td><img src="screenshots/32_rain.jpg" width="420"><br>Rain, the model's forecast, where no radar reaches</td>
 <td><img src="screenshots/24_firewx.jpg" width="420"><br>Fire weather outlook, Day 2 Elevated</td></tr>
+<tr><td><img src="screenshots/124_temperature_conus.jpg" width="420"><br>Air Temperature over the lower 48, in five-degree bands with each band named on its patch</td>
+<td><img src="screenshots/125_temperature_globe.jpg" width="420"><br>Air Temperature from a hemisphere away: the picture drapes on the globe and stops at the horizon</td></tr>
 <tr><td><img src="screenshots/26_smoke.jpg" width="420"><br>Smoke at the ground</td>
 <td><img src="screenshots/30_flash_flood.jpg" width="420"><br>Flash flood outlook, Day 2</td></tr>
 <tr><td><img src="screenshots/36_flooded_ground.jpg" width="420"><br>Flooded ground along a river at major flood</td>

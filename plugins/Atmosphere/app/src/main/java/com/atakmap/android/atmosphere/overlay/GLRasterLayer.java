@@ -23,8 +23,13 @@ import java.nio.DoubleBuffer;
 import java.nio.FloatBuffer;
 
 /**
- * Draws a {@link RasterLayer}: one texture, one quad, re-projected each frame. Copied
- * forward from Dozer Country's GLSlopeLayer (the SDK's GLSimpleHeatMapLayer).
+ * Draws a {@link RasterLayer}: one texture over a lat/lon mesh, re-projected each
+ * frame. Copied forward from Dozer Country's GLSlopeLayer (the SDK's
+ * GLSimpleHeatMapLayer), which drew one quad: four corners forwarded and the
+ * picture stretched flat between them. On the globe a flat quad is only right for a
+ * small box; a continent-wide one cut through the sphere and a box reaching the
+ * pole folded on itself (the temperature over Alaska, 2026-11-12). So the box is
+ * cut into cells a couple of degrees across and every corner is forwarded.
  * Registered with {@code GLLayerFactory.register(SPI)}; ATAK builds one of these
  * whenever a RasterLayer is added to the map.
  *
@@ -88,12 +93,42 @@ public final class GLRasterLayer extends GLAbstractLayer
         if (d == null || d.texture == null || !d.valid)
             return;
         view.forward(d.points, d.vertexCoordinates);
+        int count = d.vertices;
+        FloatBuffer vertices = d.vertexCoordinates, texels = d.textureCoordinates;
+        // On the globe, a cell past the horizon still projects to somewhere on the
+        // screen, folded back over the near side: a wide picture drew streaks of its
+        // far edge across the Pacific (2026-11-12). Cells behind the limb are left
+        // out of the draw.
+        if (view.currentPass.drawSrid == ECEF && d.sphere != null) {
+            final com.atakmap.map.MapSceneModel scene = view.currentPass.scene;
+            if (scene != null && scene.camera != null && scene.mapProjection != null) {
+                final com.atakmap.math.PointD at = scene.camera.location;
+                final GeoPoint under = scene.mapProjection.inverse(at, null);
+                final double height = under == null ? Double.NaN : under.getAltitude();
+                if (under != null && !Double.isNaN(height) && height > 0) {
+                    // A point on the sphere is in front of the limb when the angle
+                    // between it and the point under the camera is under the
+                    // horizon's: cos = R / (R + h). Loosened a little, so the limb
+                    // is never drawn short.
+                    final double threshold = Math.max(0, EARTH_RADIUS / (EARTH_RADIUS + height) - 0.02);
+                    count = d.cull(under.getLatitude(), under.getLongitude(), threshold);
+                    vertices = d.drawVertices;
+                    texels = d.drawTexels;
+                }
+            }
+        }
+        if (count == 0)
+            return;
         // The layer's opacity rides on the draw, so a transparency change needs no
         // new texture (the radar's slider, takwerx/atmosphere#7).
-        GLTexture.draw(d.texture.getTexId(), GLES20FixedPipeline.GL_TRIANGLE_FAN, 4, 2,
-                GLES20FixedPipeline.GL_FLOAT, d.textureCoordinates, 2, GLES20FixedPipeline.GL_FLOAT,
-                d.vertexCoordinates, 1f, 1f, 1f, subject.getAlpha());
+        GLTexture.draw(d.texture.getTexId(), GLES20FixedPipeline.GL_TRIANGLES, count, 2,
+                GLES20FixedPipeline.GL_FLOAT, texels, 2, GLES20FixedPipeline.GL_FLOAT,
+                vertices, 1f, 1f, 1f, subject.getAlpha());
     }
+
+    /** The globe's spatial reference, and a radius under its polar one so the test is lenient. */
+    private static final int ECEF = 4978;
+    private static final double EARTH_RADIUS = 6_300_000d;
 
     @Override
     public void release() {
@@ -169,20 +204,23 @@ public final class GLRasterLayer extends GLAbstractLayer
 
     /** GL-side state. Every method here runs on the GL thread. */
     private static final class Data {
+        /** A mesh cell is about this wide, degrees, and the mesh is at most this many across. */
+        private static final double CELL_DEGREES = 2.5;
+        private static final int MAX_CELLS = 72;
+
         GLTexture texture;
         boolean valid;
-        final DoubleBuffer points;
-        final FloatBuffer vertexCoordinates;
-        final ByteBuffer textureCoordinates;
-
-        Data() {
-            points = ByteBuffer.allocateDirect(8 * 2 * 4)
-                    .order(ByteOrder.nativeOrder()).asDoubleBuffer();
-            vertexCoordinates = ByteBuffer.allocateDirect(4 * 2 * 4)
-                    .order(ByteOrder.nativeOrder()).asFloatBuffer();
-            textureCoordinates = ByteBuffer.allocateDirect(4 * 2 * 4)
-                    .order(ByteOrder.nativeOrder());
-        }
+        /** Mesh corners as lon/lat, the forwarded screen positions, and each corner's texel. */
+        DoubleBuffer points;
+        FloatBuffer vertexCoordinates;
+        FloatBuffer textureCoordinates;
+        /** Each corner as a unit vector on the sphere, for the horizon test. */
+        float[] sphere;
+        /** The corners in front of the horizon this frame, compacted for the draw. */
+        FloatBuffer drawVertices, drawTexels;
+        /** How many corners the mesh has: six per cell, a triangle pair. */
+        int vertices;
+        private int filled;
 
         void invalidate() {
             valid = false;
@@ -208,22 +246,104 @@ public final class GLRasterLayer extends GLAbstractLayer
             // Clear first: a smaller image reusing a larger texture would otherwise
             // leave the previous frame around its edges.
             texture.load(null, 0, 0, width, height);
-            textureCoordinates.clear();
             final float u = (float) width / (float) texture.getTexWidth();
             final float v = (float) height / (float) texture.getTexHeight();
-            textureCoordinates.putFloat(0f).putFloat(0f);
-            textureCoordinates.putFloat(u).putFloat(0f);
-            textureCoordinates.putFloat(u).putFloat(v);
-            textureCoordinates.putFloat(0f).putFloat(v);
-            textureCoordinates.flip();
+            double west = ul.getLongitude(), east = ur.getLongitude();
+            final double north = ul.getLatitude(), south = ll.getLatitude();
+            // A picture that is the whole ring meets itself at the antimeridian. The
+            // map draws the two edges as two meridians a hair apart, a dark seam down
+            // the Pacific (2026-11-12). The ring is stretched a cell's worth past each
+            // edge, so the two sides overlap and the seam closes; the texel at the
+            // edge is the model's value at 180, which both sides share.
+            final boolean ring = east - west >= 359;
+            if (ring) {
+                west -= CELL_DEGREES / 2;
+                east += CELL_DEGREES / 2;
+            }
+            final int cols = Math.max(1, Math.min(MAX_CELLS, (int) Math.ceil((east - west) / CELL_DEGREES)));
+            final int rows = Math.max(1, Math.min(MAX_CELLS, (int) Math.ceil((north - south) / CELL_DEGREES)));
+            vertices = cols * rows * 6;
+            if (points == null || points.capacity() < vertices * 2) {
+                points = ByteBuffer.allocateDirect(vertices * 2 * 8)
+                        .order(ByteOrder.nativeOrder()).asDoubleBuffer();
+                vertexCoordinates = ByteBuffer.allocateDirect(vertices * 2 * 4)
+                        .order(ByteOrder.nativeOrder()).asFloatBuffer();
+                textureCoordinates = ByteBuffer.allocateDirect(vertices * 2 * 4)
+                        .order(ByteOrder.nativeOrder()).asFloatBuffer();
+                drawVertices = ByteBuffer.allocateDirect(vertices * 2 * 4)
+                        .order(ByteOrder.nativeOrder()).asFloatBuffer();
+                drawTexels = ByteBuffer.allocateDirect(vertices * 2 * 4)
+                        .order(ByteOrder.nativeOrder()).asFloatBuffer();
+                sphere = new float[vertices * 3];
+            }
             points.clear();
-            points.put(ul.getLongitude()).put(ul.getLatitude());
-            points.put(ur.getLongitude()).put(ur.getLatitude());
-            points.put(lr.getLongitude()).put(lr.getLatitude());
-            points.put(ll.getLongitude()).put(ll.getLatitude());
+            textureCoordinates.clear();
+            filled = 0;
+            for (int r = 0; r < rows; r++) {
+                final double lat0 = north - (north - south) * r / rows;
+                final double lat1 = north - (north - south) * (r + 1) / rows;
+                final float v0 = v * r / rows, v1 = v * (r + 1) / rows;
+                for (int c = 0; c < cols; c++) {
+                    final double lon0 = west + (east - west) * c / cols;
+                    final double lon1 = west + (east - west) * (c + 1) / cols;
+                    final float u0 = u * c / cols, u1 = u * (c + 1) / cols;
+                    corner(lon0, lat0, u0, v0);
+                    corner(lon1, lat0, u1, v0);
+                    corner(lon1, lat1, u1, v1);
+                    corner(lon0, lat0, u0, v0);
+                    corner(lon1, lat1, u1, v1);
+                    corner(lon0, lat1, u0, v1);
+                }
+            }
             points.flip();
+            textureCoordinates.flip();
+            vertexCoordinates.clear();
+            vertexCoordinates.limit(vertices * 2);
             texture.load(src);
             valid = true;
+        }
+
+        private void corner(double lon, double lat, float s, float t) {
+            points.put(lon).put(lat);
+            textureCoordinates.put(s).put(t);
+            final double la = Math.toRadians(lat), lo = Math.toRadians(lon);
+            final double cl = Math.cos(la);
+            sphere[filled++] = (float) (cl * Math.cos(lo));
+            sphere[filled++] = (float) (cl * Math.sin(lo));
+            sphere[filled++] = (float) Math.sin(la);
+        }
+
+        /**
+         * Keep the triangles whose every corner is in front of the horizon seen from
+         * over {@code lat, lon}: the dot product with that point's unit vector over
+         * {@code threshold}. Returns how many corners are left to draw.
+         */
+        int cull(double lat, double lon, double threshold) {
+            final double la = Math.toRadians(lat), lo = Math.toRadians(lon);
+            final double cl = Math.cos(la);
+            final float ux = (float) (cl * Math.cos(lo)), uy = (float) (cl * Math.sin(lo));
+            final float uz = (float) Math.sin(la);
+            drawVertices.clear();
+            drawTexels.clear();
+            int kept = 0;
+            for (int t = 0; t + 2 < vertices; t += 3) {
+                boolean front = true;
+                for (int k = 0; k < 3 && front; k++) {
+                    final int i = (t + k) * 3;
+                    front = sphere[i] * ux + sphere[i + 1] * uy + sphere[i + 2] * uz > threshold;
+                }
+                if (!front)
+                    continue;
+                for (int k = 0; k < 3; k++) {
+                    final int i = (t + k) * 2;
+                    drawVertices.put(vertexCoordinates.get(i)).put(vertexCoordinates.get(i + 1));
+                    drawTexels.put(textureCoordinates.get(i)).put(textureCoordinates.get(i + 1));
+                }
+                kept += 3;
+            }
+            drawVertices.flip();
+            drawTexels.flip();
+            return kept;
         }
     }
 }
