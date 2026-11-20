@@ -49,6 +49,11 @@ and others), with an Open or Get button.
 _________________________________________________________________
 STATUS
 
+Version 0.5: cooling and warming centers. Where a city publishes its list,
+Places shows them within Nearby, with type, hours, address and phone. Chicago
+is the first city. The flood section tries once more when FEMA's server drops
+the connection.
+
 Version 0.4: Sit Rep works on FirstNet. Some agency servers block the IPv6
 address that FirstNet gives a device. The Census Bureau answers it with a
 "Request Rejected" page, and EPA never answers it. Sit Rep now retries those
