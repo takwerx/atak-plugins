@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Evac Zone",
-   plugin-version: "0.6",
+   plugin-version: "0.7",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -91,10 +91,11 @@ tools, and the zone list. The top row stays put.
 ]
 
 #v(6pt)
-California is Cal OES's orders and warnings, refreshed every five minutes, with
-CAL FIRE's reason and population, its lifted zones, and the county feeds folded
-in, so one zone is drawn once. Oregon is OEM's levels: 1 Be Ready, 2 Be Set,
-3 Go Now. British Columbia is its orders and alerts.
+California is Genasys Protect's zones as the agencies issue them, refreshed
+every five minutes, with Cal OES, CAL FIRE and the county feeds folded in, so
+one zone is drawn once. Oregon is Genasys with OEM's levels: 1 Be Ready,
+2 Be Set, 3 Go Now. US ("Other states") is Genasys zones in every other state.
+British Columbia is its orders and alerts.
 ]
 
 #tak-slide[
@@ -297,8 +298,9 @@ in, so one zone is drawn once. Oregon is OEM's levels: 1 Be Ready, 2 Be Set,
 *"Zoom in to see the zones."* You are zoomed out past your threshold. Zoom in,
 or set the threshold to *Always draw them*.
 
-*A row reading STALE* kept its last zones after a refresh that failed, and says
-why. Nothing is taken off the map because a server did not answer; the next
+*A row reading "No network" or "Source not answering"* kept its last zones after
+a refresh that failed, and says how old they are ("showing what this device
+saved"). Nothing is taken off the map because a server did not answer; the next
 refresh tries again.
 
 *A feed that shows 0 zones* between incidents is telling the truth. Most feeds
@@ -311,15 +313,16 @@ on from earlier. Both say so on their buttons; the counties reset every start.
 #tak-slide[
 = Where the zones come from
 
-The catalog lists public ArcGIS services: state emergency management (Cal OES,
-Oregon OEM, EmergencyInfoBC, NCEM), CAL FIRE, and the counties and cities that publish
-their own zone maps. It is read from takwerx's server when the plugin starts, so
+The catalog lists Genasys Protect, licensed to TAKWERX, and public ArcGIS
+services: state emergency management (Cal OES, Oregon OEM, EmergencyInfoBC,
+NCEM), CAL FIRE, and the counties and cities that publish their own zone maps. It is read from takwerx's server when the plugin starts, so
 a feed can be added or corrected without a new plugin, and the copy built into
 the plugin is used when there is no connection.
 
-One state, one feed. Where several agencies publish the same zones, the state
-agency is the authority for status and the others add what they know: the
-reason, the population, a zone the state has not drawn. A zone appears once.
+One state, one feed. Where several agencies publish the same zones, one is the
+authority for status (Genasys where it covers the state, else the state agency)
+and the others add what they know: the reason, the population, a zone it has not
+drawn. A zone appears once.
 
 Every feed was checked before it went in: that it answers, that it names the
 fields it claims, that it is small enough for a phone, and that a feed calling
@@ -346,7 +349,7 @@ words.
 #v(6pt)
 // The Tool Preferences shot (shot list #20) goes beside this once a build
 // carries the manual; 0.3 has no preferences entry to photograph.
-*This guide, on the device.* Settings → Tool Preferences → Evac Zone →
+*This guide, on the device.* Settings > Tool Preferences > Evac Zone >
 *User manual* opens this guide as a PDF on the phone. It is the copy that
 matches the plugin you have installed.
 
