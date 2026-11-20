@@ -1,10 +1,10 @@
 ATAK Plugin — Atmosphere
 
-**Download Atmosphere 0.24** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.25** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.24/ATAK-Plugin-Atmosphere-0.24--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.24/ATAK-Plugin-Atmosphere-0.24--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.24/ATAK-Plugin-Atmosphere-0.24--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.25/ATAK-Plugin-Atmosphere-0.25--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.25/ATAK-Plugin-Atmosphere-0.25--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.25/ATAK-Plugin-Atmosphere-0.25--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
@@ -71,6 +71,10 @@ Capabilities:
     behind a tap; live fuels, dead fuels or both, 30 days to a year back.
   - The wind as a heat map: the speed the streaks are drawn from as a colored
     field under them, in the same bands as the key, with one switch.
+  - Air Temperature: the NOAA GFS model's temperature near the ground or at a
+    height (2,500 to 34,000 ft, the freezing level a tap away), shaded in
+    five-degree bands in °F or °C, each patch of a band named in its own
+    color on the map, with a transparency slider.
   - Storms after the fact: every storm report the NWS offices logged in the
     last three days (tornado, wind, hail, flood, rain, snow, landslide), and
     the tornado paths survey teams have walked in the last year, each line in
@@ -112,6 +116,15 @@ Capabilities:
 _________________________________________________________________
 STATUS
 
+0.25, for ATAK-CIV 5.6, 5.7 and 5.8: a new Air Temperature layer under Wind. It
+shows the NOAA GFS model's temperature for the current model hour, near the
+ground or at 2,500, 5,000, 10,000, 18,000, 30,000 or 34,000 ft, shaded in
+five-degree bands in the units the plugin is set to (°F or °C). Each patch of a
+band in view carries a pill in the band's color naming it, so the key is on the
+map. It has a transparency slider, works anywhere on the globe, and asks the
+operator once, by name, before it touches nomads.ncep.noaa.gov. Contributed by
+Eric Muehlstein (takwerx/atmosphere#8, #9). Every raster layer (radar, rain,
+temperature) now drapes on the globe and stops at the horizon.
 0.24, for ATAK-CIV 5.6, 5.7 and 5.8: the Forecast page has a Show light
 button under the hourly table. It opens a bar of the day's light from midnight
 to midnight (night, the three twilights and day, the hours the moon is up, and
@@ -220,7 +233,7 @@ PORTS REQUIRED
     geo.weather.gc.ca               radar over Canada (Environment Canada)
     api.rainviewer.com              radar everywhere else, the frame list
     tilecache.rainviewer.com        and its tiles (RainViewer's composite)
-    nomads.ncep.noaa.gov            model wind, smoke, wave and rain files
+    nomads.ncep.noaa.gov            model wind, smoke, wave, rain and air temperature files
     nowcoast.noaa.gov               sea surface temperature
     maps.water.noaa.gov             flooded ground, streams running high
     api.water.noaa.gov              river gauges and their forecasts
