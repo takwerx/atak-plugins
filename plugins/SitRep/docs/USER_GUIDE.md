@@ -127,6 +127,12 @@ ingestion zone (amber).
 
 ![A nuclear plant and its 10 mile zone](screenshots/15_nuclear_rings.png)
 
+Where a city publishes its list of cooling or warming centers, Places shows
+them within Nearby, as **Cooling centers** and **Warming centers**. Chicago is
+the first city. Each center shows its type, hours, address and phone number.
+The list is the city's sites, not a statement that a site is open now: call
+ahead before you send people.
+
 ## 911 calls
 
 Where a city or county publishes its 911 calls, the **911 calls** section

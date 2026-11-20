@@ -36,6 +36,8 @@ public final class Places extends Section {
             { "care", "Nursing and care homes", "N", "#7B1FA2" },
             { "dialysis", "Dialysis", "D", "#1565C0" },
             { "shelter", "Shelters", "+", "#2E7D32" },
+            { "cooling", "Cooling centers", "C", "#0288D1" },
+            { "warming", "Warming centers", "W", "#E65100" },
             { "animal", "Animal shelters", "A", "#6D4C41" },
             { "fair", "Fairgrounds and rodeo", "F", "#AD1457" },
             { "equestrian", "Equestrian centers", "E", "#5D4037" },
@@ -85,6 +87,8 @@ public final class Places extends Section {
     public static boolean isLine(String category) {
         return "rail".equals(category) || "transmission".equals(category);
     }
+    /** Cooling and warming center lists the cities publish: a hosted catalog, like the 911 calls. */
+    static final String CENTERS = "https://mapdepot.takwerx.org/sitrep/centers/catalog.json";
     static final String NSS_OPEN = "https://gis.fema.gov/arcgis/rest/services/NSS/OpenShelters/FeatureServer/0";
 
     public Places() {
@@ -92,7 +96,7 @@ public final class Places extends Section {
         // reports (the Corona Animal Shelter duplicate, 2026-11-13).
         super("places", "Places", true,
                 "Hospitals: takwerx IWI pack (CMS, HHS, HIFLD, state lists, FAA). Schools: USGS National Map. "
-                        + "Care homes and dialysis: California CDPH licensed facilities; elsewhere CMS certified nursing homes and dialysis (dialysis located by the Census geocoder or by phone match to Overture; about 1 in 11 could not be placed and is not listed). Shelters: FEMA National Shelter System. Airports and heliports: BTS NTAD Aviation Facilities (FAA data). "
+                        + "Care homes and dialysis: California CDPH licensed facilities; elsewhere CMS certified nursing homes and dialysis (dialysis located by the Census geocoder or by phone match to Overture; about 1 in 11 could not be placed and is not listed). Shelters: FEMA National Shelter System. Cooling and warming centers: the city's own list (City of Chicago). Airports and heliports: BTS NTAD Aviation Facilities (FAA data). "
                         + "Fire and police: USGS National Map. Military installations: DoD MIRTA via BTS NTAD. Power plants: CEC (California), EPA (elsewhere). "
                         + "Nuclear: FEMA/NRC. Dams: USACE National Inventory of Dams. Chemical: EPA RMP. "
                         + "Animal shelters, fairgrounds, equestrian centers, pharmacies, groceries, fuel and urgent care: "
@@ -338,6 +342,7 @@ public final class Places extends Section {
         } catch (Exception e) {
             missing.add("airports");
         }
+        centers(area, reach, found, missing);
         infrastructure(area, nearbyMiles, reach, found, missing);
         pack(area, reach, found, missing);
         transport(area, found, missing);
@@ -385,6 +390,78 @@ public final class Places extends Section {
         if (!missing.isEmpty())
             r.line("Did not answer: " + android.text.TextUtils.join(", ", missing) + ". Tap Refresh to try again.");
         return r;
+    }
+
+    /**
+     * Cooling and warming centers from the cities that publish a list (the takwerx
+     * centers catalog; first City of Chicago, takwerx/sit-rep#2), within Nearby. A
+     * list is the city's sites, not a statement that a site is open now: the hours
+     * and the city's note go on each one, and the crew calls ahead.
+     */
+    private static void centers(Area area, double reach, Map<String, List<JSONObject>> found, List<String> missing) {
+        final JSONArray feeds;
+        try {
+            feeds = new JSONObject(Http.get(CENTERS)).optJSONArray("feeds");
+            if (feeds == null)
+                throw new java.io.IOException("no feeds in the centers catalog");
+        } catch (Exception e) {
+            missing.add("cooling and warming centers");
+            return;
+        }
+        final double padLat = reach / 111_320d, padLon = reach / (111_320d
+                * Math.max(0.2, Math.cos(Math.toRadians((area.south + area.north) / 2))));
+        final double n = area.north + padLat, s = area.south - padLat, w = area.west - padLon, e = area.east + padLon;
+        for (int i = 0; i < feeds.length(); i++) {
+            final JSONObject f = feeds.optJSONObject(i);
+            final String adapter = f == null ? "" : f.optString("adapter");
+            if (f == null || !f.optString("url", "").startsWith("https://")
+                    || !("socrata".equals(adapter) || "list".equals(adapter)))
+                continue;
+            final String kind = f.optString("kind");
+            if (!"cooling".equals(kind) && !"warming".equals(kind))
+                continue;
+            final JSONArray b = f.optJSONArray("bbox");
+            if (b == null || b.length() != 4 || b.optDouble(0) > e || b.optDouble(2) < w
+                    || b.optDouble(1) > n || b.optDouble(3) < s)
+                continue;
+            try {
+                final String point = Calls.field(f.optString("point"));
+                // "list": the whole list as JSON rows, filtered here. Our copy on
+                // mapdepot: Chicago's portal chains to GlobalSign Root R46, which
+                // Android 12 and older do not trust (s10-dev-3, 2026-11-19).
+                final JSONArray rows;
+                if ("list".equals(adapter))
+                    rows = new JSONArray(Http.get(f.optString("url")));
+                else
+                    rows = new JSONArray(Http.get(f.optString("url") + "?$where=" + Esri.enc(String.format(Locale.US,
+                            "within_box(%s, %.6f, %.6f, %.6f, %.6f)", point, n, w, s, e)) + "&$limit=2000"));
+                final String note = f.optString("note", "").trim();
+                for (int k = 0; k < rows.length(); k++) {
+                    final JSONObject a = rows.optJSONObject(k);
+                    final double[] ll = a == null ? null : Calls.lonLat(a.optJSONObject(point));
+                    if (ll == null)
+                        continue;
+                    final double d = area.distanceMeters(ll[1], ll[0]);
+                    if (d > reach)
+                        continue;
+                    final List<String> info = new ArrayList<>();
+                    final String type = Calls.text(a, f.optString("type"));
+                    info.add(type.isEmpty() ? null : type + ".");
+                    final String hours = Calls.text(a, f.optString("hours"), 200);
+                    info.add(hours.isEmpty() ? "Hours not listed." : "Hours: " + hours);
+                    if (!note.isEmpty())
+                        info.add(note);
+                    info.add(join(Calls.text(a, f.optString("address")), Calls.text(a, f.optString("city_field")),
+                            Calls.text(a, f.optString("state_field"))));
+                    final String phone = Calls.text(a, f.optString("phone")).replaceAll("[^0-9]", "");
+                    if (phone.length() == 10)
+                        info.add(String.format("(%s) %s-%s", phone.substring(0, 3), phone.substring(3, 6), phone.substring(6)));
+                    found.get(kind).add(point(kind, Calls.text(a, f.optString("name")), ll[1], ll[0], d, area, info));
+                }
+            } catch (Exception ex) {
+                missing.add(kind + " centers");
+            }
+        }
     }
 
     /**

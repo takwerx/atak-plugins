@@ -129,11 +129,10 @@ public final class Calls extends Section {
         final List<Call> out = new ArrayList<>();
         for (int i = 0; i < rows.length(); i++) {
             final JSONObject a = rows.optJSONObject(i);
-            final JSONObject p = a == null ? null : a.optJSONObject(point);
-            final JSONArray c = p == null ? null : p.optJSONArray("coordinates");
-            if (c == null || c.length() < 2)
+            final double[] ll = a == null ? null : lonLat(a.optJSONObject(point));
+            if (ll == null)
                 continue;
-            final double lon = c.optDouble(0), lat = c.optDouble(1);
+            final double lon = ll[0], lat = ll[1];
             if (!area.contains(lat, lon))
                 continue;
             final long t = parse(a.optString(time, ""), fmt);
@@ -188,7 +187,7 @@ public final class Calls extends Section {
     // ------------------------------------------------------------------ helpers
 
     /** A catalog field name, letters, digits and underscores only, so it can sit in a query. */
-    private static String field(String name) throws java.io.IOException {
+    static String field(String name) throws java.io.IOException {
         if (name == null || !name.matches("[A-Za-z_][A-Za-z0-9_]{0,63}"))
             throw new java.io.IOException("bad field name in the call catalog");
         return name;
@@ -202,14 +201,40 @@ public final class Calls extends Section {
         }
     }
 
+    /**
+     * A Socrata point as {lon, lat}: a GeoJSON point ({@code coordinates}) or the older
+     * location column ({@code latitude}, {@code longitude}), which Chicago's 311 uses.
+     * Null when neither is there or the numbers are not a place.
+     */
+    static double[] lonLat(JSONObject p) {
+        if (p == null)
+            return null;
+        final JSONArray c = p.optJSONArray("coordinates");
+        final double lon, lat;
+        if (c != null && c.length() >= 2) {
+            lon = c.optDouble(0);
+            lat = c.optDouble(1);
+        } else {
+            lon = p.optDouble("longitude", Double.NaN);
+            lat = p.optDouble("latitude", Double.NaN);
+        }
+        if (!(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180) || (lat == 0 && lon == 0))
+            return null;
+        return new double[] { lon, lat };
+    }
+
     /** A field's text, cleaned of markup and cut short. */
-    private static String text(JSONObject a, String key) {
+    static String text(JSONObject a, String key) {
+        return text(a, key, 80);
+    }
+
+    static String text(JSONObject a, String key, int max) {
         if (key == null || key.isEmpty() || a.isNull(key))
             return "";
         String s = a.optString(key, "").replaceAll("<[^>]*>", " ").replace("&#160;", " ")
                 .replaceAll("\\s+", " ").trim();
-        if (s.length() > 80)
-            s = s.substring(0, 80);
+        if (s.length() > max)
+            s = s.substring(0, max);
         return s;
     }
 

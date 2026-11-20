@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Sit Rep",
-   plugin-version: "0.4",
+   plugin-version: "0.5",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -223,6 +223,18 @@ it carries its two NRC planning zones:
 
 Zoom out to see the 50 mile ring.
 ]
+]
+
+#tak-slide[
+= Cooling and warming centers
+
+Where a city publishes its list of cooling or warming centers, Places shows
+them within Nearby: *Cooling centers* and *Warming centers*, each a switch.
+Chicago is the first city.
+
+Each center shows its type, its hours, the address and the phone number.
+The list is the city's sites, not a statement that a site is open now.
+Call ahead before you send people.
 ]
 
 #tak-slide[
