@@ -1,8 +1,8 @@
-**Download Sit Rep 0.4** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Sit Rep 0.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/sit-rep/releases/download/v0.4/ATAK-Plugin-SitRep-0.4--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/sit-rep/releases/download/v0.4/ATAK-Plugin-SitRep-0.4--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/sit-rep/releases/download/v0.4/ATAK-Plugin-SitRep-0.4--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/sit-rep/releases/download/v0.5/ATAK-Plugin-SitRep-0.5--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/sit-rep/releases/download/v0.5/ATAK-Plugin-SitRep-0.5--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/sit-rep/releases/download/v0.5/ATAK-Plugin-SitRep-0.5--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/sit-rep/releases
 
@@ -134,6 +134,12 @@ lists the last 2 hours inside the area, by agency. **Calls on map** puts them
 on the map; while it is on, they are fetched again every 5 minutes. Medical
 calls are shown to the block in the text. Where no agency publishes calls, the
 section says "No public call feed here".
+
+Some cities publish more than 911 calls. In Chicago the section also lists
+311 service requests and traffic crash reports. Crash reports are published
+hours to days late, so that line shows the last 48 hours and is not part of the
+last 2 hours count. Near Chicago, the shelters list also shows the city's
+cooling and warming centers.
 
 ![911 calls on the map](screenshots/16_calls.png)
 

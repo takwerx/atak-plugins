@@ -4,6 +4,7 @@ import com.atakmap.android.sitrep.Area;
 import com.atakmap.android.sitrep.Units;
 import com.atakmap.android.sitrep.net.Esri;
 import com.atakmap.android.sitrep.net.Http;
+import com.atakmap.android.sitrep.net.Socrata;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -85,6 +86,43 @@ public final class Places extends Section {
     public static boolean isLine(String category) {
         return "rail".equals(category) || "transmission".equals(category);
     }
+    /**
+     * City of Chicago cooling and warming centers (data.cityofchicago.org, terms "See Terms of
+     * Use", attribution City of Chicago): the city's own lists of where people go to get out of
+     * the heat or the cold. Read only when the area is near Chicago. Row: key, word on the
+     * map, dataset URL.
+     */
+    static final String[][] CHICAGO_CENTERS = {
+            { "cooling", "Cooling center", "https://data.cityofchicago.org/resource/msrk-w9ih.json" },
+            { "warming", "Warming center", "https://data.cityofchicago.org/resource/h243-v2q5.json" },
+    };
+    /** Chicago: south, west, north, east. */
+    static final double[] CHICAGO_BOX = { 41.64, -87.94, 42.03, -87.52 };
+
+    /** Whether the area, widened by Nearby, touches the box ({@code south, west, north, east}). */
+    static boolean near(double[] box, Area area, int nearbyMiles) {
+        final double pad = nearbyMiles * 1609.344 / 111_320d;
+        return area.south - pad <= box[2] && area.north + pad >= box[0]
+                && area.west - pad <= box[3] && area.east + pad >= box[1];
+    }
+
+    /** One center as the places list shows it. */
+    static List<String> centerInfo(JSONObject a, String word) {
+        final List<String> info = new ArrayList<>();
+        final String type = a.optString("site_type", "").trim();
+        info.add(type.isEmpty() ? word + "." : word + ", " + type + ".");
+        String hours = a.optString("hours_of_operation", "").trim();
+        if (hours.length() > 140)
+            hours = hours.substring(0, 140).trim() + "...";
+        if (!hours.isEmpty())
+            info.add("Hours: " + hours);
+        info.add(join(a.optString("address", ""), a.optString("city", ""), a.optString("state", "")));
+        final String phone = a.optString("phone", "").replaceAll("[^0-9]", "");
+        if (phone.length() == 10)
+            info.add("(" + phone.substring(0, 3) + ") " + phone.substring(3, 6) + "-" + phone.substring(6));
+        return info;
+    }
+
     static final String NSS_OPEN = "https://gis.fema.gov/arcgis/rest/services/NSS/OpenShelters/FeatureServer/0";
 
     public Places() {
@@ -94,6 +132,7 @@ public final class Places extends Section {
                 "Hospitals: takwerx IWI pack (CMS, HHS, HIFLD, state lists, FAA). Schools: USGS National Map. "
                         + "Care homes and dialysis: California CDPH licensed facilities; elsewhere CMS certified nursing homes and dialysis (dialysis located by the Census geocoder or by phone match to Overture; about 1 in 11 could not be placed and is not listed). Shelters: FEMA National Shelter System. Airports and heliports: BTS NTAD Aviation Facilities (FAA data). "
                         + "Fire and police: USGS National Map. Military installations: DoD MIRTA via BTS NTAD. Power plants: CEC (California), EPA (elsewhere). "
+                        + "Chicago cooling and warming centers: City of Chicago Data Portal (terms: \"See Terms of Use\"; City of Chicago). "
                         + "Nuclear: FEMA/NRC. Dams: USACE National Inventory of Dams. Chemical: EPA RMP. "
                         + "Animal shelters, fairgrounds, equestrian centers, pharmacies, groceries, fuel and urgent care: "
                         + "Overture Maps Foundation places (CDLA-Permissive-2.0; Foursquare rows Apache-2.0). "
@@ -307,6 +346,20 @@ public final class Places extends Section {
         } catch (Exception e) {
             failures++;
             missing.add("shelters");
+        }
+        // Chicago cooling and warming centers, listed with the shelters. Only near Chicago.
+        if (near(CHICAGO_BOX, area, nearbyMiles)) {
+            try {
+                for (String[] src : CHICAGO_CENTERS)
+                    for (JSONObject a : Socrata.points(src[2], "location", null, area, nearbyMiles)) {
+                        final String name = a.optString("site_name", "").trim();
+                        found.get("shelter").add(point("shelter", src[1] + ": " + name, a.optDouble("_lat"),
+                                a.optDouble("_lon"), a.optDouble("_d"), area, centerInfo(a, src[1])));
+                    }
+            } catch (Exception e) {
+                failures++;
+                missing.add("Chicago cooling and warming centers");
+            }
         }
         // Airports and heliports: BTS NTAD Aviation Facilities (the FAA's current
         // cycle, never the FAA services6 quota). Closed sites are left out.

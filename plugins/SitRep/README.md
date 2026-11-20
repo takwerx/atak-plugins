@@ -1,10 +1,10 @@
 ATAK Plugin — Sit Rep
 
-**Download Sit Rep 0.4** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Sit Rep 0.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/sit-rep/releases/download/v0.4/ATAK-Plugin-SitRep-0.4--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/sit-rep/releases/download/v0.4/ATAK-Plugin-SitRep-0.4--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/sit-rep/releases/download/v0.4/ATAK-Plugin-SitRep-0.4--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/sit-rep/releases/download/v0.5/ATAK-Plugin-SitRep-0.5--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/sit-rep/releases/download/v0.5/ATAK-Plugin-SitRep-0.5--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/sit-rep/releases/download/v0.5/ATAK-Plugin-SitRep-0.5--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/sit-rep/releases
 
@@ -48,6 +48,12 @@ and others), with an Open or Get button.
 
 _________________________________________________________________
 STATUS
+
+Version 0.5: Chicago. Near Chicago, the Shelters list also shows the City of
+Chicago cooling and warming centers. The 911 calls section reads Chicago 311
+service requests and Chicago traffic crash reports. The crash reports are
+published hours to days late, so that line names its own time window (48
+hours) and stays out of the last 2 hours count. Other cities are unchanged.
 
 Version 0.4: Sit Rep works on FirstNet. Some agency servers block the IPv6
 address that FirstNet gives a device. The Census Bureau answers it with a
