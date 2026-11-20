@@ -346,6 +346,27 @@ it is a direction.
 ]
 
 #tak-slide[
+= Air Temperature
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("133.jpg", width: 100%)
+][
+  #image("134.jpg", width: 100%)
+][
+  *Air Temperature*, under Wind, shades the NOAA GFS model's temperature in
+  five-degree bands, in °F or °C as the units button says. Each patch of a
+  band in view carries a pill in its color naming it, so the key is on the
+  map. It is an estimate from the model, not a station measurement. Turning
+  it on sends the area of the map you are viewing to NOAA; your position is
+  not sent.
+
+  *Height* picks near the ground or 2,500 to 34,000 ft (3,000 to 10,400 m in
+  metric); the freezing level is a tap away. The *transparency* slider fades
+  the picture. It works anywhere on the globe.
+]
+]
+
+#tak-slide[
 = Rain
 
 #toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
