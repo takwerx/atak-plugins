@@ -310,6 +310,47 @@ final class PlaceIcons {
                 c.drawRect(cx - b, cy - a, cx + b, cy + a, fill);
                 break;
             }
+            case "cooling": {
+                // A white snowflake on blue: six arms, a V at the end of each.
+                c.drawRoundRect(box, r, r, white);
+                fill.setColor(0xFF0288D1);
+                c.drawRoundRect(inset(box, s * 0.07f), r * 0.8f, r * 0.8f, fill);
+                final Paint arm = new Paint(Paint.ANTI_ALIAS_FLAG);
+                arm.setColor(0xFFFFFFFF);
+                arm.setStrokeWidth(s * 0.06f);
+                arm.setStrokeCap(Paint.Cap.ROUND);
+                final float len = s * 0.30f, tip = s * 0.19f, twig = s * 0.09f;
+                for (int k = 0; k < 6; k++) {
+                    final double a = Math.toRadians(k * 60 - 90);
+                    final float ex = cx + (float) Math.cos(a) * len, ey = cy + (float) Math.sin(a) * len;
+                    c.drawLine(cx, cy, ex, ey, arm);
+                    final float bx = cx + (float) Math.cos(a) * tip, by = cy + (float) Math.sin(a) * tip;
+                    for (int side = -1; side <= 1; side += 2) {
+                        final double t = a + side * Math.toRadians(45);
+                        c.drawLine(bx, by, bx + (float) Math.cos(t) * twig, by + (float) Math.sin(t) * twig, arm);
+                    }
+                }
+                break;
+            }
+            case "warming": {
+                // A white flame on orange, with an orange heart.
+                c.drawRoundRect(box, r, r, white);
+                fill.setColor(0xFFE65100);
+                c.drawRoundRect(inset(box, s * 0.07f), r * 0.8f, r * 0.8f, fill);
+                final Path flame = new Path();
+                flame.moveTo(cx, cy - s * 0.33f);
+                flame.cubicTo(cx + s * 0.30f, cy - s * 0.04f, cx + s * 0.27f, cy + s * 0.30f, cx, cy + s * 0.30f);
+                flame.cubicTo(cx - s * 0.27f, cy + s * 0.30f, cx - s * 0.30f, cy - s * 0.04f, cx, cy - s * 0.33f);
+                flame.close();
+                c.drawPath(flame, white);
+                final Path heart = new Path();
+                heart.moveTo(cx, cy - s * 0.02f);
+                heart.cubicTo(cx + s * 0.14f, cy + s * 0.12f, cx + s * 0.12f, cy + s * 0.26f, cx, cy + s * 0.26f);
+                heart.cubicTo(cx - s * 0.12f, cy + s * 0.26f, cx - s * 0.14f, cy + s * 0.12f, cx, cy - s * 0.02f);
+                heart.close();
+                c.drawPath(heart, fill);
+                break;
+            }
             case "animal": {
                 c.drawRoundRect(box, r, r, white);
                 fill.setColor(0xFF6D4C41);
