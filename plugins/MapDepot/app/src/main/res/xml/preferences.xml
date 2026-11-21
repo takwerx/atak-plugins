@@ -1,10 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Map Depot has no settings to speak of: the depot address is fixed, and
+    Map Depot has almost no settings: the depot address is fixed, and
     everything else is a choice made on the page itself. This screen exists so
-    the manual has somewhere to be reached from. ATAK surfaces a plugin's
+    the manual has somewhere to be reached from (ATAK surfaces a plugin's
     documentation through its Tool Preferences entry, and without one the PDF
-    ships inside the APK with no way for anyone to open it.
+    ships inside the APK with no way for anyone to open it) and, since CARTO
+    began requiring one, to hold the operator's own basemap API key.
+
+    The key row is a plain Preference, wired by hand in
+    MapDepotPreferenceFragment: its dialog must be built on the MapView
+    context (an EditTextPreference builds it on the plugin's and ATAK dies with
+    BadTokenException), and the key lives in the MapView context's preferences
+    with everything else so it survives a plugin reload.
 -->
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
 
@@ -12,5 +19,13 @@
         android:key="manual"
         android:title="@string/manual_title"
         android:summary="@string/manual_summary" />
+
+    <PreferenceCategory android:title="@string/keys_heading">
+
+        <Preference
+            android:key="key_carto"
+            android:title="@string/key_carto_title" />
+
+    </PreferenceCategory>
 
 </PreferenceScreen>
