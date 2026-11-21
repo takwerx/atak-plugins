@@ -9,8 +9,18 @@ export ANDROID_HOME="${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetool
 export ANDROID_SDK_ROOT="$ANDROID_HOME"
 
 # The ATAK CIV SDK lives outside every repo — its license forbids redistribution.
-# Point this at whichever SDK version you are targeting.
-export ATAK_SDK="${ATAK_SDK:-$HOME/atak-sdk/ATAK-CIV-5.6.0.8}"
+# Point this at whichever SDK version you are targeting. Default (ops #802): the
+# 5.8.0.10 SDK once it is unpacked, else the old 5.6.0.8 default. Scripts that pick
+# an SDK by version (local-properties.sh, submission-zip.sh) use sort -V, so
+# 5.8.0.10 beats 5.8.0.5; a plain sort would get that wrong.
+if [ -z "${ATAK_SDK:-}" ]; then
+    if [ -d "$HOME/atak-sdk/ATAK-CIV-5.8.0.10" ]; then
+        ATAK_SDK="$HOME/atak-sdk/ATAK-CIV-5.8.0.10"
+    else
+        ATAK_SDK="$HOME/atak-sdk/ATAK-CIV-5.6.0.8"
+    fi
+fi
+export ATAK_SDK
 
 export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$PATH"
 
