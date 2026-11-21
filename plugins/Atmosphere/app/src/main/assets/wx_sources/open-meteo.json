@@ -148,6 +148,42 @@
       "defaultOn": true
     },
     {
+      "key": "cloud_cover_low",
+      "label": "Low cloud",
+      "quantity": "percent",
+      "requestGroups": [
+        "current",
+        "hourly"
+      ],
+      "currentPath": "current.cloud_cover_low",
+      "seriesPath": "hourly.cloud_cover_low",
+      "defaultOn": true
+    },
+    {
+      "key": "cloud_cover_mid",
+      "label": "Mid cloud",
+      "quantity": "percent",
+      "requestGroups": [
+        "current",
+        "hourly"
+      ],
+      "currentPath": "current.cloud_cover_mid",
+      "seriesPath": "hourly.cloud_cover_mid",
+      "defaultOn": true
+    },
+    {
+      "key": "cloud_cover_high",
+      "label": "High cloud",
+      "quantity": "percent",
+      "requestGroups": [
+        "current",
+        "hourly"
+      ],
+      "currentPath": "current.cloud_cover_high",
+      "seriesPath": "hourly.cloud_cover_high",
+      "defaultOn": true
+    },
+    {
       "key": "visibility",
       "label": "Visibility",
       "quantity": "length",

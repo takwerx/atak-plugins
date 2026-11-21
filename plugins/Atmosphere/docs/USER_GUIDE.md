@@ -91,7 +91,11 @@ old the reading is.
 - **Now**: temperature, humidity, the 20-foot wind and where it is from, gusts,
   mixing height, transport wind, wet bulb globe temperature and the chance of
   rain; under them the sky cover, sunrise, sunset and the moon. An element the
-  forecast office does not issue says so.
+  forecast office does not issue says so. With **Open-Meteo** as the forecast
+  source the readout also shows low, mid and high cloud, each as a percent of
+  its own layer (low is below about 6,500 ft, high is above about 20,000 ft).
+  The NWS forecast has the total sky cover only. In **Next hours** each layer
+  is a button of its own.
 - **Next hours**: the next day and a half as a line, one value at a time; the
   buttons under it pick which. **Show hourly table** opens the whole table.
 - **Show light**: the light for the point, one day at a time (the arrows step

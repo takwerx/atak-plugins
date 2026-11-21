@@ -8531,6 +8531,9 @@ public final class AtmospherePane {
             case POP: return "Precip chance";
             case PRECIP: return "Precip";
             case SKY: return "Sky cover";
+            case CLOUD_LOW: return CloudLevel.LOW.label;
+            case CLOUD_MID: return CloudLevel.MID.label;
+            case CLOUD_HIGH: return CloudLevel.HIGH.label;
             default: return r.label;
         }
     }
@@ -8729,6 +8732,9 @@ public final class AtmospherePane {
             case WBGT: return "Wet bulb globe";
             case POP: return "Precip chance";
             case PRECIP: return "Precip " + Units.displayUnit(Quantity.PRECIPITATION, units);
+            case CLOUD_LOW: return CloudLevel.LOW.label;
+            case CLOUD_MID: return CloudLevel.MID.label;
+            case CLOUD_HIGH: return CloudLevel.HIGH.label;
             default: return r.label;
         }
     }
@@ -9089,7 +9095,7 @@ public final class AtmospherePane {
     /** What a reading is, from its quantity and its name, so days can be aggregated. */
     private enum Kind {
         TEMP, DEW, FEELS, WBGT, RH, WIND, WIND20, GUST, TRANSPORT, DIR, TDIR, MIXING, POP,
-        PRECIP, SKY, OTHER;
+        PRECIP, SKY, CLOUD_LOW, CLOUD_MID, CLOUD_HIGH, OTHER;
 
         static Kind fromName(String n) {
             if (n == null) return TEMP;
@@ -9112,6 +9118,12 @@ public final class AtmospherePane {
             case PERCENT:
                 if (k.contains("humid")) return Kind.RH;
                 if (k.contains("precip")) return Kind.POP;
+                // The decks first: "Low cloud" is a percentage of its own, not the
+                // total the okta circle draws.
+                final CloudLevel deck = CloudLevel.of(k);
+                if (deck == CloudLevel.LOW) return Kind.CLOUD_LOW;
+                if (deck == CloudLevel.MID) return Kind.CLOUD_MID;
+                if (deck == CloudLevel.HIGH) return Kind.CLOUD_HIGH;
                 if (k.contains("cloud") || k.contains("sky")) return Kind.SKY;
                 return Kind.OTHER;
             case SPEED:
@@ -9151,6 +9163,9 @@ public final class AtmospherePane {
             case POP: return "Precip %";
             case PRECIP: return "Precip";
             case SKY: return "Sky";
+            case CLOUD_LOW: return CloudLevel.LOW.shortLabel;
+            case CLOUD_MID: return CloudLevel.MID.shortLabel;
+            case CLOUD_HIGH: return CloudLevel.HIGH.shortLabel;
             default: return r.label.length() > 9 ? r.label.substring(0, 9) : r.label;
         }
     }
