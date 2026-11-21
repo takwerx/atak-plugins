@@ -1,0 +1,95 @@
+name: Bug report
+description: "Signal DF is broken or behaving unexpectedly"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. The version and device fields are required because they decide
+        whether this is an already-fixed bug or a live one; without them the first reply is
+        always "which version?".
+
+        **This repository is public.** Before you paste a log or attach a screenshot, remove
+        callsigns, coordinates, server names, addresses and tokens.
+  - type: input
+    id: version
+    attributes:
+      label: "Signal DF version"
+      description: "Shown in ATAK's Plugins manager, in the TAKwerx Market, and in the release name."
+      placeholder: "e.g. 0.3"
+    validations:
+      required: true
+  - type: input
+    id: atak
+    attributes:
+      label: ATAK version
+      description: "ATAK-CIV version and build, from ATAK's About screen."
+      placeholder: "e.g. ATAK-CIV 5.4.0.x"
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Where you installed the plugin from
+      options:
+        - TAKwerx Market (inside ATAK)
+        - Signed APK from this repository's Releases
+        - Built it myself
+        - Other (say which below)
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: What ATAK is running on
+      options:
+        - Android phone or tablet
+        - TAKwerx ATAK Terminal (Mac or Windows)
+        - Android emulator
+        - Other (say which below)
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device model and Android version
+      placeholder: "e.g. Pixel 8, Android 15"
+    validations:
+      required: true
+  - type: dropdown
+    id: network
+    attributes:
+      label: Network when it happened
+      options:
+        - Online
+        - Offline or no data coverage
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected to see instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and screenshots
+      description: |
+        Anything that shows the problem: a screenshot, or ATAK's log around the time it happened.
+        Paste logs as text so they are searchable. Remove callsigns, coordinates, server names and tokens first.
+      render: shell
+    validations:
+      required: false
