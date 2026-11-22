@@ -17,7 +17,9 @@
         { "name": "Dozer Country", "pkg": "com.atakmap.android.dozercountry.plugin" },
         { "name": "FireCast",      "pkg": "com.atakmap.android.firecast.plugin" },
         { "name": "LCES",          "pkg": "com.atakmap.android.lces.plugin" },
-        { "name": "IPAWS Alerts",  "pkg": "com.atakmap.android.ipaws.plugin" }
+        { "name": "IPAWS Alerts",  "pkg": "com.atakmap.android.ipaws.plugin" },
+        { "name": "Comms",         "pkg": "com.atakmap.android.comms.plugin" },
+        { "name": "PLSS Grid",     "pkg": "com.atakmap.android.plss.plugin" }
       ]
     },
     {
@@ -32,8 +34,9 @@
       "id": "hazmat",
       "name": "Hazmat",
       "plugins": [
-        { "name": "Atmosphere",    "pkg": "com.atakmap.android.atmosphere.plugin" },
-        { "name": "Evac Zone",     "pkg": "com.atakmap.android.evaczone.plugin" }
+        { "name": "Atmosphere", "pkg": "com.atakmap.android.atmosphere.plugin" },
+        { "name": "Evac Zone",  "pkg": "com.atakmap.android.evaczone.plugin" },
+        { "name": "Cam Depot",  "pkg": "com.atakmap.android.camdepot.plugin" }
       ]
     },
     {
@@ -55,14 +58,9 @@
       "id": "search_rescue",
       "name": "Search and Rescue",
       "plugins": [
-        { "name": "Map Depot",     "pkg": "com.atakmap.android.mapdepot.plugin" },
-        { "name": "PLSS Grid",     "pkg": "com.atakmap.android.plss.plugin" },
-        { "name": "Signal DF",     "pkg": "com.atakmap.android.signaldf.plugin" },
-        { "name": "Atmosphere",    "pkg": "com.atakmap.android.atmosphere.plugin" },
-        { "name": "AirAware",      "pkg": "com.atakmap.android.airaware.plugin" },
-        { "name": "Feature Layer", "pkg": "com.atakmap.android.featurelayer.plugin" },
-        { "name": "Comms",         "pkg": "com.atakmap.android.comms.plugin" },
-        { "name": "Sit Rep",       "pkg": "com.atakmap.android.sitrep.plugin" }
+        { "name": "Map Depot",  "pkg": "com.atakmap.android.mapdepot.plugin" },
+        { "name": "Atmosphere", "pkg": "com.atakmap.android.atmosphere.plugin" },
+        { "name": "Cam Depot",  "pkg": "com.atakmap.android.camdepot.plugin" }
       ]
     }
   ]
