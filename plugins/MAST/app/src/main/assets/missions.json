@@ -26,6 +26,7 @@
     {
       "id": "tactical_response",
       "name": "Tactical Response",
+      "tools": ["rangeandbearing.xml", "firetools.xml", "redx.xml", "bloodhound.xml", "casevac.xml", "alert.xml"],
       "plugins": [
         { "name": "Tactical Response", "pkg": "com.atakmap.android.tacticalresponse.plugin" },
         { "name": "Cam Depot",         "pkg": "com.atakmap.android.camdepot.plugin" }
@@ -34,6 +35,7 @@
     {
       "id": "hazmat",
       "name": "Hazmat",
+      "tools": ["rangeandbearing.xml", "geofences.xml", "redx.xml", "routes.xml", "elevation.xml"],
       "plugins": [
         { "name": "Atmosphere", "pkg": "com.atakmap.android.atmosphere.plugin" },
         { "name": "Evac Zone",  "pkg": "com.atakmap.android.evaczone.plugin" },
@@ -43,6 +45,7 @@
     {
       "id": "swiftwater",
       "name": "Swift Water / Flood",
+      "tools": ["rangeandbearing.xml", "routes.xml", "trackhistory.xml", "bloodhound.xml", "elevation.xml"],
       "plugins": [
         { "name": "Atmosphere", "pkg": "com.atakmap.android.atmosphere.plugin" },
         { "name": "Cam Depot",  "pkg": "com.atakmap.android.camdepot.plugin" }
@@ -51,6 +54,7 @@
     {
       "id": "search_rescue",
       "name": "Search and Rescue",
+      "tools": ["rangeandbearing.xml", "trackhistory.xml", "routes.xml", "goto.xml", "bloodhound.xml", "resection.xml"],
       "plugins": [
         { "name": "Map Depot",  "pkg": "com.atakmap.android.mapdepot.plugin" },
         { "name": "Atmosphere", "pkg": "com.atakmap.android.atmosphere.plugin" },
