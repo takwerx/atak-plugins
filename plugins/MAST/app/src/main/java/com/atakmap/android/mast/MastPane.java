@@ -44,6 +44,8 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
 
     private static final String TAG = "MAST.Pane";
     private static final String PREF_MISSION = "mast_mission";
+    /** Tag on a mission tile: drawn taller than a plugin tile. */
+    private static final String TALL = "tall";
     private static final String MARKET_PKG = "com.atakmap.android.takwerxmarket.plugin";
 
     private final Context plugin;
@@ -125,8 +127,17 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
 
     // ---- tiles ----------------------------------------------------------------------
 
+    /**
+     * A mission tile is bigger than a plugin tile: the picker is the first page, read
+     * at a glance, three per row (operator, 2026-11-22: "first page of MAST is big
+     * buttons", keep 3 per row, larger).
+     */
     private Button missionTile(final Missions.Mission m) {
         final Button b = tile(m.name);
+        b.setTextSize(20);
+        b.setTypeface(b.getTypeface(), android.graphics.Typeface.BOLD);
+        b.setMaxLines(3);
+        b.setTag(TALL);
         b.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -180,7 +191,8 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
             rp.topMargin = tiles.getChildCount() == 0 ? 0 : dp(6);
             tiles.addView(row, rp);
         }
-        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(120), 1f);
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
+                dp(TALL.equals(b.getTag()) ? 170 : 120), 1f);
         lp.setMarginEnd(dp(6));
         row.addView(b, lp);
     }
