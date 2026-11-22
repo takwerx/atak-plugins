@@ -137,6 +137,18 @@
         <item name="android:ellipsize">end</item>
     </style>
 
+    <!-- A section heading over each group (CLAUDE.md, "Label sections"): cyan, small
+         caps, bold, full strength. -->
+    <style name="TakwerxSectionHeading">
+        <item name="android:textSize">12sp</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">#00E5FF</item>
+        <item name="android:paddingTop">14dp</item>
+        <item name="android:paddingBottom">6dp</item>
+        <item name="android:paddingLeft">6dp</item>
+    </style>
+
     <!-- A mission tile, FOBS's tile: icon over a label that may wrap to two lines,
          three per row. Width and weight are set in code because tiles are built from
          the mission file, not from a layout. -->

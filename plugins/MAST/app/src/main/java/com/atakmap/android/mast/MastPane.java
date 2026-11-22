@@ -1,415 +1,273 @@
 package com.atakmap.android.mast;
 
 import android.app.AlertDialog;
-import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
 import android.graphics.drawable.Drawable;
-import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.text.InputType;
 import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
-import android.widget.Toast;
 
+import com.atak.plugins.impl.AtakPluginRegistry;
 import com.atak.plugins.impl.PluginLayoutInflater;
-import com.atakmap.android.drawing.mapItems.DrawingShape;
+import com.atak.plugins.impl.PluginMapComponent;
 import com.atakmap.android.dropdown.DropDown;
 import com.atakmap.android.dropdown.DropDownReceiver;
 import com.atakmap.android.ipc.AtakBroadcast;
-import com.atakmap.android.maps.MapItem;
 import com.atakmap.android.maps.MapView;
-import com.atakmap.android.mast.feed.FeedPublisher;
 import com.atakmap.android.mast.plugin.R;
-import com.atakmap.android.toolbar.ToolManagerBroadcastReceiver;
 import com.atakmap.coremap.log.Log;
 
-import java.util.Map;
+import java.util.List;
 
 /**
- * The MAST pane: header value buttons (mission, mode, feed, floor) over the mission's
- * tool tiles, FOBS-style, three per row, built from the mission file.
+ * The MAST pane: the front door to the mission plugins (PLAN-MAST-v0.1, direction
+ * change 2026-11-22). A pinned Mission button over either the mission picker or the
+ * picked mission's plugins, one tile each with the plugin's own toolbar icon. The
+ * last mission is remembered, so the toolbar button from inside FOBS lands back on
+ * the Wildfire page.
  *
- * <p>A {@link DropDownReceiver} rather than the stable {@code Pane}, and that is a
- * documented exception to the prefer-{@code gov.tak.api} rule: Command mode's board
- * needs full width and the stable Pane cannot resize after it is shown
- * ({@code memory: atak-dropdown-full-width-resize}). Half is the operating state.
+ * <p>A tile opens its plugin the way its toolbar button does: ATAK registers a local
+ * receiver for {@code <identifier>.ACTION} on every toolbar item it is given
+ * ({@code ATAKUIService.addToolbarItem}, 5.8 jar) and calls the item's own listener,
+ * and every takwerx plugin uses its package as the identifier. So no plugin needs a
+ * MAST-specific action, FOBS included, which has none.
  *
- * <p>Every dialog and toast here is built on the MapView's context; the plugin context
- * cannot own a window and takes ATAK down with it.
+ * <p>Every dialog here is built on the MapView's context; the plugin context cannot
+ * own a window and takes ATAK down with it.
  */
-public class MastPane extends DropDownReceiver implements DropDown.OnStateListener, MapsList.Host {
+public class MastPane extends DropDownReceiver implements DropDown.OnStateListener {
 
     private static final String TAG = "MAST.Pane";
-    private static final String SHAPE_TOOL = "com.atakmap.android.drawing.SHAPE_TOOL";
-    /** Callback ATAK's shape tool fires when the shape is finished; carries the tile. */
-    private static final String SHAPE_DONE = "com.atakmap.android.mast.SHAPE_DONE";
-    private static final String EXTRA_TILE = "mast_tile";
-    private static final String PREF_MODE = "mast_mode_command";
-    static final String PREF_FLOOR = "mast_floor";
-    static final String[] FLOORS = { "B2", "B1", "F1", "F2", "F3", "F4", "F5", "F6" };
+    private static final String PREF_MISSION = "mast_mission";
+    private static final String MARKET_PKG = "com.atakmap.android.takwerxmarket.plugin";
 
     private final Context plugin;
     private final Context host;
-    private final FeedPublisher feeds;
     private final SharedPreferences prefs;
     private final View root;
     private final Button missionBtn;
-    private final Button modeBtn;
-    private final Button feedBtn;
-    private final Button floorBtn;
+    private final ScrollView scroll;
     private final TextView section;
     private final LinearLayout tiles;
-    private final View grid;
-    private final View mapsView;
-    private final MapsList maps;
-    private final MarkerDrop drop;
-    private Mission mission;
-    private double currentWidth = HALF_WIDTH;
-    private double currentHeight = FULL_HEIGHT;
+    private List<Missions.Mission> missions;
+    private boolean picking;
 
-    private final BroadcastReceiver shapeDone = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            onShapeDone(intent.getStringExtra("uid"), intent.getIntExtra(EXTRA_TILE, -1));
-        }
-    };
-
-    public MastPane(MapView mapView, Context pluginContext, FeedPublisher feeds) {
+    public MastPane(MapView mapView, Context pluginContext) {
         super(mapView);
         this.plugin = pluginContext;
         this.host = mapView.getContext();
-        this.feeds = feeds;
         this.prefs = PreferenceManager.getDefaultSharedPreferences(host);
-        this.drop = new MarkerDrop(mapView, pluginContext, feeds, FLOORS,
-                pluginContext.getString(R.string.floor_all), PREF_FLOOR);
-        // A finished or cancelled drop brings the tools back (operator, 2026-09-19:
-        // "when I cancel a tool it needs to bring me back to tools").
-        this.drop.setOnDone(new Runnable() {
-            @Override
-            public void run() {
-                reopen();
-            }
-        });
 
         root = PluginLayoutInflater.inflate(plugin, R.layout.mast_pane, null);
         missionBtn = root.findViewById(R.id.mast_mission);
-        modeBtn = root.findViewById(R.id.mast_mode);
-        feedBtn = root.findViewById(R.id.mast_feed);
-        floorBtn = root.findViewById(R.id.mast_floor);
+        scroll = root.findViewById(R.id.mast_scroll);
         section = root.findViewById(R.id.mast_section);
         tiles = root.findViewById(R.id.mast_tiles);
-        grid = root.findViewById(R.id.mast_grid);
-        mapsView = root.findViewById(R.id.mast_maps);
-        maps = new MapsList(mapView, pluginContext, root, this);
-
         missionBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                toast(plugin.getString(R.string.next_build, "Mission picker"));
+                showPicker();
             }
         });
-        modeBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                boolean command = !prefs.getBoolean(PREF_MODE, false);
-                prefs.edit().putBoolean(PREF_MODE, command).apply();
-                refreshHeader();
-                if (command)
-                    toast(plugin.getString(R.string.next_build, "Command mode board"));
-            }
-        });
-        feedBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                feeds.pick(new FeedPublisher.OnFeed() {
-                    @Override
-                    public void go(FeedPublisher.Feed feed) {
-                        refreshHeader();
-                    }
-                });
-            }
-        });
-        floorBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                pickFloor();
-            }
-        });
-
-        AtakBroadcast.getInstance().registerReceiver(shapeDone,
-                new AtakBroadcast.DocumentedIntentFilter(SHAPE_DONE,
-                        "MAST: ATAK's shape tool finished; carries the shape uid and the tile"));
     }
 
-    // ---- building the grid ---------------------------------------------------------
-
-    public void setMission(Mission m) {
-        this.mission = m;
-        tiles.removeAllViews();
-        final float dp = plugin.getResources().getDisplayMetrics().density;
-        LinearLayout row = null;
-        for (final Mission.Tile t : m.tiles) {
-            if (row == null || row.getChildCount() == 3) {
-                row = new LinearLayout(plugin);
-                row.setOrientation(LinearLayout.HORIZONTAL);
-                // A two-line label would otherwise drop its tile below the others.
-                row.setBaselineAligned(false);
-                LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                rp.topMargin = tiles.getChildCount() == 0 ? 0 : (int) (6 * dp);
-                tiles.addView(row, rp);
-            }
-            Button b = new Button(plugin, null, 0, R.style.MastTile);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, (int) (120 * dp), 1f);
-            lp.setMarginEnd((int) (6 * dp));
-            b.setLayoutParams(lp);
-            b.setText(t.label);
-            int id = plugin.getResources().getIdentifier(t.icon, "drawable", plugin.getPackageName());
-            if (id != 0) {
-                Drawable d = plugin.getResources().getDrawable(id);
-                b.setCompoundDrawablesWithIntrinsicBounds(null, d, null, null);
-            } else {
-                Log.w(TAG, "no drawable '" + t.icon + "' for tile " + t.label);
-            }
-            b.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    onTile(t);
-                }
-            });
-            row.addView(b);
-        }
-        // Pad the last row so its tiles keep the width of a full row.
-        while (row != null && row.getChildCount() < 3) {
-            View spacer = new View(plugin);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, 1, 1f);
-            lp.setMarginEnd((int) (6 * dp));
-            row.addView(spacer, lp);
-        }
-        floorBtn.setVisibility(m.floors ? View.VISIBLE : View.GONE);
-        refreshHeader();
+    public void setMissions(List<Missions.Mission> missions) {
+        this.missions = missions;
     }
 
-    private void refreshHeader() {
-        missionBtn.setText(plugin.getString(R.string.mission_label,
-                mission == null ? "" : mission.name));
-        modeBtn.setText(prefs.getBoolean(PREF_MODE, false) ? R.string.mode_command
-                : R.string.mode_tactical);
-        FeedPublisher.Feed f = feeds.current();
-        if (f == null)
-            feedBtn.setText(R.string.feed_none);
-        else
-            feedBtn.setText(plugin.getString(feeds.isCurrentConnected()
-                    ? R.string.feed_current : R.string.feed_offline, f.name));
-        floorBtn.setText(plugin.getString(R.string.floor_label,
-                prefs.getString(PREF_FLOOR, plugin.getString(R.string.floor_all))));
-        section.setText(prefs.getBoolean(PREF_MODE, false) ? R.string.section_command
-                : R.string.section_tactical);
+    private Missions.Mission current() {
+        if (missions == null)
+            return null;
+        final String id = prefs.getString(PREF_MISSION, null);
+        for (Missions.Mission m : missions)
+            if (m.id.equals(id))
+                return m;
+        return null;
     }
 
-    private void pickFloor() {
-        final String[] rows = new String[FLOORS.length + 1];
-        rows[0] = plugin.getString(R.string.floor_all);
-        System.arraycopy(FLOORS, 0, rows, 1, FLOORS.length);
-        String cur = prefs.getString(PREF_FLOOR, rows[0]);
-        int checked = 0;
-        for (int i = 0; i < rows.length; i++)
-            if (rows[i].equals(cur))
-                checked = i;
-        new AlertDialog.Builder(host)
-                .setTitle(plugin.getString(R.string.floor_pick))
-                .setSingleChoiceItems(rows, checked, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int which) {
-                        prefs.edit().putString(PREF_FLOOR, rows[which]).apply();
-                        refreshHeader();
-                        d.dismiss();
-                    }
-                })
-                .setNegativeButton(plugin.getString(R.string.cancel), null)
-                .show();
-    }
+    // ---- the two pages --------------------------------------------------------------
 
-    // ---- tiles ---------------------------------------------------------------------
-
-    private void onTile(Mission.Tile t) {
-        switch (t.kind) {
-            case ATAK:
-                atakScreen(t);
-                break;
-            case SHAPE:
-                startShape(t);
-                break;
-            case MAPS:
-                grid.setVisibility(View.GONE);
-                mapsView.setVisibility(View.VISIBLE);
-                maps.open(t.view, t.search);
-                break;
-            case MARKER:
-                closeDropDown();
-                drop.begin(t, mission != null && mission.floors);
-                break;
-            case PLUGIN:
-                openPlugin(t);
-                break;
-            default:
-                break;
-        }
-    }
-
-    /** An ATAK dropdown: set the preferences the tile names, ask for text if it wants some, send. */
-    private void atakScreen(final Mission.Tile t) {
-        if (t.ask == null) {
-            sendAtak(t, null);
+    /** The remembered mission's page, or the picker when none is remembered yet. */
+    private void showCurrent() {
+        final Missions.Mission m = current();
+        if (m == null) {
+            showPicker();
             return;
         }
-        final EditText input = new EditText(host);
-        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
-        input.setSingleLine(true);
-        new AlertDialog.Builder(host)
-                .setTitle(t.askTitle)
-                .setView(input)
-                .setPositiveButton(plugin.getString(R.string.ok), new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int which) {
-                        String s = input.getText().toString().trim();
-                        if (s.length() > 0)
-                            sendAtak(t, s);
-                    }
-                })
-                .setNegativeButton(plugin.getString(R.string.cancel), null)
-                .show();
-        input.requestFocus();
+        picking = false;
+        missionBtn.setText(plugin.getString(R.string.mission_current, m.name));
+        section.setText(plugin.getString(R.string.section_plugins, m.name));
+        tiles.removeAllViews();
+        for (final Missions.Plugin p : m.plugins)
+            addTile(pluginTile(p));
+        padLastRow();
+        scroll.scrollTo(0, 0);
     }
 
-    private void sendAtak(Mission.Tile t, String asked) {
-        if (!t.prefs.isEmpty()) {
-            SharedPreferences.Editor e = prefs.edit();
-            for (Map.Entry<String, Boolean> p : t.prefs.entrySet())
-                e.putBoolean(p.getKey(), p.getValue());
-            e.apply();
+    private void showPicker() {
+        picking = true;
+        final Missions.Mission m = current();
+        missionBtn.setText(m == null ? plugin.getString(R.string.mission_none)
+                : plugin.getString(R.string.mission_current, m.name));
+        section.setText(R.string.section_pick);
+        tiles.removeAllViews();
+        if (missions != null)
+            for (final Missions.Mission mission : missions)
+                addTile(missionTile(mission));
+        padLastRow();
+        scroll.scrollTo(0, 0);
+    }
+
+    // ---- tiles ----------------------------------------------------------------------
+
+    private Button missionTile(final Missions.Mission m) {
+        final Button b = tile(m.name);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                prefs.edit().putString(PREF_MISSION, m.id).apply();
+                showCurrent();
+            }
+        });
+        return b;
+    }
+
+    private Button pluginTile(final Missions.Plugin p) {
+        final boolean loaded = isLoaded(p.pkg);
+        final Button b = tile(loaded ? p.name
+                : plugin.getString(R.string.plugin_not_installed, p.name));
+        final Drawable icon = loaded ? icon(p.pkg) : null;
+        if (icon != null) {
+            final int size = dp(48);
+            icon.setBounds(0, 0, size, size);
+            b.setCompoundDrawables(null, icon, null, null);
         }
-        Intent i = new Intent(t.action);
-        if (asked != null && t.ask != null)
-            i.putExtra(t.ask, asked);
-        if (!t.paths.isEmpty())
-            i.putStringArrayListExtra("list_item_paths", new java.util.ArrayList<String>(t.paths));
-        Log.d(TAG, "tile " + t.label + " -> " + t.action + (asked == null ? "" : " " + t.ask + "=" + asked));
+        if (!loaded)
+            b.setAlpha(0.45f);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (isLoaded(p.pkg))
+                    open(p);
+                else
+                    missing(p);
+            }
+        });
+        return b;
+    }
+
+    private Button tile(String label) {
+        final Button b = new Button(plugin, null, 0, R.style.MastTile);
+        b.setText(label);
+        return b;
+    }
+
+    private void addTile(Button b) {
+        LinearLayout row = tiles.getChildCount() == 0 ? null
+                : (LinearLayout) tiles.getChildAt(tiles.getChildCount() - 1);
+        if (row == null || row.getChildCount() == 3) {
+            row = new LinearLayout(plugin);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            // A two-line label would otherwise drop its tile below the others.
+            row.setBaselineAligned(false);
+            final LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            rp.topMargin = tiles.getChildCount() == 0 ? 0 : dp(6);
+            tiles.addView(row, rp);
+        }
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(120), 1f);
+        lp.setMarginEnd(dp(6));
+        row.addView(b, lp);
+    }
+
+    /** Pad the last row so its tiles keep the width of a full row. */
+    private void padLastRow() {
+        if (tiles.getChildCount() == 0)
+            return;
+        final LinearLayout row = (LinearLayout) tiles.getChildAt(tiles.getChildCount() - 1);
+        while (row.getChildCount() < 3) {
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, 1, 1f);
+            lp.setMarginEnd(dp(6));
+            row.addView(new View(plugin), lp);
+        }
+    }
+
+    // ---- opening another plugin -----------------------------------------------------
+
+    /** Closes MAST, then taps the plugin's toolbar button through ATAK's own receiver. */
+    private void open(Missions.Plugin p) {
         closeDropDown();
-        AtakBroadcast.getInstance().sendBroadcast(i);
-        if (!t.paths.isEmpty() && !t.prefs.isEmpty())
-            getMapView().postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    reapplyPrefs(t);
-                }
-            }, 700);
+        try {
+            AtakBroadcast.getInstance().sendBroadcast(new Intent(p.pkg + ".ACTION"));
+        } catch (RuntimeException e) {
+            Log.w(TAG, "could not open " + p.pkg, e);
+        }
+    }
+
+    private void missing(final Missions.Plugin p) {
+        final AlertDialog.Builder d = new AlertDialog.Builder(host)
+                .setTitle(p.name)
+                .setMessage(plugin.getString(R.string.plugin_missing, p.name));
+        if (isLoaded(MARKET_PKG)) {
+            d.setPositiveButton(plugin.getString(R.string.open_market),
+                    new android.content.DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(android.content.DialogInterface dlg, int which) {
+                            open(new Missions.Plugin("TAKwerx Market", MARKET_PKG));
+                        }
+                    });
+            d.setNegativeButton(plugin.getString(R.string.cancel), null);
+        } else {
+            d.setPositiveButton(plugin.getString(R.string.ok), null);
+        }
+        d.show();
     }
 
     /**
-     * Overlay Manager turns Show All back on whenever it navigates into a list
-     * ({@code openMenu} ticks the box for any non-empty path, and the box writes
-     * {@code fov_filter=false}), so a tile that wants both a folder and the in-view
-     * filter sets the preference again once the navigation has landed and sends the
-     * toolbar-unset broadcast, which is the one intent that makes Overlay Manager
-     * re-read the preference into the box ({@code setViewToMode}, 4.6 source).
+     * Whether a plugin is loaded in ATAK. A plugin cannot ask Android which packages are
+     * installed, so ATAK's own registry is asked (Sit Rep's check); if that fails, the
+     * tile shows as loaded and a missing plugin ignores the tap.
      */
-    private void reapplyPrefs(Mission.Tile t) {
-        SharedPreferences.Editor e = prefs.edit();
-        for (Map.Entry<String, Boolean> p : t.prefs.entrySet())
-            e.putBoolean(p.getKey(), p.getValue());
-        e.apply();
-        AtakBroadcast.getInstance().sendBroadcast(
-                new Intent("com.atakmap.android.maps.toolbar.UNSET_TOOLBAR"));
-        Log.d(TAG, "tile " + t.label + ": prefs re-applied after navigation");
-    }
-
-    /** ATAK's own polygon tool; the shape gets the tile's name and colors when it is done. */
-    private void startShape(Mission.Tile t) {
-        Bundle b = new Bundle();
-        Intent cb = new Intent(SHAPE_DONE);
-        cb.putExtra(EXTRA_TILE, t.index);
-        b.putParcelable("callback", cb);
-        closeDropDown();
-        ToolManagerBroadcastReceiver.getInstance().startTool(SHAPE_TOOL, b);
-    }
-
-    private void onShapeDone(String uid, int tileIndex) {
-        // The callback fires whether the shape was finished or the tool was cancelled
-        // (no uid); either way the tools come back.
-        reopen();
-        if (uid == null || mission == null || tileIndex < 0 || tileIndex >= mission.tiles.size())
-            return;
-        Mission.Tile t = mission.tiles.get(tileIndex);
-        MapItem item = getMapView().getRootGroup().deepFindUID(uid);
-        if (!(item instanceof DrawingShape)) {
-            Log.w(TAG, "shape callback for " + uid + " found " + item);
-            return;
-        }
-        DrawingShape shape = (DrawingShape) item;
-        // The tool takes no title or color from its bundle, so they are set here.
-        shape.setTitle(t.title + " " + countTitled(t.title));
-        shape.setColor(t.color);
-        shape.setFillColor(t.fill);
-        shape.persist(getMapView().getMapEventDispatcher(), null, MastPane.class);
-        Log.d(TAG, "shape " + uid + " is " + shape.getTitle());
-        if (t.hasGeofence())
-            toast(plugin.getString(R.string.next_build, "Geofence on " + t.title));
-    }
-
-    /** How many items already carry this title prefix, so the next one is numbered. */
-    private int countTitled(String prefix) {
-        final int[] n = { 0 };
-        final String p = prefix + " ";
-        getMapView().getRootGroup().deepForEachItem(new com.atakmap.android.maps.MapGroup.MapItemsCallback() {
-            @Override
-            public boolean onItemFunction(MapItem item) {
-                String title = item.getTitle();
-                if (title != null && title.startsWith(p))
-                    n[0]++;
-                return false;
-            }
-        });
-        return n[0] + 1;
-    }
-
-    /** Another takwerx plugin's pane: greyed with a Market pointer when it is not installed. */
-    private void openPlugin(Mission.Tile t) {
+    private static boolean isLoaded(String pkg) {
         try {
-            host.getPackageManager().getPackageInfo(t.pkg, 0);
-        } catch (PackageManager.NameNotFoundException e) {
-            toast(plugin.getString(R.string.plugin_missing, t.pluginName));
-            return;
+            final AtakPluginRegistry reg = AtakPluginRegistry.get();
+            return reg == null || reg.isPluginLoaded(pkg) || reg.isPluginLoaded(pkg + ".civ");
+        } catch (Throwable t) {
+            return true;
         }
-        toast(plugin.getString(R.string.next_build, t.pluginName));
     }
 
-    // ---- pane plumbing (IapDropDown's shape) ---------------------------------------
+    /** The plugin's own toolbar icon, as ATAK keeps it for the Tools list. */
+    private static Drawable icon(String pkg) {
+        try {
+            final Drawable d = PluginMapComponent.getPluginIconWithId(pkg);
+            return d == null ? null : d.getConstantState() == null ? d
+                    : d.getConstantState().newDrawable().mutate();
+        } catch (Throwable t) {
+            return null;
+        }
+    }
 
+    private int dp(int v) {
+        return (int) (v * plugin.getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    // ---- pane plumbing --------------------------------------------------------------
+
+    /** Opens on the remembered mission's page; on the picker the first time. */
     public void show() {
         if (isVisible())
             return;
         setRetain(true);
-        refreshHeader();
-        // ignoreBackButton: Back steps a full-width pane back to half before it closes.
-        showDropDown(root, HALF_WIDTH, FULL_HEIGHT, FULL_WIDTH, HALF_HEIGHT, true, this);
-    }
-
-    /** Back to the tools after a tool on the map ends, on the UI thread. */
-    private void reopen() {
-        getMapView().post(new Runnable() {
-            @Override
-            public void run() {
-                show();
-            }
-        });
+        showCurrent();
+        // ignoreBackButton false: Back closes the pane (memory: a true here makes
+        // the pane unclosable); onBackButtonPressed steps the picker back first.
+        showDropDown(root, HALF_WIDTH, FULL_HEIGHT, FULL_WIDTH, HALF_HEIGHT, false, this);
     }
 
     public void toggle() {
@@ -421,70 +279,16 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        // Opened by the toolbar item, not by broadcast.
-    }
-
-    @Override
-    protected void onStateRequested(int state) {
-        if (state == DROPDOWN_STATE_FULLSCREEN)
-            goWide();
-        else if (state == DROPDOWN_STATE_NORMAL)
-            goNarrow();
-    }
-
-    private void goWide() {
-        if (!isPortrait())
-            resize(FULL_WIDTH - HANDLE_THICKNESS_LANDSCAPE, FULL_HEIGHT);
-        else
-            resize(FULL_WIDTH, FULL_HEIGHT - HANDLE_THICKNESS_PORTRAIT);
-    }
-
-    private void goNarrow() {
-        if (!isPortrait())
-            resize(HALF_WIDTH, FULL_HEIGHT);
-        else
-            resize(FULL_WIDTH, HALF_HEIGHT);
-    }
-
-    private boolean isWide() {
-        return !isPortrait() ? currentWidth > HALF_WIDTH + 0.01 : currentHeight > HALF_HEIGHT + 0.01;
-    }
-
-    /** The maps list's Back: the tile grid again. */
-    @Override
-    public void onBack() {
-        maps.close();
-        mapsView.setVisibility(View.GONE);
-        grid.setVisibility(View.VISIBLE);
-    }
-
-    private boolean showingMaps() {
-        return mapsView.getVisibility() == View.VISIBLE;
+        // Opened by the toolbar item or by SHOW_ACTION (MAST.java).
     }
 
     @Override
     protected boolean onBackButtonPressed() {
-        if (showingMaps()) {
-            onBack();
-            return true;
-        }
-        if (isWide()) {
-            goNarrow();
+        if (picking && current() != null) {
+            showCurrent();
             return true;
         }
         return false;
-    }
-
-    @Override
-    public void onDropDownSizeChanged(double width, double height) {
-        currentWidth = width;
-        currentHeight = height;
-    }
-
-    @Override
-    public void onDropDownVisible(boolean visible) {
-        if (visible)
-            refreshHeader();
     }
 
     @Override
@@ -492,22 +296,18 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
     }
 
     @Override
+    public void onDropDownVisible(boolean v) {
+    }
+
+    @Override
+    public void onDropDownSizeChanged(double width, double height) {
+    }
+
+    @Override
     public void onDropDownClose() {
-        if (showingMaps())
-            onBack();
     }
 
     @Override
     protected void disposeImpl() {
-        drop.dispose();
-        try {
-            AtakBroadcast.getInstance().unregisterReceiver(shapeDone);
-        } catch (Exception e) {
-            Log.w(TAG, "shape receiver was not registered", e);
-        }
-    }
-
-    private void toast(String s) {
-        Toast.makeText(host, s, Toast.LENGTH_SHORT).show();
     }
 }

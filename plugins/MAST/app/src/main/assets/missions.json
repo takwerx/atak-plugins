@@ -1,0 +1,65 @@
+{
+  "schema": 2,
+  "missions": [
+    {
+      "id": "wildfire",
+      "name": "Wildfire",
+      "plugins": [
+        { "name": "FOBS",          "pkg": "com.atakmap.android.fobs.plugin" },
+        { "name": "FireCast",      "pkg": "com.atakmap.android.firecast.plugin" },
+        { "name": "Atmosphere",    "pkg": "com.atakmap.android.atmosphere.plugin" },
+        { "name": "AirAware",      "pkg": "com.atakmap.android.airaware.plugin" },
+        { "name": "Evac Zone",     "pkg": "com.atakmap.android.evaczone.plugin" },
+        { "name": "Feature Layer", "pkg": "com.atakmap.android.featurelayer.plugin" },
+        { "name": "LCES",          "pkg": "com.atakmap.android.lces.plugin" },
+        { "name": "IWI",           "pkg": "com.atakmap.android.iwi.plugin" },
+        { "name": "Dozer Country", "pkg": "com.atakmap.android.dozercountry.plugin" },
+        { "name": "Map Depot",     "pkg": "com.atakmap.android.mapdepot.plugin" },
+        { "name": "Cam Depot",     "pkg": "com.atakmap.android.camdepot.plugin" },
+        { "name": "Sit Rep",       "pkg": "com.atakmap.android.sitrep.plugin" }
+      ]
+    },
+    {
+      "id": "active_shooter",
+      "name": "Active Shooter",
+      "plugins": [
+        { "name": "Tactical Response", "pkg": "com.atakmap.android.tacticalresponse.plugin" },
+        { "name": "Map Depot",         "pkg": "com.atakmap.android.mapdepot.plugin" },
+        { "name": "Cam Depot",         "pkg": "com.atakmap.android.camdepot.plugin" },
+        { "name": "Traffic",           "pkg": "com.atakmap.android.traffic.plugin" },
+        { "name": "Comms",             "pkg": "com.atakmap.android.comms.plugin" },
+        { "name": "Sit Rep",           "pkg": "com.atakmap.android.sitrep.plugin" }
+      ]
+    },
+    {
+      "id": "hazmat",
+      "name": "Hazmat",
+      "plugins": [
+        { "name": "Atmosphere",    "pkg": "com.atakmap.android.atmosphere.plugin" },
+        { "name": "Evac Zone",     "pkg": "com.atakmap.android.evaczone.plugin" },
+        { "name": "IPAWS Alerts",  "pkg": "com.atakmap.android.ipaws.plugin" },
+        { "name": "Feature Layer", "pkg": "com.atakmap.android.featurelayer.plugin" },
+        { "name": "Traffic",       "pkg": "com.atakmap.android.traffic.plugin" },
+        { "name": "Map Depot",     "pkg": "com.atakmap.android.mapdepot.plugin" },
+        { "name": "Cam Depot",     "pkg": "com.atakmap.android.camdepot.plugin" },
+        { "name": "Comms",         "pkg": "com.atakmap.android.comms.plugin" },
+        { "name": "Sit Rep",       "pkg": "com.atakmap.android.sitrep.plugin" }
+      ]
+    },
+    {
+      "id": "swiftwater",
+      "name": "Swift Water / Flood",
+      "plugins": [
+        { "name": "Atmosphere",    "pkg": "com.atakmap.android.atmosphere.plugin" },
+        { "name": "Feature Layer", "pkg": "com.atakmap.android.featurelayer.plugin" },
+        { "name": "IPAWS Alerts",  "pkg": "com.atakmap.android.ipaws.plugin" },
+        { "name": "Evac Zone",     "pkg": "com.atakmap.android.evaczone.plugin" },
+        { "name": "Traffic",       "pkg": "com.atakmap.android.traffic.plugin" },
+        { "name": "Map Depot",     "pkg": "com.atakmap.android.mapdepot.plugin" },
+        { "name": "Cam Depot",     "pkg": "com.atakmap.android.camdepot.plugin" },
+        { "name": "Comms",         "pkg": "com.atakmap.android.comms.plugin" },
+        { "name": "Sit Rep",       "pkg": "com.atakmap.android.sitrep.plugin" }
+      ]
+    }
+  ]
+}

@@ -1,62 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- App -->
+
     <string name="app_name">MAST</string>
-    <!-- description -->
     <string name="app_desc">Mission Adaptable Support Tools: pick the mission, open its plugins</string>
 
-    <!-- Pane header -->
-    <string name="mission_label">%s</string>
-    <string name="mode_tactical">Tactical</string>
-    <string name="mode_command">Command</string>
-    <string name="feed_none">Feed: none</string>
-    <string name="feed_current">Feed: %s</string>
-    <string name="feed_offline">Feed: %s (server offline)</string>
-    <string name="floor_label">Floor: %s</string>
-    <string name="floor_all">All</string>
-    <string name="floor_pick">Floor</string>
-    <string name="section_tactical">Tactical tools</string>
-    <string name="section_command">Command board</string>
+    <!-- Pane -->
+    <string name="mission_current">Mission: %s</string>
+    <string name="mission_none">Pick a mission</string>
+    <string name="section_plugins">%s plugins</string>
+    <string name="section_pick">Pick a mission</string>
+    <string name="plugin_not_installed">%s\nNot installed</string>
+    <string name="plugin_missing">%s is not on this device. Get it from the TAKwerx Market.</string>
+    <string name="open_market">Open Market</string>
+    <string name="mission_load_failed">MAST could not read its mission file: %s</string>
     <string name="cancel">Cancel</string>
     <string name="ok">OK</string>
 
-    <!-- Maps list -->
-    <string name="back_to_tools">Back to tools</string>
-    <string name="maps_section">Maps</string>
-    <string name="maps_in_view">In view</string>
-    <string name="maps_all">All maps</string>
-    <string name="maps_go">Go</string>
-    <string name="maps_shown">Shown</string>
-    <string name="maps_hidden">Hidden</string>
-    <string name="maps_search_hint">Building name</string>
-    <string name="maps_none_in_view">No maps in view. Tap All maps, or move the map.</string>
-    <string name="maps_none">No image overlays on this phone</string>
-    <string name="maps_no_overlay">ATAK has no Image Overlay list</string>
-
-    <!-- Marker drop popup -->
-    <string name="pick_feed_first">Pick a feed first</string>
-    <string name="count_label">How many</string>
-    <string name="place_on_map">On the map</string>
-    <string name="place_my_location">My location</string>
-    <string name="place_no_gps">No GPS</string>
-    <string name="tap_to_place">Tap the map to place %s</string>
-    <string name="text_needed">%s is needed</string>
-    <string name="place_failed">%s was not placed</string>
-
-    <!-- Not built yet: every tile says so rather than doing nothing -->
-    <string name="next_build">%s: next build</string>
-    <string name="plugin_missing">Install %s from the TAKwerx Market</string>
-    <string name="mission_load_failed">MAST could not read its mission file: %s</string>
-
-    <!-- Feeds, copied forward from FOBS -->
-    <string name="feed_no_server">No TAK Server is connected</string>
-    <string name="feed_choose">Choose a server</string>
-    <string name="feed_loading">Getting feeds from the server…</string>
-    <string name="feed_pick">Feeds on %s</string>
-    <string name="feed_locked">%s (password protected)</string>
-    <string name="feed_locked_unsupported">Password-protected feeds are not supported yet</string>
-    <string name="feed_list_failed">Could not get the feed list from the server</string>
-    <string name="feed_empty">No feeds on that server</string>
-    <string name="feed_published">Sent to feed %s</string>
-    <string name="feed_publish_failed">Could not add to feed %s</string>
 </resources>

@@ -4,15 +4,10 @@ import android.content.Context;
 import android.widget.Toast;
 
 import com.atak.plugins.impl.PluginContextProvider;
-import com.atakmap.android.cot.detail.CotDetailManager;
-import com.atakmap.android.maps.MapEvent;
-import com.atakmap.android.maps.MapEventDispatcher;
-import com.atakmap.android.maps.MapItem;
+import com.atakmap.android.ipc.AtakBroadcast;
 import com.atakmap.android.maps.MapView;
-import com.atakmap.android.mast.MastDetailHandler;
 import com.atakmap.android.mast.MastPane;
-import com.atakmap.android.mast.Mission;
-import com.atakmap.android.mast.feed.FeedPublisher;
+import com.atakmap.android.mast.Missions;
 import com.atakmap.coremap.log.Log;
 
 import gov.tak.api.plugin.IPlugin;
@@ -24,11 +19,15 @@ import gov.tak.platform.marshal.MarshalManager;
 
 /**
  * MAST, Mission Adaptable Support Tools: pick the mission, open its plugins. One
- * toolbar button, one pane. See PLAN-MAST-v0.1 in the notes repo.
+ * toolbar button, one pane: the front door to the mission plugins. See
+ * PLAN-MAST-v0.1 in the notes repo.
  */
 public class MAST implements IPlugin {
 
     private static final String TAG = "MAST";
+
+    /** Opens the pane; a system receiver, so adb reaches it too (Atmosphere's way). */
+    public static final String SHOW_ACTION = "com.atakmap.android.mast.SHOW";
 
     IServiceController serviceController;
     Context pluginContext;
@@ -36,19 +35,7 @@ public class MAST implements IPlugin {
     ToolbarItem toolbarItem;
     private MapView mapView;
     private MastPane pane;
-    private FeedPublisher feeds;
-    private MastDetailHandler detailHandler;
-
-    /** Every save of an item MAST put in a feed is re-sent to it: a drag, a rename, a count. */
-    private final MapEventDispatcher.MapEventDispatchListener persisted =
-            new MapEventDispatcher.MapEventDispatchListener() {
-                @Override
-                public void onMapEvent(MapEvent event) {
-                    MapItem item = event.getItem();
-                    if (feeds != null && item != null && feeds.isLive(item))
-                        feeds.onPersisted(item);
-                }
-            };
+    private android.content.BroadcastReceiver showReceiver;
 
     public MAST(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -88,20 +75,30 @@ public class MAST implements IPlugin {
             Log.w(TAG, "no MapView; MAST not started");
             return;
         }
-        detailHandler = new MastDetailHandler();
-        CotDetailManager.getInstance().registerHandler(detailHandler);
-        feeds = new FeedPublisher(mapView, pluginContext);
-        mapView.getMapEventDispatcher().addMapEventListener(MapEvent.ITEM_PERSIST, persisted);
-        pane = new MastPane(mapView, pluginContext, feeds);
+        pane = new MastPane(mapView, pluginContext);
         try {
-            pane.setMission(Mission.load(pluginContext, "missions/active_shooter.json"));
+            pane.setMissions(Missions.load(pluginContext, "missions.json"));
         } catch (Exception e) {
-            Log.e(TAG, "mission load failed", e);
+            Log.e(TAG, "missions load failed", e);
             Toast.makeText(mapView.getContext(),
                     pluginContext.getString(R.string.mission_load_failed, e.getMessage()),
                     Toast.LENGTH_LONG).show();
         }
         uiService.addToolbarItem(toolbarItem);
+        showReceiver = new android.content.BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, android.content.Intent intent) {
+                if (pane != null)
+                    pane.show();
+            }
+        };
+        try {
+            AtakBroadcast.getInstance().registerSystemReceiver(showReceiver,
+                    new AtakBroadcast.DocumentedIntentFilter(SHOW_ACTION, "Open the MAST pane"));
+        } catch (RuntimeException e) {
+            Log.w(TAG, "show receiver", e);
+            showReceiver = null;
+        }
     }
 
     @Override
@@ -109,19 +106,17 @@ public class MAST implements IPlugin {
         if (uiService == null)
             return;
         uiService.removeToolbarItem(toolbarItem);
+        if (showReceiver != null) {
+            try {
+                AtakBroadcast.getInstance().unregisterSystemReceiver(showReceiver);
+            } catch (RuntimeException e) {
+                Log.w(TAG, "show receiver was not registered", e);
+            }
+            showReceiver = null;
+        }
         if (pane != null) {
             pane.dispose();
             pane = null;
-        }
-        if (mapView != null)
-            mapView.getMapEventDispatcher().removeMapEventListener(MapEvent.ITEM_PERSIST, persisted);
-        if (feeds != null) {
-            feeds.dispose();
-            feeds = null;
-        }
-        if (detailHandler != null) {
-            CotDetailManager.getInstance().unregisterHandler(detailHandler);
-            detailHandler = null;
         }
     }
 }
