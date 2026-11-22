@@ -5,17 +5,14 @@
       "id": "wildfire",
       "name": "Wildfire",
       "plugins": [
-        { "name": "FOBS",          "pkg": "com.atakmap.android.fobs.plugin" },
-        { "name": "FireCast",      "pkg": "com.atakmap.android.firecast.plugin" },
-        { "name": "Atmosphere",    "pkg": "com.atakmap.android.atmosphere.plugin" },
-        { "name": "AirAware",      "pkg": "com.atakmap.android.airaware.plugin" },
-        { "name": "Evac Zone",     "pkg": "com.atakmap.android.evaczone.plugin" },
-        { "name": "Feature Layer", "pkg": "com.atakmap.android.featurelayer.plugin" },
-        { "name": "LCES",          "pkg": "com.atakmap.android.lces.plugin" },
         { "name": "IWI",           "pkg": "com.atakmap.android.iwi.plugin" },
-        { "name": "Dozer Country", "pkg": "com.atakmap.android.dozercountry.plugin" },
-        { "name": "Map Depot",     "pkg": "com.atakmap.android.mapdepot.plugin" },
+        { "name": "FOBS",          "pkg": "com.atakmap.android.fobs.plugin" },
+        { "name": "Atmosphere",    "pkg": "com.atakmap.android.atmosphere.plugin" },
         { "name": "Cam Depot",     "pkg": "com.atakmap.android.camdepot.plugin" },
+        { "name": "Feature Layer", "pkg": "com.atakmap.android.featurelayer.plugin" },
+        { "name": "Evac Zone",     "pkg": "com.atakmap.android.evaczone.plugin" },
+        { "name": "AirAware",      "pkg": "com.atakmap.android.airaware.plugin" },
+        { "name": "Map Depot",     "pkg": "com.atakmap.android.mapdepot.plugin" },
         { "name": "Sit Rep",       "pkg": "com.atakmap.android.sitrep.plugin" }
       ]
     },
