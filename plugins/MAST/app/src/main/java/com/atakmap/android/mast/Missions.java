@@ -15,7 +15,8 @@ import java.util.List;
  * The missions MAST offers and the plugins each one opens, read from
  * {@code assets/missions.json} at plugin start. A mission is data, not code, so the
  * operator's edits to a list, and later an agency's own mission (with its own layer
- * tags), are a file change (PLAN-MAST-v0.1, direction change 2026-11-22).
+ * tags), are a file change (PLAN-MAST-v0.1, direction change 2026-11-22). An
+ * optional {@code tools} list names ATAK's own tools shown above the plugins.
  */
 public final class Missions {
 
@@ -35,11 +36,17 @@ public final class Missions {
         public final String id;
         public final String name;
         public final List<Plugin> plugins;
+        /**
+         * ATAK's own tools for this mission, each named by its item file in atak.apk
+         * ({@code assets/actionbar/items/redx.xml}); see {@link AtakTools}.
+         */
+        public final List<String> tools;
 
-        Mission(String id, String name, List<Plugin> plugins) {
+        Mission(String id, String name, List<Plugin> plugins, List<String> tools) {
             this.id = id;
             this.name = name;
             this.plugins = Collections.unmodifiableList(plugins);
+            this.tools = Collections.unmodifiableList(tools);
         }
     }
 
@@ -62,7 +69,12 @@ public final class Missions {
                 final JSONObject p = ps.getJSONObject(j);
                 plugins.add(new Plugin(p.getString("name"), p.getString("pkg")));
             }
-            out.add(new Mission(m.getString("id"), m.getString("name"), plugins));
+            final JSONArray ts = m.optJSONArray("tools");
+            final List<String> tools = new ArrayList<>();
+            if (ts != null)
+                for (int j = 0; j < ts.length(); j++)
+                    tools.add(ts.getString(j));
+            out.add(new Mission(m.getString("id"), m.getString("name"), plugins, tools));
         }
         return Collections.unmodifiableList(out);
     }

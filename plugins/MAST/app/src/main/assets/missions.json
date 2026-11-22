@@ -4,6 +4,7 @@
     {
       "id": "wildfire",
       "name": "Wildfire",
+      "tools": ["rangeandbearing.xml", "routes.xml", "firetools.xml", "redx.xml"],
       "plugins": [
         { "name": "IWI",           "pkg": "com.atakmap.android.iwi.plugin" },
         { "name": "FOBS",          "pkg": "com.atakmap.android.fobs.plugin" },

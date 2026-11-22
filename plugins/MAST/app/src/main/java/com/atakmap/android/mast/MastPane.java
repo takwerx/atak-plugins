@@ -101,8 +101,23 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
         }
         picking = false;
         missionBtn.setText(plugin.getString(R.string.mission_current, m.name));
-        section.setText(plugin.getString(R.string.section_plugins, m.name));
         tiles.removeAllViews();
+        final String pluginsHeading = plugin.getString(R.string.section_plugins, m.name);
+        boolean anyTool = false;
+        for (final String file : m.tools) {
+            final AtakTools.Tool t = AtakTools.load(host, file);
+            if (t == null)
+                continue;
+            anyTool = true;
+            addTile(toolTile(t));
+        }
+        if (anyTool) {
+            section.setText(R.string.section_tools);
+            padLastRow();
+            addHeading(pluginsHeading);
+        } else {
+            section.setText(pluginsHeading);
+        }
         for (final Missions.Plugin p : m.plugins)
             addTile(pluginTile(p));
         padLastRow();
@@ -174,6 +189,36 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
         return b;
     }
 
+    /** An ATAK tool: closes MAST and sends the broadcast ATAK's own menu item sends. */
+    private Button toolTile(final AtakTools.Tool t) {
+        final Button b = tile(t.title);
+        if (t.icon != null) {
+            final int size = dp(48);
+            t.icon.setBounds(0, 0, size, size);
+            b.setCompoundDrawables(null, t.icon, null, null);
+        }
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                closeDropDown();
+                try {
+                    AtakBroadcast.getInstance().sendBroadcast(t.intent());
+                } catch (RuntimeException e) {
+                    Log.w(TAG, "could not start ATAK tool " + t.file, e);
+                }
+            }
+        });
+        return b;
+    }
+
+    /** A second section heading inside the tile list, the same style as the first. */
+    private void addHeading(String text) {
+        final TextView h = new TextView(plugin, null, 0, R.style.TakwerxSectionHeading);
+        h.setText(text);
+        tiles.addView(h, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+    }
+
     private Button tile(String label) {
         final Button b = new Button(plugin, null, 0, R.style.MastTile);
         b.setText(label);
@@ -181,8 +226,10 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
     }
 
     private void addTile(Button b) {
-        LinearLayout row = tiles.getChildCount() == 0 ? null
-                : (LinearLayout) tiles.getChildAt(tiles.getChildCount() - 1);
+        // The last child is a row of tiles, or a heading that starts a new section.
+        final View last = tiles.getChildCount() == 0 ? null
+                : tiles.getChildAt(tiles.getChildCount() - 1);
+        LinearLayout row = last instanceof LinearLayout ? (LinearLayout) last : null;
         if (row == null || row.getChildCount() == 3) {
             row = new LinearLayout(plugin);
             row.setOrientation(LinearLayout.HORIZONTAL);
@@ -190,7 +237,7 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
             row.setBaselineAligned(false);
             final LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            rp.topMargin = tiles.getChildCount() == 0 ? 0 : dp(6);
+            rp.topMargin = last instanceof LinearLayout ? dp(6) : 0;
             tiles.addView(row, rp);
         }
         final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(120), 1f);
@@ -200,9 +247,11 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
 
     /** Pad the last row so its tiles keep the width of a full row. */
     private void padLastRow() {
-        if (tiles.getChildCount() == 0)
+        final View last = tiles.getChildCount() == 0 ? null
+                : tiles.getChildAt(tiles.getChildCount() - 1);
+        if (!(last instanceof LinearLayout))
             return;
-        final LinearLayout row = (LinearLayout) tiles.getChildAt(tiles.getChildCount() - 1);
+        final LinearLayout row = (LinearLayout) last;
         while (row.getChildCount() < 3) {
             final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, 1, 1f);
             lp.setMarginEnd(dp(6));
