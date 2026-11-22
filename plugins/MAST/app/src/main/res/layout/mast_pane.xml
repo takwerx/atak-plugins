@@ -17,6 +17,33 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
 
+    <!-- On a mission page: which tiles show, ATAK's own tools or the mission's
+         plugins. Hidden on the picker and on a mission with no tools. -->
+    <LinearLayout
+        android:id="@+id/mast_view_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/mast_show_tools"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:text="@string/view_tools" />
+
+        <Button
+            android:id="@+id/mast_show_plugins"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/view_plugins" />
+    </LinearLayout>
+
     <ScrollView
         android:id="@+id/mast_scroll"
         android:layout_width="match_parent"

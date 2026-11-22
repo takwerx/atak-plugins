@@ -22,6 +22,7 @@ import com.atakmap.android.maps.MapView;
 import com.atakmap.android.mast.plugin.R;
 import com.atakmap.coremap.log.Log;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -44,6 +45,10 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
 
     private static final String TAG = "MAST.Pane";
     private static final String PREF_MISSION = "mast_mission";
+    /** Which tiles a mission page shows; remembered like the mission. */
+    private static final String PREF_VIEW = "mast_view";
+    private static final String VIEW_TOOLS = "tools";
+    private static final String VIEW_PLUGINS = "plugins";
     private static final String MARKET_PKG = "com.atakmap.android.takwerxmarket.plugin";
 
     private final Context plugin;
@@ -54,6 +59,9 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
     private final ScrollView scroll;
     private final TextView section;
     private final LinearLayout tiles;
+    private final View viewRow;
+    private final Button showToolsBtn;
+    private final Button showPluginsBtn;
     private List<Missions.Mission> missions;
     private boolean picking;
 
@@ -68,10 +76,27 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
         scroll = root.findViewById(R.id.mast_scroll);
         section = root.findViewById(R.id.mast_section);
         tiles = root.findViewById(R.id.mast_tiles);
+        viewRow = root.findViewById(R.id.mast_view_row);
+        showToolsBtn = root.findViewById(R.id.mast_show_tools);
+        showPluginsBtn = root.findViewById(R.id.mast_show_plugins);
         missionBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 showPicker();
+            }
+        });
+        showToolsBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                prefs.edit().putString(PREF_VIEW, VIEW_TOOLS).apply();
+                showCurrent();
+            }
+        });
+        showPluginsBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                prefs.edit().putString(PREF_VIEW, VIEW_PLUGINS).apply();
+                showCurrent();
             }
         });
     }
@@ -102,30 +127,34 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
         picking = false;
         missionBtn.setText(plugin.getString(R.string.mission_current, m.name));
         tiles.removeAllViews();
-        final String pluginsHeading = plugin.getString(R.string.section_plugins, m.name);
-        boolean anyTool = false;
+        final List<AtakTools.Tool> tools = new ArrayList<>();
         for (final String file : m.tools) {
             final AtakTools.Tool t = AtakTools.load(host, file);
-            if (t == null)
-                continue;
-            anyTool = true;
-            addTile(toolTile(t));
+            if (t != null)
+                tools.add(t);
         }
-        if (anyTool) {
-            section.setText(R.string.section_tools);
-            padLastRow();
-            addHeading(pluginsHeading);
+        // A mission with no tools has nothing to choose between: plugins, no row.
+        viewRow.setVisibility(tools.isEmpty() ? View.GONE : View.VISIBLE);
+        final boolean showTools = !tools.isEmpty()
+                && VIEW_TOOLS.equals(prefs.getString(PREF_VIEW, VIEW_PLUGINS));
+        showToolsBtn.setSelected(showTools);
+        showPluginsBtn.setSelected(!showTools);
+        if (showTools) {
+            section.setText(plugin.getString(R.string.section_tools, m.name));
+            for (final AtakTools.Tool t : tools)
+                addTile(toolTile(t));
         } else {
-            section.setText(pluginsHeading);
+            section.setText(plugin.getString(R.string.section_plugins, m.name));
+            for (final Missions.Plugin p : m.plugins)
+                addTile(pluginTile(p));
         }
-        for (final Missions.Plugin p : m.plugins)
-            addTile(pluginTile(p));
         padLastRow();
         toTop();
     }
 
     private void showPicker() {
         picking = true;
+        viewRow.setVisibility(View.GONE);
         final Missions.Mission m = current();
         missionBtn.setText(m == null ? plugin.getString(R.string.mission_none)
                 : plugin.getString(R.string.mission_current, m.name));
@@ -209,14 +238,6 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
             }
         });
         return b;
-    }
-
-    /** A second section heading inside the tile list, the same style as the first. */
-    private void addHeading(String text) {
-        final TextView h = new TextView(plugin, null, 0, R.style.TakwerxSectionHeading);
-        h.setText(text);
-        tiles.addView(h, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
     }
 
     private Button tile(String label) {

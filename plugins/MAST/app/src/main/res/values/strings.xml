@@ -9,7 +9,9 @@
     <string name="mission_none">Pick a mission</string>
     <string name="section_plugins">%s plugins</string>
     <string name="section_pick">Pick a mission</string>
-    <string name="section_tools">ATAK tools</string>
+    <string name="section_tools">%s ATAK tools</string>
+    <string name="view_tools">ATAK Tools</string>
+    <string name="view_plugins">Plugins</string>
     <string name="plugin_not_installed">%s\nNot installed</string>
     <string name="plugin_missing">%s is not on this device. Get it from the TAKwerx Market.</string>
     <string name="open_market">Open Market</string>
