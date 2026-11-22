@@ -124,7 +124,11 @@ band in view carries a pill in the band's color naming it, so the key is on the
 map. It has a transparency slider, works anywhere on the globe, and asks the
 operator once, by name, before it touches nomads.ncep.noaa.gov. Contributed by
 Eric Muehlstein (takwerx/atmosphere#8, #9). Every raster layer (radar, rain,
-temperature) now drapes on the globe and stops at the horizon.
+temperature) now drapes on the globe and stops at the horizon. It also adds a
+Clouds layer next to Smoke (all cloud, or the low, middle or high deck, hour by
+hour on the time strip, with the percent "Here"), and low, mid and high cloud in
+the point forecast when the source is Open-Meteo. Wind no longer asks NOAA for
+the same wind again on every settled map move.
 0.24, for ATAK-CIV 5.6, 5.7 and 5.8: the Forecast page has a Show light
 button under the hourly table. It opens a bar of the day's light from midnight
 to midnight (night, the three twilights and day, the hours the moon is up, and
