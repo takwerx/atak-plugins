@@ -81,10 +81,12 @@ import com.atakmap.android.atmosphere.overlay.WaveOverlay;
 import com.atakmap.android.atmosphere.overlay.RainOverlay;
 import com.atakmap.android.atmosphere.waves.NomadsWaves;
 import com.atakmap.android.atmosphere.rain.NomadsRain;
+import com.atakmap.android.atmosphere.overlay.CloudOverlay;
 import com.atakmap.android.atmosphere.overlay.SmokeOverlay;
 import com.atakmap.android.atmosphere.overlay.TropicalOverlay;
 import com.atakmap.android.atmosphere.overlay.WindScaleView;
 import com.atakmap.android.atmosphere.overlay.WindOverlay;
+import com.atakmap.android.atmosphere.cloud.NomadsCloud;
 import com.atakmap.android.atmosphere.smoke.NomadsSmoke;
 import com.atakmap.android.atmosphere.wind.NomadsWind;
 import com.atakmap.android.atmosphere.plugin.R;
@@ -155,6 +157,7 @@ public final class AtmospherePane {
     private RainOverlay rain;
     private int rainHours;
     private static final String PREF_SMOKE_OPEN = "weather.smoke.open";
+    private static final String PREF_CLOUD_OPEN = "weather.clouds.open";
     private static final String PREF_AIR_OPEN = "weather.air.open";
     private static final String PREF_STATIONS_OPEN = "weather.layers.stations.open";
     private static final String PREF_GAUGES_OPEN = "weather.layers.gauges.open";
@@ -522,6 +525,15 @@ public final class AtmospherePane {
     private boolean smokeOpen = true;
     private SmokeOverlay smoke;
     private int smokeHours;
+    private final Button cloudToggle;
+    private final ImageButton cloudExpand;
+    private final LinearLayout cloudSettings;
+    private final WindScaleView cloudScale;
+    private final TextView cloudReading;
+    private final LinearLayout cloudLayerRow;
+    private boolean cloudOpen = true;
+    private CloudOverlay clouds;
+    private int cloudHours;
     private final Button airToggle;
     private final ImageButton airExpand;
     private final LinearLayout airSettings;
@@ -1131,6 +1143,14 @@ public final class AtmospherePane {
         smokeReading = find(R.id.smoke_reading);
         smokeHeightRow = find(R.id.smoke_height_row);
         buildSmokeHeightRow();
+        cloudToggle = find(R.id.cloud_toggle);
+        cloudExpand = find(R.id.cloud_expand);
+        cloudSettings = find(R.id.cloud_settings);
+        cloudScale = new WindScaleView(pluginContext);
+        ((LinearLayout) find(R.id.cloud_scale_host)).addView(cloudScale);
+        cloudReading = find(R.id.cloud_reading);
+        cloudLayerRow = find(R.id.cloud_layer_row);
+        buildCloudLayerRow();
         airToggle = find(R.id.air_toggle);
         airExpand = find(R.id.air_expand);
         airSettings = find(R.id.air_settings);
@@ -1495,6 +1515,7 @@ public final class AtmospherePane {
         wavesOpen = prefs == null || prefs.getBoolean(PREF_WAVES_OPEN, true);
         rainOpen = prefs == null || prefs.getBoolean(PREF_RAIN_OPEN, true);
         smokeOpen = prefs == null || prefs.getBoolean(PREF_SMOKE_OPEN, true);
+        cloudOpen = prefs == null || prefs.getBoolean(PREF_CLOUD_OPEN, true);
         airOpen = prefs == null || prefs.getBoolean(PREF_AIR_OPEN, true);
         spotOpen = prefs == null || prefs.getBoolean(PREF_SPOT_OPEN, true);
         stationsOpen = prefs == null || prefs.getBoolean(PREF_STATIONS_OPEN, true);
@@ -1681,6 +1702,14 @@ public final class AtmospherePane {
             public void onClick(View v) {
                 smokeOpen = !smokeOpen;
                 rememberFold(PREF_SMOKE_OPEN, smokeOpen);
+                updateLayerControls();
+            }
+        });
+        cloudExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                cloudOpen = !cloudOpen;
+                rememberFold(PREF_CLOUD_OPEN, cloudOpen);
                 updateLayerControls();
             }
         });
@@ -2195,6 +2224,54 @@ public final class AtmospherePane {
                                 windLabel(smoke.hourIndex(), smoke.validTime(smoke.hourIndex())));
                 }
                 updateSmokeReading();
+            }
+        });
+        updateLayerControls();
+    }
+
+    /**
+     * The cloud overlay, owned by the plugin. A forecast from the same GFS runs as the
+     * wind, so it shares the strip and the wind's way of naming an hour.
+     */
+    public void setClouds(CloudOverlay overlay) {
+        clouds = overlay;
+        if (clouds == null)
+            return;
+        clouds.setListener(new CloudOverlay.Listener() {
+            @Override
+            public void onFrames(List<String> labels, int shown) {
+                cloudHours = Math.max(0, labels.size() - 1);
+                if (stripLayer() == TimeLayer.CLOUDS) {
+                    setWhenTimes(cloudTimes(), shown, 0);
+                    stripShowing = TimeLayer.CLOUDS;
+                }
+                updateLayerControls();
+            }
+
+            @Override
+            public void onFrameShown(int index, long validTime) {
+                if (!clouds.isOn())
+                    return;
+                if (stripLayer() == TimeLayer.CLOUDS) {
+                    showWhen(index);
+                    scrubberLabel.setText(windLabel(index, validTime));
+                }
+                // A new hour is a new picture, so the number at the point moves too.
+                updateCloudReading();
+            }
+
+            @Override
+            public void onStatus(String status) {
+                if (!clouds.isOn())
+                    return;
+                if (stripLayer() == TimeLayer.CLOUDS) {
+                    if (!status.isEmpty())
+                        scrubberLabel.setText(status);
+                    else
+                        scrubberLabel.setText(windLabel(clouds.hourIndex(),
+                                clouds.validTime(clouds.hourIndex())));
+                }
+                updateCloudReading();
             }
         });
         updateLayerControls();
@@ -3777,6 +3854,21 @@ public final class AtmospherePane {
                 }
             }
         });
+        cloudToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (clouds == null)
+                    return;
+                if (clouds.isOn()) {
+                    clouds.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(CloudOverlay.LAYER_ID)) {
+                    turnCloudsOn();
+                } else {
+                    askToAllowClouds();
+                }
+            }
+        });
         radarToggle.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -3923,6 +4015,15 @@ public final class AtmospherePane {
         if (smoke != null)
             for (int i = 0; i <= smokeHours; i++)
                 out.add(smoke.validTime(i));
+        return out;
+    }
+
+    /** The clouds' forecast hours as wall-clock times, index for index. */
+    private List<Long> cloudTimes() {
+        final List<Long> out = new ArrayList<>();
+        if (clouds != null)
+            for (int i = 0; i <= cloudHours; i++)
+                out.add(clouds.validTime(i));
         return out;
     }
 
@@ -4160,7 +4261,7 @@ public final class AtmospherePane {
     }
 
     /** The layers that share the one time strip. */
-    private enum TimeLayer { RADAR, WIND, SMOKE, WAVES, RAIN }
+    private enum TimeLayer { RADAR, WIND, SMOKE, CLOUDS, WAVES, RAIN }
 
     /** The time layer switched on last: the strip is its, while it is on. */
     private TimeLayer stripOwner;
@@ -4175,6 +4276,8 @@ public final class AtmospherePane {
                 return wind != null && wind.isOn();
             case SMOKE:
                 return smoke != null && smoke.isOn();
+            case CLOUDS:
+                return clouds != null && clouds.isOn();
             case WAVES:
                 return waves != null && waves.isOn();
             default:
@@ -4190,7 +4293,7 @@ public final class AtmospherePane {
     private TimeLayer stripLayer() {
         if (stripOwner != null && timeLayerOn(stripOwner))
             return stripOwner;
-        for (TimeLayer t : new TimeLayer[] { TimeLayer.WIND, TimeLayer.SMOKE, TimeLayer.WAVES,
+        for (TimeLayer t : new TimeLayer[] { TimeLayer.WIND, TimeLayer.SMOKE, TimeLayer.CLOUDS, TimeLayer.WAVES,
                 TimeLayer.RAIN, TimeLayer.RADAR })
             if (timeLayerOn(t))
                 return t;
@@ -4209,6 +4312,8 @@ public final class AtmospherePane {
             setWhenTimes(windTimes(), wind.hourIndex(), 0);
         else if (owner == TimeLayer.SMOKE)
             setWhenTimes(smokeTimes(), smoke.hourIndex(), 0);
+        else if (owner == TimeLayer.CLOUDS)
+            setWhenTimes(cloudTimes(), clouds.hourIndex(), 0);
         else if (owner == TimeLayer.WAVES)
             setWhenTimes(wavesTimes(), waves.hourIndex(), 0);
         else if (owner == TimeLayer.RAIN)
@@ -4231,6 +4336,9 @@ public final class AtmospherePane {
             scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
         } else if (owner == TimeLayer.SMOKE) {
             smoke.setHourIndex(index);
+            scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
+        } else if (owner == TimeLayer.CLOUDS) {
+            clouds.setHourIndex(index);
             scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
         } else if (owner == TimeLayer.WAVES) {
             waves.setHourIndex(index);
@@ -4963,6 +5071,10 @@ public final class AtmospherePane {
         if (smoke != null && (!on || allowed(SmokeOverlay.LAYER_ID)))
             smoke.setOn(on);
         else if (smoke != null && on)
+            blocked++;
+        if (clouds != null && (!on || allowed(CloudOverlay.LAYER_ID)))
+            clouds.setOn(on);
+        else if (clouds != null && on)
             blocked++;
         if (air != null && (!on || allowed(AirQualityOverlay.LAYER_ID)))
             air.setOn(on);
@@ -5826,6 +5938,8 @@ public final class AtmospherePane {
     private void turnRadarOn() {
         if (smoke != null && smoke.isOn())
             smoke.setOn(false);
+        if (clouds != null && clouds.isOn())
+            clouds.setOn(false);
         if (waves != null && waves.isOn())
             waves.setOn(false);
         if (rain != null && rain.isOn())
@@ -5843,6 +5957,8 @@ public final class AtmospherePane {
     private void turnWindOn() {
         if (smoke != null && smoke.isOn())
             smoke.setOn(false);
+        if (clouds != null && clouds.isOn())
+            clouds.setOn(false);
         if (waves != null && waves.isOn())
             waves.setOn(false);
         if (rain != null && rain.isOn())
@@ -5858,6 +5974,8 @@ public final class AtmospherePane {
 
     /** One at a time with every time layer, Radar and Wind included (see {@link #turnRadarOn}). */
     private void turnSmokeOn() {
+        if (clouds != null && clouds.isOn())
+            clouds.setOn(false);
         if (radar != null && radar.isOn())
             radar.setOn(false);
         if (wind != null && wind.isOn())
@@ -5875,6 +5993,8 @@ public final class AtmospherePane {
 
     /** One at a time with every time layer, Radar and Wind included (see {@link #turnRadarOn}). */
     private void turnWavesOn() {
+        if (clouds != null && clouds.isOn())
+            clouds.setOn(false);
         if (radar != null && radar.isOn())
             radar.setOn(false);
         if (wind != null && wind.isOn())
@@ -5892,6 +6012,8 @@ public final class AtmospherePane {
 
     /** One at a time with every time layer, Radar and Wind included (see {@link #turnRadarOn}). */
     private void turnRainOn() {
+        if (clouds != null && clouds.isOn())
+            clouds.setOn(false);
         if (radar != null && radar.isOn())
             radar.setOn(false);
         if (wind != null && wind.isOn())
@@ -5903,6 +6025,25 @@ public final class AtmospherePane {
         if (rain != null) {
             rain.setOn(true);
             stripOwner = TimeLayer.RAIN;
+        }
+        updateLayerControls();
+    }
+
+    /** One at a time with every time layer, Radar and Wind included (see {@link #turnRadarOn}). */
+    private void turnCloudsOn() {
+        if (radar != null && radar.isOn())
+            radar.setOn(false);
+        if (wind != null && wind.isOn())
+            wind.setOn(false);
+        if (smoke != null && smoke.isOn())
+            smoke.setOn(false);
+        if (waves != null && waves.isOn())
+            waves.setOn(false);
+        if (rain != null && rain.isOn())
+            rain.setOn(false);
+        if (clouds != null) {
+            clouds.setOn(true);
+            stripOwner = TimeLayer.CLOUDS;
         }
         updateLayerControls();
     }
@@ -6510,6 +6651,25 @@ public final class AtmospherePane {
                 .show();
     }
 
+    private void askToAllowClouds() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.cloud_allow_title))
+                .setMessage(pluginContext.getString(R.string.cloud_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(CloudOverlay.LAYER_ID, true);
+                                turnCloudsOn();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
     private void askToAllowWind() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
@@ -6869,6 +7029,18 @@ public final class AtmospherePane {
             updateSmokeHeightRow();
             updateSmokeReading();
         }
+        final boolean cloudOn = clouds != null && clouds.isOn();
+        cloudToggle.setText(cloudOn ? R.string.cloud_on : R.string.cloud_off);
+        cloudToggle.setTextColor(pluginContext.getResources().getColor(
+                cloudOn ? R.color.state_on : R.color.state_off));
+        cloudExpand.setVisibility(cloudOn ? View.VISIBLE : View.GONE);
+        cloudExpand.setRotation(cloudOpen ? 180f : 0f);
+        cloudSettings.setVisibility(cloudOn && cloudOpen ? View.VISIBLE : View.GONE);
+        if (cloudOn) {
+            updateCloudScale();
+            updateCloudLayerRow();
+            updateCloudReading();
+        }
         final boolean wavesOn = waves != null && waves.isOn();
         wavesToggle.setText(wavesOn ? R.string.waves_on : R.string.waves_off);
         wavesToggle.setTextColor(pluginContext.getResources().getColor(
@@ -7199,13 +7371,15 @@ public final class AtmospherePane {
             hostScrubberIn(windSettings);
         else if (owner == TimeLayer.SMOKE)
             hostScrubberIn(smokeSettings);
+        else if (owner == TimeLayer.CLOUDS)
+            hostScrubberIn(cloudSettings);
         else if (owner == TimeLayer.WAVES)
             hostScrubberIn(wavesSettings);
         else if (owner == TimeLayer.RAIN)
             hostScrubberIn(rainSettings);
         else if (owner == TimeLayer.RADAR)
             hostScrubberIn(radarSettings);
-        scrubber.setVisibility(radarOn || windOn || smokeOn || wavesOn || rainOn ? View.VISIBLE : View.GONE);
+        scrubber.setVisibility(radarOn || windOn || smokeOn || cloudOn || wavesOn || rainOn ? View.VISIBLE : View.GONE);
         creditTheLayers(radarOn, windOn);
         applyGroupFolds();
         syncPageSwitches();
@@ -7249,6 +7423,11 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_smoke, SmokeOverlay.HOST));
+        }
+        if (clouds != null && clouds.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_cloud, CloudOverlay.HOST));
         }
         if (waves != null && waves.isOn()) {
             if (out.length() > 0)
@@ -7808,6 +7987,81 @@ public final class AtmospherePane {
                     : line + "\n" + pluginContext.getString(R.string.smoke_cropped);
         smokeReading.setText(line);
     }
+    /**
+     * The four things the model says about cloud, as four presets side by side: all of
+     * it, and the low, middle and high decks (what a crew sees from the ground, what an
+     * aircraft flies through, and what streaks the sky far above).
+     */
+    private void buildCloudLayerRow() {
+        for (final NomadsCloud.Layer l : NomadsCloud.Layer.values()) {
+            final Button b = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, cloudLayerRow, false);
+            b.setText(l == NomadsCloud.Layer.TOTAL ? R.string.cloud_total
+                    : l == NomadsCloud.Layer.LOW ? R.string.cloud_low
+                    : l == NomadsCloud.Layer.MID ? R.string.cloud_mid : R.string.cloud_high);
+            b.setTextSize(13);
+            b.setTag(l);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (clouds == null)
+                        return;
+                    clouds.setLayer(l);
+                    updateCloudLayerRow();
+                    updateCloudScale();
+                    updateCloudReading();
+                }
+            });
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = dp(4);
+            lp.topMargin = dp(4);
+            b.setLayoutParams(lp);
+            cloudLayerRow.addView(b);
+        }
+    }
+
+    private void updateCloudLayerRow() {
+        final NomadsCloud.Layer picked = clouds == null ? null : clouds.layer();
+        for (int i = 0; i < cloudLayerRow.getChildCount(); i++) {
+            final View cell = cloudLayerRow.getChildAt(i);
+            if (cell instanceof Button)
+                ((Button) cell).setTextColor(cell.getTag() == picked
+                        ? pluginContext.getResources().getColor(R.color.state_on)
+                        : Color.WHITE);
+        }
+    }
+
+    /** The legend for the clouds on the map: percent of the sky covered, white to gray. */
+    private void updateCloudScale() {
+        final NomadsCloud.Layer l = clouds == null ? NomadsCloud.Layer.TOTAL : clouds.layer();
+        cloudScale.setBands(l.legendColors(), l.legendBreaks(), l.unit());
+        cloudScale.setEnds(null, null);
+    }
+
+    /** The cloud cover at the pane's own point, read out of the picture already on the map. */
+    private void updateCloudReading() {
+        if (clouds == null || !clouds.isOn()) {
+            cloudReading.setText(R.string.empty);
+            return;
+        }
+        final GeoPoint p = point();
+        final NomadsCloud.Layer l = clouds.layer();
+        final float v = p == null ? Float.NaN
+                : clouds.readingAt(p.getLatitude(), p.getLongitude());
+        String line;
+        if (p == null)
+            line = "";
+        else if (Float.isNaN(v))
+            line = pluginContext.getString(R.string.wind_here_unknown);
+        else
+            line = pluginContext.getString(R.string.cloud_here, Math.round(v), l.words(v));
+        if (clouds.isCropped())
+            line = line.isEmpty() ? pluginContext.getString(R.string.cloud_cropped)
+                    : line + "\n" + pluginContext.getString(R.string.cloud_cropped);
+        cloudReading.setText(line);
+    }
+
     /** The legend's numbers follow the operator's unit, like every other speed. */
     private void updateWindScale() {
         final float[] breaks = new float[WindScaleView.bandCount() - 1];
@@ -8071,6 +8325,8 @@ public final class AtmospherePane {
             updateRainReading();
         if (smoke != null && smoke.isOn())
             updateSmokeReading();
+        if (clouds != null && clouds.isOn())
+            updateCloudReading();
         if (air != null && air.isOn())
             updateAirReading();
     }

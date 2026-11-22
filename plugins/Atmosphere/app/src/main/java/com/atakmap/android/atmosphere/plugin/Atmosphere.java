@@ -46,6 +46,7 @@ import com.atakmap.android.atmosphere.overlay.RainTotalsOverlay;
 import com.atakmap.android.atmosphere.overlay.RainGaugesOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
+import com.atakmap.android.atmosphere.overlay.CloudOverlay;
 import com.atakmap.android.atmosphere.overlay.SmokeOverlay;
 import com.atakmap.android.atmosphere.overlay.TropicalOverlay;
 import com.atakmap.android.atmosphere.ui.StormDetailsReceiver;
@@ -178,6 +179,7 @@ public class Atmosphere implements IPlugin {
     private StormDetailsReceiver stormDetails;
     private WindOverlay wind;
     private SmokeOverlay smoke;
+    private CloudOverlay clouds;
     private WaveOverlay waves;
     private RainOverlay rain;
     private RainOverlay temperature;
@@ -318,6 +320,8 @@ public class Atmosphere implements IPlugin {
         wind.start();
         smoke = new SmokeOverlay(mapView, egress);
         smoke.start();
+        clouds = new CloudOverlay(mapView, egress);
+        clouds.start();
         waves = new WaveOverlay(mapView, egress);
         waves.start();
         rain = new RainOverlay(mapView, egress);
@@ -466,6 +470,7 @@ public class Atmosphere implements IPlugin {
             atmospherePane.setRadar(radar);
             atmospherePane.setWind(wind);
             atmospherePane.setSmoke(smoke);
+            atmospherePane.setClouds(clouds);
             if (waves != null)
                 atmospherePane.setWaves(waves);
             if (rain != null)
@@ -686,6 +691,10 @@ public class Atmosphere implements IPlugin {
             smoke.stop();
             smoke = null;
         }
+        if (clouds != null) {
+            clouds.stop();
+            clouds = null;
+        }
         if (wind != null) {
             wind.stop();
             wind = null;
@@ -730,6 +739,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setWind(wind);
             if (smoke != null)
                 atmospherePane.setSmoke(smoke);
+            if (clouds != null)
+                atmospherePane.setClouds(clouds);
             if (waves != null)
                 atmospherePane.setWaves(waves);
             if (rain != null)
