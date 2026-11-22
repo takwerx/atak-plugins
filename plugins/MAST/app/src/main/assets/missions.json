@@ -24,11 +24,7 @@
       "name": "Tactical Response",
       "plugins": [
         { "name": "Tactical Response", "pkg": "com.atakmap.android.tacticalresponse.plugin" },
-        { "name": "Map Depot",         "pkg": "com.atakmap.android.mapdepot.plugin" },
-        { "name": "Cam Depot",         "pkg": "com.atakmap.android.camdepot.plugin" },
-        { "name": "Traffic",           "pkg": "com.atakmap.android.traffic.plugin" },
-        { "name": "Comms",             "pkg": "com.atakmap.android.comms.plugin" },
-        { "name": "Sit Rep",           "pkg": "com.atakmap.android.sitrep.plugin" }
+        { "name": "Cam Depot",         "pkg": "com.atakmap.android.camdepot.plugin" }
       ]
     },
     {
