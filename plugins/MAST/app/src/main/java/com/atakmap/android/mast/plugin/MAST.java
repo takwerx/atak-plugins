@@ -23,7 +23,7 @@ import gov.tak.api.ui.ToolbarItemAdapter;
 import gov.tak.platform.marshal.MarshalManager;
 
 /**
- * MAST, Mission Adaptable Survey Tool: pick the mission, get only its tools. One
+ * MAST, Mission Adaptable Support Tools: pick the mission, open its plugins. One
  * toolbar button, one pane. See PLAN-MAST-v0.1 in the notes repo.
  */
 public class MAST implements IPlugin {

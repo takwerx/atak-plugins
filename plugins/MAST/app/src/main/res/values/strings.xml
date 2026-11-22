@@ -3,7 +3,7 @@
     <!-- App -->
     <string name="app_name">MAST</string>
     <!-- description -->
-    <string name="app_desc">Mission Adaptable Survey Tool: pick the mission, get only its tools</string>
+    <string name="app_desc">Mission Adaptable Support Tools: pick the mission, open its plugins</string>
 
     <!-- Pane header -->
     <string name="mission_label">%s</string>
