@@ -1,5 +1,31 @@
 {
   "schema": 2,
+  "names": {
+    "com.atakmap.android.airaware.plugin":         "AirAware",
+    "com.atakmap.android.atmosphere.plugin":       "Atmosphere",
+    "com.atakmap.android.camdepot.plugin":         "Cam Depot",
+    "com.atakmap.android.comms.plugin":            "Comms",
+    "com.atakmap.android.cursorwerx.plugin":       "Cursorwerx",
+    "com.atakmap.android.damageassessment.plugin": "Damage Assessment",
+    "com.atakmap.android.datasync.plugin":         "Data Sync",
+    "com.atakmap.android.dozercountry.plugin":     "Dozer Country",
+    "com.atakmap.android.evaczone.plugin":         "Evac Zone",
+    "com.atakmap.android.featurelayer.plugin":     "Feature Layer",
+    "com.atakmap.android.firecast.plugin":         "FireCast",
+    "com.atakmap.android.fireview.plugin":         "FireView",
+    "com.atakmap.android.fobs.plugin":             "FOBS",
+    "com.atakmap.android.iap.plugin":              "IAP",
+    "com.atakmap.android.ipaws.plugin":            "IPAWS Alerts",
+    "com.atakmap.android.iwi.plugin":              "IWI",
+    "com.atakmap.android.lces.plugin":             "LCES",
+    "com.atakmap.android.mapdepot.plugin":         "Map Depot",
+    "com.atakmap.android.plss.plugin":             "PLSS Grid",
+    "com.atakmap.android.signaldf.plugin":         "Signal DF",
+    "com.atakmap.android.sitrep.plugin":           "Sit Rep",
+    "com.atakmap.android.tacticalresponse.plugin": "Tactical Response",
+    "com.atakmap.android.takwerxmarket.plugin":    "TAKwerx Market",
+    "com.atakmap.android.traffic.plugin":          "Traffic"
+  },
   "missions": [
     {
       "id": "wildfire",

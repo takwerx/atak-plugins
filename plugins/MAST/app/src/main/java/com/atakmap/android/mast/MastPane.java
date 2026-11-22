@@ -2,10 +2,15 @@ package com.atakmap.android.mast;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
 import android.content.SharedPreferences;
 import android.graphics.drawable.Drawable;
 import android.preference.PreferenceManager;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -22,7 +27,12 @@ import com.atakmap.android.maps.MapView;
 import com.atakmap.android.mast.plugin.R;
 import com.atakmap.coremap.log.Log;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -49,6 +59,8 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
     private static final String PREF_VIEW = "mast_view";
     private static final String VIEW_TOOLS = "tools";
     private static final String VIEW_PLUGINS = "plugins";
+    /** TakwerxSectionHeading's cyan. */
+    private static final int MISSION_CYAN = 0xFF00E5FF;
     private static final String MARKET_PKG = "com.atakmap.android.takwerxmarket.plugin";
 
     private final Context plugin;
@@ -125,30 +137,44 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
             return;
         }
         picking = false;
-        missionBtn.setText(plugin.getString(R.string.mission_current, m.name));
+        missionBtn.setText(missionLabel(m));
         tiles.removeAllViews();
-        final List<AtakTools.Tool> tools = new ArrayList<>();
-        for (final String file : m.tools) {
-            final AtakTools.Tool t = AtakTools.load(host, file);
-            if (t != null)
-                tools.add(t);
-        }
-        // A mission with no tools has nothing to choose between: plugins, no row.
-        viewRow.setVisibility(tools.isEmpty() ? View.GONE : View.VISIBLE);
-        final boolean showTools = !tools.isEmpty()
-                && VIEW_TOOLS.equals(prefs.getString(PREF_VIEW, VIEW_PLUGINS));
+        viewRow.setVisibility(View.VISIBLE);
+        final boolean showTools = VIEW_TOOLS.equals(prefs.getString(PREF_VIEW, VIEW_PLUGINS));
         showToolsBtn.setSelected(showTools);
         showPluginsBtn.setSelected(!showTools);
-        if (showTools) {
-            section.setText(plugin.getString(R.string.section_tools, m.name));
-            for (final AtakTools.Tool t : tools)
-                addTile(toolTile(t));
-        } else {
-            section.setText(plugin.getString(R.string.section_plugins, m.name));
-            for (final Missions.Plugin p : m.plugins)
-                addTile(pluginTile(p));
+        final String view = showTools ? VIEW_TOOLS : VIEW_PLUGINS;
+        final List<String> ids = page(m, view);
+        section.setText(plugin.getString(showTools ? R.string.section_tools
+                : R.string.section_plugins, m.name));
+        for (int i = 0; i < ids.size(); i++) {
+            final String id = ids.get(i);
+            final Button b;
+            if (showTools) {
+                final AtakTools.Tool t = AtakTools.load(host, id);
+                if (t == null)
+                    continue; // this ATAK has no such tool
+                b = toolTile(t);
+            } else {
+                b = pluginTile(new Missions.Plugin(pluginName(id), id));
+            }
+            final int at = i;
+            b.setOnLongClickListener(new View.OnLongClickListener() {
+                @Override
+                public boolean onLongClick(View v) {
+                    editTile(m, view, at);
+                    return true;
+                }
+            });
+            addTile(tiles, b);
         }
-        padLastRow();
+        // Blank slots after the last tile, like an empty place in ATAK's toolbar:
+        // always at least one, and enough to finish the row.
+        final int filled = countTiles(tiles);
+        final int blanks = 3 - (filled % 3);
+        for (int i = 0; i < blanks; i++)
+            addTile(tiles, blankTile(m, view));
+        padLastRow(tiles);
         toTop();
     }
 
@@ -157,13 +183,13 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
         viewRow.setVisibility(View.GONE);
         final Missions.Mission m = current();
         missionBtn.setText(m == null ? plugin.getString(R.string.mission_none)
-                : plugin.getString(R.string.mission_current, m.name));
+                : missionLabel(m));
         section.setText(R.string.section_pick);
         tiles.removeAllViews();
         if (missions != null)
             for (final Missions.Mission mission : missions)
-                addTile(missionTile(mission));
-        padLastRow();
+                addTile(tiles, missionTile(mission));
+        padLastRow(tiles);
         toTop();
     }
 
@@ -178,6 +204,20 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
                 scroll.scrollTo(0, 0);
             }
         });
+    }
+
+    /**
+     * "Mission: Search and Rescue" with the mission's name in the section cyan, so the
+     * mission in use is the first thing the eye finds at the top of the pane.
+     */
+    private CharSequence missionLabel(Missions.Mission m) {
+        final String text = plugin.getString(R.string.mission_current, m.name);
+        final int at = text.lastIndexOf(m.name);
+        final SpannableString s = new SpannableString(text);
+        if (at >= 0)
+            s.setSpan(new ForegroundColorSpan(MISSION_CYAN), at, at + m.name.length(),
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return s;
     }
 
     // ---- tiles ----------------------------------------------------------------------
@@ -246,7 +286,7 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
         return b;
     }
 
-    private void addTile(Button b) {
+    private void addTile(LinearLayout tiles, Button b) {
         // The last child is a row of tiles, or a heading that starts a new section.
         final View last = tiles.getChildCount() == 0 ? null
                 : tiles.getChildAt(tiles.getChildCount() - 1);
@@ -267,7 +307,7 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
     }
 
     /** Pad the last row so its tiles keep the width of a full row. */
-    private void padLastRow() {
+    private void padLastRow(LinearLayout tiles) {
         final View last = tiles.getChildCount() == 0 ? null
                 : tiles.getChildAt(tiles.getChildCount() - 1);
         if (!(last instanceof LinearLayout))
@@ -278,6 +318,295 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
             lp.setMarginEnd(dp(6));
             row.addView(new View(plugin), lp);
         }
+    }
+
+    private static int countTiles(LinearLayout tiles) {
+        int n = 0;
+        for (int i = 0; i < tiles.getChildCount(); i++)
+            if (tiles.getChildAt(i) instanceof LinearLayout)
+                n += ((LinearLayout) tiles.getChildAt(i)).getChildCount();
+        return n;
+    }
+
+    // ---- editing a page, like ATAK's toolbar -----------------------------------------
+
+    /**
+     * The tiles on one mission page, as tool item files or plugin packages. MAST ships
+     * a base set per mission (missions.json); once the operator changes a page, the
+     * page is kept in a preference and the base set no longer applies to it, until
+     * Reset Page.
+     */
+    private List<String> page(Missions.Mission m, String view) {
+        final String saved = prefs.getString(pageKey(m, view), null);
+        final List<String> ids = new ArrayList<>();
+        if (saved != null) {
+            try {
+                final JSONArray a = new JSONArray(saved);
+                for (int i = 0; i < a.length(); i++)
+                    ids.add(a.getString(i));
+                return ids;
+            } catch (JSONException e) {
+                Log.w(TAG, "page " + pageKey(m, view) + " unreadable, base set used", e);
+                ids.clear();
+            }
+        }
+        if (VIEW_TOOLS.equals(view))
+            ids.addAll(m.tools);
+        else
+            for (Missions.Plugin p : m.plugins)
+                ids.add(p.pkg);
+        return ids;
+    }
+
+    private void savePage(Missions.Mission m, String view, List<String> ids) {
+        prefs.edit().putString(pageKey(m, view), new JSONArray(ids).toString()).apply();
+        showCurrent();
+    }
+
+    private static String pageKey(Missions.Mission m, String view) {
+        return "mast_page_" + m.id + "_" + view;
+    }
+
+    /** An empty place on the page: a tap picks what goes there. */
+    private Button blankTile(final Missions.Mission m, final String view) {
+        final boolean tools = VIEW_TOOLS.equals(view);
+        final Button b = tile(plugin.getString(tools ? R.string.choose_tool
+                : R.string.choose_plugin));
+        b.setAlpha(0.6f);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                choose(m, view, -1);
+            }
+        });
+        b.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                confirmReset(m, view);
+                return true;
+            }
+        });
+        return b;
+    }
+
+    /** Long press on a tile: replace, move, remove, or put the base set back. */
+    private void editTile(final Missions.Mission m, final String view, final int at) {
+        final List<String> ids = page(m, view);
+        if (at < 0 || at >= ids.size())
+            return;
+        final String[] items = {
+                plugin.getString(R.string.edit_replace),
+                plugin.getString(R.string.edit_left),
+                plugin.getString(R.string.edit_right),
+                plugin.getString(R.string.edit_remove),
+                plugin.getString(R.string.edit_reset)
+        };
+        new AlertDialog.Builder(host)
+                .setTitle(VIEW_TOOLS.equals(view) ? toolTitle(ids.get(at))
+                        : pluginName(ids.get(at)))
+                .setItems(items, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        switch (which) {
+                            case 0:
+                                choose(m, view, at);
+                                return;
+                            case 1:
+                                if (at > 0) {
+                                    ids.add(at - 1, ids.remove(at));
+                                    savePage(m, view, ids);
+                                }
+                                return;
+                            case 2:
+                                if (at < ids.size() - 1) {
+                                    ids.add(at + 1, ids.remove(at));
+                                    savePage(m, view, ids);
+                                }
+                                return;
+                            case 3:
+                                ids.remove(at);
+                                savePage(m, view, ids);
+                                return;
+                            default:
+                                confirmReset(m, view);
+                        }
+                    }
+                })
+                .setNegativeButton(plugin.getString(R.string.cancel), null)
+                .show();
+    }
+
+    private void confirmReset(final Missions.Mission m, final String view) {
+        new AlertDialog.Builder(host)
+                .setTitle(plugin.getString(R.string.edit_reset))
+                .setMessage(plugin.getString(R.string.reset_message, m.name))
+                .setPositiveButton(plugin.getString(R.string.edit_reset),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                prefs.edit().remove(pageKey(m, view)).apply();
+                                showCurrent();
+                            }
+                        })
+                .setNegativeButton(plugin.getString(R.string.cancel), null)
+                .show();
+    }
+
+    /**
+     * The chooser: a grid of tiles in a dialog, every ATAK tool or every loaded plugin
+     * with a toolbar button, less what the page already has. {@code at} is the tile to
+     * replace, or -1 to add at the end.
+     */
+    private void choose(final Missions.Mission m, final String view, final int at) {
+        final boolean tools = VIEW_TOOLS.equals(view);
+        final List<String> ids = page(m, view);
+        final LinearLayout grid = new LinearLayout(plugin);
+        grid.setOrientation(LinearLayout.VERTICAL);
+        final ScrollView sv = new ScrollView(plugin);
+        sv.setPadding(dp(8), dp(8), dp(2), dp(8));
+        sv.addView(grid);
+        final AlertDialog[] dlg = new AlertDialog[1];
+        final List<String> offered = tools ? allTools() : allPlugins();
+        for (final String id : offered) {
+            if (ids.contains(id))
+                continue;
+            final Button b;
+            if (tools) {
+                final AtakTools.Tool t = AtakTools.load(host, id);
+                if (t == null)
+                    continue;
+                b = tile(t.title);
+                setIcon(b, t.icon);
+            } else {
+                b = tile(pluginName(id));
+                setIcon(b, icon(id));
+            }
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (dlg[0] != null)
+                        dlg[0].dismiss();
+                    if (at >= 0 && at < ids.size())
+                        ids.set(at, id);
+                    else
+                        ids.add(id);
+                    savePage(m, view, ids);
+                }
+            });
+            addTile(grid, b);
+        }
+        padLastRow(grid);
+        final AlertDialog.Builder d = new AlertDialog.Builder(host)
+                .setTitle(plugin.getString(tools ? R.string.choose_tool_title
+                        : R.string.choose_plugin_title))
+                .setNegativeButton(plugin.getString(R.string.cancel), null);
+        if (grid.getChildCount() == 0)
+            d.setMessage(plugin.getString(R.string.choose_none));
+        else
+            d.setView(sv);
+        dlg[0] = d.show();
+    }
+
+    /** Every item in ATAK's tool menu, by title, from atak.apk's own item files. */
+    private List<String> allTools() {
+        final List<AtakTools.Tool> found = new ArrayList<>();
+        try {
+            final String[] files = host.getAssets().list("actionbar/items");
+            if (files != null)
+                for (String f : files) {
+                    if (!f.endsWith(".xml") || "quit.xml".equals(f))
+                        continue;
+                    final AtakTools.Tool t = AtakTools.load(host, f);
+                    if (t != null)
+                        found.add(t);
+                }
+        } catch (Exception e) {
+            Log.w(TAG, "could not list ATAK's tools", e);
+        }
+        Collections.sort(found, new Comparator<AtakTools.Tool>() {
+            @Override
+            public int compare(AtakTools.Tool a, AtakTools.Tool b) {
+                return a.title.compareToIgnoreCase(b.title);
+            }
+        });
+        final List<String> out = new ArrayList<>();
+        for (AtakTools.Tool t : found)
+            out.add(t.file);
+        return out;
+    }
+
+    /**
+     * Every loaded plugin that has a toolbar button, MAST itself left out. A tile opens
+     * a plugin through its toolbar button, so one without a button cannot be offered.
+     */
+    private List<String> allPlugins() {
+        final List<String> out = new ArrayList<>();
+        try {
+            final AtakPluginRegistry reg = AtakPluginRegistry.get();
+            if (reg != null)
+                for (String pkg : reg.getPluginsLoaded())
+                    if (!pkg.equals(plugin.getPackageName()) && icon(pkg) != null)
+                        out.add(pkg);
+        } catch (Throwable t) {
+            Log.w(TAG, "could not list loaded plugins", t);
+        }
+        Collections.sort(out, new Comparator<String>() {
+            @Override
+            public int compare(String a, String b) {
+                return pluginName(a).compareToIgnoreCase(pluginName(b));
+            }
+        });
+        return out;
+    }
+
+    /**
+     * A plugin's name: the name missions.json gives it, else the app label ATAK holds
+     * for it, else the package.
+     */
+    private String pluginName(String pkg) {
+        final String known = Missions.name(pkg);
+        if (known != null)
+            return known;
+        if (missions != null)
+            for (Missions.Mission m : missions)
+                for (Missions.Plugin p : m.plugins)
+                    if (p.pkg.equals(pkg))
+                        return p.name;
+        // Someone else's plugin: its own label, read from its own resources.
+        try {
+            final AtakPluginRegistry reg = AtakPluginRegistry.get();
+            if (reg != null)
+                for (ApplicationInfo ai : reg.getAssociatedApplications()) {
+                    if (!pkg.equals(ai.packageName))
+                        continue;
+                    if (ai.nonLocalizedLabel != null)
+                        return ai.nonLocalizedLabel.toString();
+                    if (ai.labelRes != 0)
+                        return host.createPackageContext(pkg, 0).getResources()
+                                .getString(ai.labelRes);
+                }
+        } catch (Throwable t) {
+            Log.w(TAG, "no label for " + pkg, t);
+        }
+        // Last resort: com.example.android.foo.plugin -> Foo.
+        final String[] parts = pkg.split("\\.");
+        String word = parts.length > 1 && "plugin".equals(parts[parts.length - 1])
+                ? parts[parts.length - 2] : parts[parts.length - 1];
+        return word.isEmpty() ? pkg
+                : Character.toUpperCase(word.charAt(0)) + word.substring(1);
+    }
+
+    private String toolTitle(String file) {
+        final AtakTools.Tool t = AtakTools.load(host, file);
+        return t == null ? file : t.title;
+    }
+
+    private void setIcon(Button b, Drawable icon) {
+        if (icon == null)
+            return;
+        final int size = dp(48);
+        icon.setBounds(0, 0, size, size);
+        b.setCompoundDrawables(null, icon, null, null);
     }
 
     // ---- opening another plugin -----------------------------------------------------

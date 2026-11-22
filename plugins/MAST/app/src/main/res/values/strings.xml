@@ -12,6 +12,17 @@
     <string name="section_tools">%s ATAK tools</string>
     <string name="view_tools">ATAK Tools</string>
     <string name="view_plugins">Plugins</string>
+    <string name="choose_tool">+\nChoose Tool</string>
+    <string name="choose_plugin">+\nChoose Plugin</string>
+    <string name="choose_tool_title">Choose an ATAK Tool</string>
+    <string name="choose_plugin_title">Choose a Plugin</string>
+    <string name="choose_none">Everything you can add is already on this page.</string>
+    <string name="edit_replace">Replace</string>
+    <string name="edit_left">Move Left</string>
+    <string name="edit_right">Move Right</string>
+    <string name="edit_remove">Remove</string>
+    <string name="edit_reset">Reset Page</string>
+    <string name="reset_message">Put back the tiles MAST ships for %s on this page? Your changes to this page are lost.</string>
     <string name="plugin_not_installed">%s\nNot installed</string>
     <string name="plugin_missing">%s is not on this device. Get it from the TAKwerx Market.</string>
     <string name="open_market">Open Market</string>

@@ -9,7 +9,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The missions MAST offers and the plugins each one opens, read from
@@ -50,7 +52,20 @@ public final class Missions {
         }
     }
 
+    /**
+     * Display names by package, for plugins a page can hold that its mission does not
+     * list (the plugin chooser); ATAK does not hand a plugin another plugin's label.
+     */
+    private static final Map<String, String> NAMES = new HashMap<>();
+
     private Missions() {
+    }
+
+    /** The name missions.json gives a package, or null. */
+    public static String name(String pkg) {
+        synchronized (NAMES) {
+            return NAMES.get(pkg);
+        }
     }
 
     /** Reads the file; throws with the file named when it is not schema 2. */
@@ -59,6 +74,14 @@ public final class Missions {
         if (root.optInt("schema") != 2)
             throw new IllegalArgumentException(asset + ": schema " + root.optInt("schema")
                     + ", MAST reads schema 2");
+        final JSONObject names = root.optJSONObject("names");
+        if (names != null)
+            synchronized (NAMES) {
+                for (java.util.Iterator<String> it = names.keys(); it.hasNext();) {
+                    final String pkg = it.next();
+                    NAMES.put(pkg, names.getString(pkg));
+                }
+            }
         final JSONArray ms = root.getJSONArray("missions");
         final List<Mission> out = new ArrayList<>();
         for (int i = 0; i < ms.length(); i++) {
