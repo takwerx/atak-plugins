@@ -92,6 +92,7 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
     private String dragId;
     private Missions.Mission dragMission;
     private String dragView;
+    private int hoverSlot = -1;
     private final List<ObjectAnimator> wiggles = new ArrayList<>();
     private final Map<String, AtakTools.Tool> toolCache = new HashMap<>();
 
@@ -281,15 +282,20 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
                     return true;
                 case DragEvent.ACTION_DRAG_LOCATION:
                     autoScroll(e.getY());
-                    moveTo(slotAt(e.getX(), e.getY()));
+                    hover(slotAt(e.getX(), e.getY()));
                     return true;
                 case DragEvent.ACTION_DROP:
+                    swapInto(slotAt(e.getX(), e.getY()));
+                    return true;
+                case DragEvent.ACTION_DRAG_EXITED:
+                    hover(-1);
                     return true;
                 case DragEvent.ACTION_DRAG_ENDED:
                     final Missions.Mission m = dragMission;
                     final String view = dragView;
                     dragId = null;
                     dragMission = null;
+                    hoverSlot = -1;
                     if (!work.equals(page(m, view)))
                         prefs.edit().putString(pageKey(m, view),
                                 new JSONArray(work).toString()).apply();
@@ -319,15 +325,38 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
         return -1;
     }
 
-    private void moveTo(int slot) {
-        if (slot < 0)
+    /**
+     * The tile under the finger gets a green border: that is the one the drop swaps
+     * with. Nothing else moves while dragging (operator, 2026-11-22: "they move but
+     * dont swap one for one").
+     */
+    private void hover(int slot) {
+        if (slot == hoverSlot)
             return;
-        final int target = Math.min(slot, work.size() - 1);
+        hoverSlot = slot;
+        int n = 0;
+        for (int i = 0; i < tiles.getChildCount(); i++) {
+            final View r = tiles.getChildAt(i);
+            if (!(r instanceof LinearLayout))
+                continue;
+            final LinearLayout row = (LinearLayout) r;
+            for (int j = 0; j < row.getChildCount(); j++, n++)
+                row.getChildAt(j).setSelected(n == slot);
+        }
+    }
+
+    /**
+     * The drop: the dragged tile and the tile under it trade places. Dropped on a
+     * blank place, the tile goes to the end of the page.
+     */
+    private void swapInto(int slot) {
         final int from = work.indexOf(dragId);
-        if (from < 0 || from == target)
+        if (from < 0 || slot < 0 || slot == from)
             return;
-        work.add(target, work.remove(from));
-        renderTiles(dragMission, dragView);
+        if (slot < work.size())
+            Collections.swap(work, from, slot);
+        else
+            work.add(work.remove(from));
     }
 
     /** Near the top or bottom edge, the page scrolls under the dragged tile. */
