@@ -20,8 +20,8 @@
       ]
     },
     {
-      "id": "active_shooter",
-      "name": "Active Shooter",
+      "id": "tactical_response",
+      "name": "Tactical Response",
       "plugins": [
         { "name": "Tactical Response", "pkg": "com.atakmap.android.tacticalresponse.plugin" },
         { "name": "Map Depot",         "pkg": "com.atakmap.android.mapdepot.plugin" },
@@ -57,6 +57,20 @@
         { "name": "Traffic",       "pkg": "com.atakmap.android.traffic.plugin" },
         { "name": "Map Depot",     "pkg": "com.atakmap.android.mapdepot.plugin" },
         { "name": "Cam Depot",     "pkg": "com.atakmap.android.camdepot.plugin" },
+        { "name": "Comms",         "pkg": "com.atakmap.android.comms.plugin" },
+        { "name": "Sit Rep",       "pkg": "com.atakmap.android.sitrep.plugin" }
+      ]
+    },
+    {
+      "id": "search_rescue",
+      "name": "Search and Rescue",
+      "plugins": [
+        { "name": "Map Depot",     "pkg": "com.atakmap.android.mapdepot.plugin" },
+        { "name": "PLSS Grid",     "pkg": "com.atakmap.android.plss.plugin" },
+        { "name": "Signal DF",     "pkg": "com.atakmap.android.signaldf.plugin" },
+        { "name": "Atmosphere",    "pkg": "com.atakmap.android.atmosphere.plugin" },
+        { "name": "AirAware",      "pkg": "com.atakmap.android.airaware.plugin" },
+        { "name": "Feature Layer", "pkg": "com.atakmap.android.featurelayer.plugin" },
         { "name": "Comms",         "pkg": "com.atakmap.android.comms.plugin" },
         { "name": "Sit Rep",       "pkg": "com.atakmap.android.sitrep.plugin" }
       ]
