@@ -40,7 +40,7 @@ Capabilities:
     their readings graded by sea state, the nearest tide and current
     predictions, and the coastal or offshore waters forecast for their zone.
   - Map layers: radar and modeled wind with a time scrubber; forecast smoke and
-    the EPA's air quality; the SPC fire weather outlook and the WPC excessive
+    forecast clouds (all, low, middle or high, hour by hour); the EPA's air quality; the SPC fire weather outlook and the WPC excessive
     rainfall outlook, one day at a time; modeled flooded ground now or for the
     next five days and the streams running high, with the flows behind a tap
     (both experimental services, and labeled so); the beach forecast by rip
@@ -233,7 +233,7 @@ PORTS REQUIRED
     geo.weather.gc.ca               radar over Canada (Environment Canada)
     api.rainviewer.com              radar everywhere else, the frame list
     tilecache.rainviewer.com        and its tiles (RainViewer's composite)
-    nomads.ncep.noaa.gov            model wind, smoke, wave, rain and air temperature files
+    nomads.ncep.noaa.gov            model wind, smoke, cloud, wave, rain and air temperature files
     nowcoast.noaa.gov               sea surface temperature
     maps.water.noaa.gov             flooded ground, streams running high
     api.water.noaa.gov              river gauges and their forecasts

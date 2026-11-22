@@ -91,7 +91,11 @@ old the reading is.
 - **Now**: temperature, humidity, the 20-foot wind and where it is from, gusts,
   mixing height, transport wind, wet bulb globe temperature and the chance of
   rain; under them the sky cover, sunrise, sunset and the moon. An element the
-  forecast office does not issue says so.
+  forecast office does not issue says so. With **Open-Meteo** as the forecast
+  source the readout also shows low, mid and high cloud, each as a percent of
+  its own layer (low is below about 6,500 ft, high is above about 20,000 ft).
+  The NWS forecast has the total sky cover only. In **Next hours** each layer
+  is a button of its own.
 - **Next hours**: the next day and a half as a line, one value at a time; the
   buttons under it pick which. **Show hourly table** opens the whole table.
 - **Show light**: the light for the point, one day at a time (the arrows step
@@ -182,6 +186,7 @@ opening the plugin.
 | Fire | Lightning | NOAA's lightning strike density, the newest 15 minutes, in five bands from under 1 to over 150 strikes in a 5-mile square |
 | Fire | PSPS | California's Public Safety Power Shutoffs: counties warned, circuits watched, areas shut off, by utility |
 | Fire | Smoke | Forecast smoke at the ground or through the whole sky, with the amount "Here"; the same forecast at every zoom, so the smoke keeps its shape as you zoom |
+| Fire | Clouds | NOAA's forecast of how much of the sky is covered, hour by hour on the same time strip as the wind: all cloud, or the low, middle or high deck on its own, drawn white thinning to gray, with the percent and a word ("mostly cloudy") "Here". Works anywhere in the world, not only the lower 48. A view wider than about 60 by 40 degrees is drawn for its middle |
 | Fire | Air Quality | The EPA's air quality areas and the index "Here" |
 | Rain and rivers | Flash Flood Outlook | Excessive rainfall areas for three days, marginal to high |
 | Rain and rivers | River Gauges | Gauges colored by flood category; stage, flow and hydrograph behind a tap |
