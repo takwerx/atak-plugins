@@ -106,7 +106,7 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
         for (final Missions.Plugin p : m.plugins)
             addTile(pluginTile(p));
         padLastRow();
-        scroll.scrollTo(0, 0);
+        toTop();
     }
 
     private void showPicker() {
@@ -120,7 +120,20 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
             for (final Missions.Mission mission : missions)
                 addTile(missionTile(mission));
         padLastRow();
-        scroll.scrollTo(0, 0);
+        toTop();
+    }
+
+    /**
+     * Back to the top once the new tiles are laid out; a scrollTo before layout kept
+     * the picker's scroll and hid the page heading (s10-dev-3, 2026-11-22).
+     */
+    private void toTop() {
+        scroll.post(new Runnable() {
+            @Override
+            public void run() {
+                scroll.scrollTo(0, 0);
+            }
+        });
     }
 
     // ---- tiles ----------------------------------------------------------------------
