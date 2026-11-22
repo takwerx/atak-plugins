@@ -381,7 +381,10 @@ public final class CloudOverlay {
                     || cy < region.getSouth() || cy > region.getNorth();
         }
         if (!refetch) {
-            final double viewSpan = clamped.getEast() - clamped.getWest();
+            // A view tighter than the asked-for minimum is answered by the minimum box,
+            // so it must not read as "much smaller than the region" and ask again.
+            final double viewSpan = Math.max(clamped.getEast() - clamped.getWest(),
+                    NomadsCloud.MIN_SPAN / 2);
             final double regionSpan = region.getEast() - region.getWest();
             refetch = viewSpan < regionSpan / 3.5 || viewSpan > regionSpan * 1.6;
         }
@@ -403,8 +406,14 @@ public final class CloudOverlay {
             }
             final double padX = Math.min((e - w) * 0.5, Math.max(0, (maxLon - (e - w)) / 2));
             final double padY = Math.min((n - s) * 0.5, Math.max(0, (maxLat - (n - s)) / 2));
-            region = new GeoBounds(Math.min(chosen.north, n + padY), Math.max(chosen.west, w - padX),
-                    Math.max(chosen.south, s - padY), Math.min(chosen.east, e + padX));
+            // The field is one number per quarter degree. A box narrower than that can
+            // hold one row or none, so zoomed in tight the picture was empty and Here
+            // said "outside the area being drawn". Ask for at least MIN_SPAN degrees.
+            final double[] lon = NomadsCloud.atLeast(w - padX, e + padX, NomadsCloud.MIN_SPAN,
+                    chosen.west, chosen.east);
+            final double[] lat = NomadsCloud.atLeast(s - padY, n + padY, NomadsCloud.MIN_SPAN,
+                    chosen.south, chosen.north);
+            region = new GeoBounds(lat[1], lon[0], lat[0], lon[1]);
             cache.clear();
         }
         showHour();

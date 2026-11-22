@@ -61,6 +61,73 @@ public class CloudMapTest {
         assertEquals(100.0, mid.sample(NODE_A_LAT, NODE_A_LON), 0.15);
     }
 
+    /**
+     * What the pane's Here line reads, at the point the tak-dev emulator sat on
+     * (39.237255 N, 123.150032 W), from a real response: the 2026-11-22 00Z run at f006,
+     * 36-42 N, 126-120 W. The expected numbers come from a separate Python reader
+     * (decode_cloud.py), template 4.0. The averages since hour 0 would read 99.9, 99.3,
+     * 100 and 100 here, so a chip that drew the wrong message fails this.
+     */
+    @Test
+    public void hereReadsEachChipAtThePanesPointFromTheHourNotTheAverage() throws Exception {
+        final byte[] body = Files.readAllBytes(
+                new File("src/test/resources/gfs_cloud_mendocino_f006.grib2").toPath());
+        final double lat = 39.237255, lon = -123.150032;
+        assertEquals(75.1, NomadsCloud.read(body, Layer.LOW).sample(lat, lon), 0.15);
+        assertEquals(99.0, NomadsCloud.read(body, Layer.MID).sample(lat, lon), 0.15);
+        assertEquals(19.7, NomadsCloud.read(body, Layer.HIGH).sample(lat, lon), 0.15);
+        assertEquals(99.4, NomadsCloud.read(body, Layer.TOTAL).sample(lat, lon), 0.15);
+        assertEquals("mostly cloudy", Layer.LOW.words(75.1f));
+        assertEquals("a few clouds", Layer.HIGH.words(19.7f));
+    }
+
+    /** Quarter-degree nodes (multiples of 0.25) inside an interval. */
+    private static int nodesIn(double low, double high) {
+        return (int) (Math.floor(high / 0.25) - Math.ceil(low / 0.25)) + 1;
+    }
+
+    /**
+     * Zoomed in to about 7 km on the emulator's point (39.237 N, 123.150 W) the box
+     * asked for was the view plus half again, 0.2 degrees: one row of nodes, and that row
+     * (39.25) was north of the point, so the picture was empty and Here said "outside the
+     * area being drawn". The box now holds at least four cells, with nodes on both sides.
+     */
+    @Test
+    public void aTightZoomStillAsksForARealLattice() {
+        final double lat = 39.237255, lon = -123.150032;
+        final double halfView = 0.05, pad = halfView; // the view, plus half again each side
+        final double[] la = NomadsCloud.atLeast(lat - halfView - pad, lat + halfView + pad,
+                NomadsCloud.MIN_SPAN, -90, 90);
+        final double[] lo = NomadsCloud.atLeast(lon - halfView - pad, lon + halfView + pad,
+                NomadsCloud.MIN_SPAN, -180, 180);
+        assertEquals(1.0, la[1] - la[0], 1e-9);
+        assertEquals(1.0, lo[1] - lo[0], 1e-9);
+        assertTrue(nodesIn(la[0], la[1]) >= 4);
+        assertTrue(nodesIn(lo[0], lo[1]) >= 4);
+        // Nodes below and above, left and right of the point: the point is inside a cell.
+        assertTrue(Math.floor(lat / 0.25) * 0.25 >= la[0]);
+        assertTrue(Math.ceil(lat / 0.25) * 0.25 <= la[1]);
+        assertTrue(Math.floor(lon / 0.25) * 0.25 >= lo[0]);
+        assertTrue(Math.ceil(lon / 0.25) * 0.25 <= lo[1]);
+        // The box that was asked for before holds one row and no column, so no cell.
+        assertTrue(nodesIn(lat - halfView - pad, lat + halfView + pad) < 2);
+        assertTrue(nodesIn(lon - halfView - pad, lon + halfView + pad) < 2);
+    }
+
+    @Test
+    public void aBoxAtTheModelsEdgeSlidesInsteadOfShrinking() {
+        final double[] a = NomadsCloud.atLeast(89.9, 90.0, 1.0, -90, 90);
+        assertEquals(89.0, a[0], 1e-9);
+        assertEquals(90.0, a[1], 1e-9);
+        final double[] b = NomadsCloud.atLeast(-180.0, -179.95, 1.0, -180, 180);
+        assertEquals(-180.0, b[0], 1e-9);
+        assertEquals(-179.0, b[1], 1e-9);
+        // A box already wide enough is left alone.
+        final double[] c = NomadsCloud.atLeast(10, 14, 1.0, -180, 180);
+        assertEquals(10, c[0], 1e-9);
+        assertEquals(14, c[1], 1e-9);
+    }
+
     @Test
     public void eachLayerIsItsOwnField() throws Exception {
         final byte[] body = california();

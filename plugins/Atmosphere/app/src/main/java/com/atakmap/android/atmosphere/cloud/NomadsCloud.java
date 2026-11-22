@@ -118,7 +118,37 @@ public final class NomadsCloud {
      */
     public static final double SPAN_LON = 60.0, SPAN_LAT = 40.0;
 
+    /**
+     * The narrowest box asked for, degrees across and up: four cells of the quarter
+     * degree field, so the answer always holds a lattice with rows and columns on both
+     * sides of any point inside it.
+     */
+    public static final double MIN_SPAN = 1.0;
+
     private NomadsCloud() {
+    }
+
+    /**
+     * {@code [low, high]} of an interval widened about its middle to at least
+     * {@code min}, then held inside {@code [limitLow, limitHigh]} by sliding, not
+     * shrinking, so a view at the edge of the model still gets the full width.
+     */
+    public static double[] atLeast(double low, double high, double min, double limitLow,
+            double limitHigh) {
+        if (high - low < min) {
+            final double c = (low + high) / 2;
+            low = c - min / 2;
+            high = c + min / 2;
+        }
+        if (low < limitLow) {
+            high = Math.min(limitHigh, high + (limitLow - low));
+            low = limitLow;
+        }
+        if (high > limitHigh) {
+            low = Math.max(limitLow, low - (high - limitHigh));
+            high = limitHigh;
+        }
+        return new double[] { low, high };
     }
 
     public static String url(Layer layer, long runUtc, int forecastHour, double west,
