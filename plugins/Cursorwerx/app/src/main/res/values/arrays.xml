@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Wheel zoom: one click multiplies the map scale by the value. Doubling the scale
+         takes about 7, 5, 3, 2 and 1.5 clicks down the list. The pane shows the short
+         name, the dialogs the whole line; the two arrays stay in step, and the values
+         stay decimal strings because ATAK's list preference stores a string. -->
+    <string-array name="wheel_zoom_entries">
+        <item>Fine, 10% a click</item>
+        <item>Gentle, 15% a click (default)</item>
+        <item>Medium, 25% a click</item>
+        <item>Fast, 40% a click</item>
+        <item>Very fast, 60% a click</item>
+    </string-array>
+    <string-array name="wheel_zoom_names">
+        <item>Fine</item>
+        <item>Gentle</item>
+        <item>Medium</item>
+        <item>Fast</item>
+        <item>Very fast</item>
+    </string-array>
+    <string-array name="wheel_zoom_values">
+        <item>1.10</item>
+        <item>1.15</item>
+        <item>1.25</item>
+        <item>1.40</item>
+        <item>1.60</item>
+    </string-array>
+</resources>

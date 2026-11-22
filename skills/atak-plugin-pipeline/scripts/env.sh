@@ -46,9 +46,13 @@ export PATH="${JAVA_HOME:+$JAVA_HOME/bin:}${ANDROID_HOME:+$ANDROID_HOME/platform
 # plugin reaches the SDK through sdk.path in its gitignored local.properties.
 export ATAK_SDK_ROOT="${ATAK_SDK_ROOT:-$HOME/atak-sdk}"
 if [ -z "${ATAK_SDK:-}" ]; then
-    ATAK_SDK="$(ls -d "$ATAK_SDK_ROOT"/ATAK-CIV-* 2>/dev/null | sort -V | tail -1)"
+    ATAK_SDK="$(for d in "$ATAK_SDK_ROOT"/ATAK-CIV-*/; do [ -f "$d/main.jar" ] && echo "${d%/}"; done | sort -V | tail -1)"
 fi
 export ATAK_SDK="${ATAK_SDK:-}"
+
+# joshuafuller/atak-plugin-preflight, cloned once; submission-zip.sh pulls it
+# to the latest and runs it before zipping.
+export ATAK_PREFLIGHT="${ATAK_PREFLIGHT:-$HOME/atak-plugin-preflight}"
 
 # Build artifacts live outside every checkout, in one place: a zip written into
 # one checkout is invisible from another. Signed APKs returned by tak.gov are
@@ -78,7 +82,7 @@ plugin_dir() {
         # (the APK name, the proguard descriptor), so it decides here too.
         case "$cand" in
             "$root"|"$root/$name")
-                grep -q "rootProject.name *= *['\"]$name['\"]" "$cand/settings.gradle" 2>/dev/null || continue ;;
+                grep -q "rootProject.name *= *['\"]${name}['\"]" "$cand/settings.gradle" 2>/dev/null || continue ;;
         esac
         printf '%s\n' "$cand"
         return 0
@@ -102,9 +106,29 @@ version_code() {
         printf "%d", $1*10000 + $2*100 + $3 }'
 }
 
+# atak_code <5.8.0> -> 5080: the ATAK target's share of a versionCode. ATAK
+# major <= 9, minor <= 99, patch <= 9, or the digits run into each other.
+atak_code() {
+    printf '%s' "$1" | awk -F. '{
+        if ($1 !~ /^[0-9]+$/ || $1 > 9 || ($2 != "" && ($2 !~ /^[0-9]+$/ || $2 > 99)) ||
+            ($3 != "" && ($3 !~ /^[0-9]+$/ || $3 > 9))) exit 1
+        printf "%d", $1*1000 + $2*10 + $3 }'
+}
+
+# target_version_code <1.3> <5.8.0> -> 103005080: what the APK built for that
+# target carries. One code per target: an MDM handed two targets of one release
+# under one code and two hashes reports an incompatible build.
+target_version_code() {
+    local p a
+    p="$(version_code "$1")" || return 1
+    a="$(atak_code "$2")" || return 1
+    printf '%d' "$((p * 10000 + a))"
+}
+
 # sdk_for <5.8.0> -> the newest unpacked SDK matching that ATAK version
 sdk_for() {
-    ls -d "$ATAK_SDK_ROOT"/ATAK-CIV-"$1"* 2>/dev/null | sort -V | tail -1
+    # Folders holding main.jar only, never a downloaded ATAK-CIV-<v>-SDK.zip.
+    for d in "$ATAK_SDK_ROOT"/ATAK-CIV-"$1"*/; do [ -f "$d/main.jar" ] && echo "${d%/}"; done | sort -V | tail -1
 }
 
 # aapt / keytool, wherever this machine keeps them

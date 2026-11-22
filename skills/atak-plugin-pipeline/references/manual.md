@@ -26,7 +26,7 @@ Three pieces, all required (`samples/dsmmanager` is the SDK's reference, and
 APK proves nothing: the PDF is in there either way.
 
 `PdfHelper` re-extracts the PDF when the version it recorded changes, so with a
-`versionCode` derived from `PLUGIN_VERSION` (see [publishing.md](publishing.md))
+`versionCode` derived from `PLUGIN_VERSION` and the ATAK target (see [publishing.md](publishing.md))
 the manual updates by itself. With the SDK's git-derived code — 1 on every signed
 build — it never does: the first manual a user opens is the one they keep, the
 plugin manager says 0.8 while the manual says 0.5, and nothing on the device can
@@ -57,10 +57,14 @@ whatever is installed locally, and harden the download task —
 
 ## How a guide gets built — shot list first
 
-The user guide and the manual are written around screenshots, and the
-screenshots come from a **signed build on a phone running official ATAK** (a dev
-build watermarks every frame). The order is fixed, and it costs one extra
-release:
+The user guide and the manual are written around screenshots. Pictures where
+the **map** is the point come from a **signed build on a phone running official
+ATAK** (a dev build watermarks the map). Pictures of the plugin's own UI (the
+pane, a dialog, a menu, a settings list) do not: the watermark is never inside
+a pane or dialog crop, so shoot those on the dev phone with the local build and
+commit them with the change that altered the screen. A UI picture left for "the
+signed build" costs a whole resubmission. For the map shots the order is fixed,
+and it costs one extra release:
 
 1. Write the shot list before taking any shots: framing rules, then a numbered
    table of shots (section, what it shows, crop).

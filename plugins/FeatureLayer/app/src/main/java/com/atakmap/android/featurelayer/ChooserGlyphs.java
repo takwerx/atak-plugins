@@ -67,15 +67,25 @@ final class ChooserGlyphs {
     private final File dir;
     private final Map<String, String> uris = new HashMap<>();
 
-    ChooserGlyphs(File dir) {
+    private static final java.util.concurrent.atomic.AtomicBoolean PURGED = new java.util.concurrent.atomic.AtomicBoolean();
+
+    ChooserGlyphs(final File dir) {
         this.dir = dir;
-        // Drawings from an earlier revision are stale, not cached.
-        final File[] old = dir.listFiles();
-        if (old != null)
-            for (File f : old)
-                if (f.getName().startsWith("chooser") && !f.getName().startsWith(PREFIX))
-                    //noinspection ResultOfMethodCallIgnored
-                    f.delete();
+        // Drawings from an earlier revision are stale, not cached. Once per process and
+        // off the main thread: listing a 4,000-file icon directory for every layer at
+        // plugin load, on the main thread, was the ANR of 2026-09-18 14:26.
+        if (PURGED.compareAndSet(false, true))
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    final File[] old = dir.listFiles();
+                    if (old != null)
+                        for (File f : old)
+                            if (f.getName().startsWith("chooser") && !f.getName().startsWith(PREFIX))
+                                //noinspection ResultOfMethodCallIgnored
+                                f.delete();
+                }
+            }, "chooser-purge").start();
     }
 
     /** A color that reads on the chooser's dark rows: dark ones become light grey. */

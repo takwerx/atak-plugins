@@ -1,12 +1,12 @@
 # TAKwerx Market for ATAK — User Guide
 
-**Version 1.5 · takwerx**
+**Version 1.8 · takwerx**
 
-**Download TAKwerx Market 1.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download TAKwerx Market 1.8** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/takwerx-market/releases/download/v1.5/ATAK-Plugin-TakwerxMarket-1.5--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/takwerx-market/releases/download/v1.5/ATAK-Plugin-TakwerxMarket-1.5--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/takwerx-market/releases/download/v1.5/ATAK-Plugin-TakwerxMarket-1.5--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/takwerx-market/releases/download/v1.8/ATAK-Plugin-TakwerxMarket-1.8--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/takwerx-market/releases/download/v1.8/ATAK-Plugin-TakwerxMarket-1.8--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/takwerx-market/releases/download/v1.8/ATAK-Plugin-TakwerxMarket-1.8--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/takwerx-market/releases
 
@@ -219,11 +219,11 @@ from tak.gov cannot be updated from here, and the market says so instead of
 letting Android fail.
 
 **Vector tile packages and ATAK 5.8.** ATAK 5.8.0.4 does not start with a
-vector tile package (Map Depot's public-lands maps) on the phone. If you have
-any, the market will not offer the 5.8 update, and says so. It comes back when
-tak.gov ships a fixed ATAK. To update anyway, remove the packages from the phone
-first (Map Depot's Offline Public Lands list can delete them), then tap Update
-again.
+vector tile package (Map Depot's public-lands maps) on the phone. 5.8.0.5 fixed
+that, and it is the 5.8 the market offers, so a phone with packages updates to
+it like any other. If the market is ever offered an older 5.8 build on a phone
+with packages, it refuses that one and says so: tap Refresh, then Update, and
+choose 5.8.0.5 or newer.
 
 ![After the ATAK update and Update all: every plugin on 5.8, header All up to date](screenshots/21-all-on-58.png)
 
@@ -263,6 +263,48 @@ TAKwerx one, and that cannot be changed from the device. ATAK can import
 preferences from a data package, so a setting for it would be a way to point the
 market somewhere else without you doing anything, and what the market offers you
 is exactly the thing worth being sure about.
+
+---
+
+## The market is installed but not in ATAK's plugin list
+
+Android lists TAKwerx Market as installed, but ATAK's **Plugins** screen (TAK
+Package Mgmt) has no row for it, so there is no checkbox to load it and no icon
+in the toolbar. Other plugins you sideloaded may be missing from the list too.
+
+This is ATAK, not the market. ATAK builds that screen from a file it keeps,
+`atak/support/apks/sideloaded/product.inf`, and on a phone where that file is
+out of date or missing, a plugin installed while ATAK was not running never gets
+a row. Without a row ATAK never loads it, and the market cannot fix this itself,
+because it is the plugin that is not loaded. It has been reported to the TAK
+Product Center: https://github.com/TAK-Product-Center/atak-civ/issues/14
+
+**Fix: sync the list.** In **Plugins**, tap the blue circular arrows at the top,
+then **OK** on *Sync Packages*. ATAK scans what is installed and writes the file
+again. **Last Updated** at the top right resets to a few seconds, the count goes
+up, and **TAKwerx Market** appears at the bottom of the list as *Not loaded*.
+Tick it and choose **Load**. It does not matter what state the file is in: a
+sync that finishes replaces it completely, whether it is out of date, missing,
+damaged, or already edited by hand.
+
+![TAK Package Mgmt after a sync: Last Updated 0s, and the TAKwerx Market row at the bottom, Not loaded](screenshots/25-package-mgmt-after-sync.png)
+
+**If Last Updated does not change,** the sync did not finish and the file was
+not rewritten. Add the market's line to the end of the file yourself, with a
+file manager or with adb, then quit and reopen ATAK. The row appears, and you
+tick it as above:
+
+```
+Android,plugin,com.atakmap.android.takwerxmarket.plugin,TAKwerx Market,1.8,108005080,,,Install and update takwerx plugins,,21,com.atakmap.app@5.8.0.CIV,-1
+```
+
+```bash
+adb shell "echo 'Android,plugin,com.atakmap.android.takwerxmarket.plugin,TAKwerx Market,1.8,108005080,,,Install and update takwerx plugins,,21,com.atakmap.app@5.8.0.CIV,-1' >> /sdcard/atak/support/apks/sideloaded/product.inf"
+```
+
+On ATAK 5.6 or 5.7, change `5.8.0.CIV` to `5.6.0.CIV` or `5.7.0.CIV`. The next
+sync that does finish rewrites the line with the real details, so it does not
+need to be exact.
 
 ---
 

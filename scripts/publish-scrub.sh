@@ -18,6 +18,17 @@
 #   - the SDK's shared dev keystore password/alias (tnttnt / wintec_mapping): in
 #     every SDK download, documented in CLAUDE.md as not a secret
 #   - Co-Authored-By noreply@anthropic.com, example.com, schema/xmlns URLs
+#   - 1-877-487-6867, the FAA's public Flight Service line. The phone rule is
+#     there to stop a person's number reaching a public repo; an agency's
+#     published service line is content a plugin is supposed to show. AirAware
+#     prints it beside the UAS flight plan so a crew can file a NOTAM. Add other
+#     public agency numbers here as they come up, never a personal one.
+#   - The eight emergency lines the IRPG (NWCG PMS 461, public domain) prints
+#     and LCES carries as the book's own text: CHEMTREC, INFOTRAC, 3E Company,
+#     the U.S. Army Operations Center, the Poison Center, the National Response
+#     Center (HazMat Isolation Distances, p. 55; UXO Safety, p. 25) and the
+#     SAFECOM aircraft mishap line (p. 79). A new IRPG edition that changes one
+#     shows up here as a scrub failure, which is the right place to notice it.
 #   - ATAK's plugin-api literal, com.atakmap.app@<x.y.z>.<FLAVOR>. It is not an
 #     address: it is the version string every plugin manifest declares and every
 #     depot catalog line carries. The pattern is deliberately tight (exact ATAK
@@ -91,7 +102,15 @@ done < <(list_files)
 
 # ---- 2. content patterns ----------------------------------------------------
 # Each pattern is an extended regex; ALLOW is applied to matching lines.
-ALLOW='noreply@anthropic\.com|com\.atakmap\.app@[0-9]+\.[0-9]+\.[0-9]+\.[A-Z]+|example\.com|schemas\.android\.com|w3\.org|0\.0\.0\.0|127\.0\.0\.1|localhost|tnttnt|wintec_mapping|takrepoUser|takrepoPassword|storePassword|keyPassword'
+#
+# 192.168.50.5 is the KrakenSDR's own documented default -- the address its Pi
+# image serves on when it falls back to being its own access point, published in
+# KrakenRF's wiki. It is a vendor constant in the same class as localhost and
+# example.com, not anybody's infrastructure, and Signal DF's setup guide cannot
+# be written without it. Allowlisting a literal like this is only ever right when
+# the number is a third party's published default; a real address of ours still
+# fails, which is the whole point.
+ALLOW='noreply@anthropic\.com|com\.atakmap\.app@[0-9]+\.[0-9]+\.[0-9]+\.[A-Z]+|example\.com|schemas\.android\.com|w3\.org|0\.0\.0\.0|127\.0\.0\.1|localhost|192\.168\.50\.5|tnttnt|wintec_mapping|takrepoUser|takrepoPassword|storePassword|keyPassword|1-877-487-6867|1-800-424-9300|1-800-535-5053|1-800-451-8346|1-703-697-0218|1-800-222-1222|1-800-424-8802|1-888-464-7427'
 
 # The tak.gov submission README must carry a point-of-contact address, and the
 # generic email scan would otherwise block the very zip that needs it. This is the

@@ -3,20 +3,21 @@ package com.atakmap.android.traffic.plugin;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.graphics.Typeface;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.style.ForegroundColorSpan;
-import android.text.style.RelativeSizeSpan;
-import android.text.style.StyleSpan;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
 import com.atak.plugins.impl.PluginContextProvider;
 import com.atak.plugins.impl.PluginLayoutInflater;
+import com.atakmap.android.ipc.AtakBroadcast;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.traffic.LiveOverlay;
+import com.atakmap.android.traffic.incidents.IncidentDetails;
+import com.atakmap.android.traffic.incidents.IncidentFeed;
+import com.atakmap.android.traffic.incidents.IncidentSettings;
 import com.atakmap.coremap.log.Log;
 
 import java.text.SimpleDateFormat;
@@ -41,7 +42,7 @@ import gov.tak.platform.marshal.MarshalManager;
  * and keeps itself current while the map sits untouched. The engine is
  * {@link LiveOverlay}; this class is the four controls in front of it.
  */
-public class Traffic implements IPlugin, LiveOverlay.Listener {
+public class Traffic implements IPlugin, LiveOverlay.Listener, IncidentFeed.Listener {
 
     private static final String TAG = "Traffic";
 
@@ -54,6 +55,15 @@ public class Traffic implements IPlugin, LiveOverlay.Listener {
     private Pane pane;
 
     private LiveOverlay overlay;
+
+    /**
+     * The 511 layer: road incidents beside the tiles, with its own switch. Separate
+     * from {@link #overlay} on purpose -- either can be on without the other.
+     */
+    private IncidentFeed incidents;
+    private IncidentDetails incidentDetails;
+    /** Answers ATAK before it opens a radial on a 511 icon; see {@link #registerTap}. */
+    private com.atakmap.android.menu.MapMenuEventListener menuListener;
 
     /** What the source button offers. Order is the order they are shown. */
     private final List<LiveOverlay.Source> sources = new ArrayList<>();
@@ -84,6 +94,8 @@ public class Traffic implements IPlugin, LiveOverlay.Listener {
      * on a metered connection or a cold start in the field.
      */
     private static final String PREF_PERSIST = "traffic.persist";
+    /** Whether 511 was on when ATAK last stopped; restored under the same opt-in. */
+    private static final String PREF_INCIDENTS_ON = "traffic.incidentsOn";
 
     private Button sourceButton;
     private Button toggleButton;
@@ -91,9 +103,19 @@ public class Traffic implements IPlugin, LiveOverlay.Listener {
     private Button refreshButton;
     private Button intervalButton;
     private TextView status;
+    private Button incidentsButton;
+    private TextView incidentsStatus;
+    private Button incidentsAddState;
+    private View mainPage;
+    private View incidentsPage;
+    /** Where the main page was scrolled when the settings page replaced it. */
+    private int mainScrollY;
+    private IncidentSettings incidentSettings;
 
     private final SimpleDateFormat clock =
             new SimpleDateFormat("HH:mm:ss", Locale.US);
+    private final SimpleDateFormat shortClock =
+            new SimpleDateFormat("HH:mm", Locale.US);
 
     public Traffic(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -115,7 +137,10 @@ public class Traffic implements IPlugin, LiveOverlay.Listener {
         // where a reviewer looks for it, rather than on a button.
         sources.add(new LiveOverlay.Source("traffic",
                 "Traffic Overlay",
-                "mapsources/traffic.xml", 60000L));
+                "mapsources/traffic.xml", 60000L,
+                // Highway shields above the traffic, so the colored line does not
+                // cover the base map's route numbers (operator, 2026-09-26).
+                "mapsources/traffic-labels.xml"));
         chosen = sources.get(0);
 
         toolbarItem = new ToolbarItem.Builder(
@@ -137,6 +162,7 @@ public class Traffic implements IPlugin, LiveOverlay.Listener {
     @Override
     public void onStart() {
         registerPreferences();
+        startIncidents();
         restore();
 
         if (uiService == null)
@@ -152,10 +178,21 @@ public class Traffic implements IPlugin, LiveOverlay.Listener {
             overlay.turnOff();
             overlay = null;
         }
+        stopIncidents();
         unregisterPreferences();
 
         if (uiService == null)
             return;
+        // Close our pane on the way out. ATAK leaves an open pane on screen when the
+        // plugin unloads -- a reinstall does exactly that -- and its buttons still
+        // point at this unloaded instance: 511 ON then answered "no map view" while
+        // the freshly loaded plugin sat there working (s10-dev-2, 2026-09-26).
+        try {
+            if (pane != null && uiService.isPaneVisible(pane))
+                uiService.closePane(pane);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "could not close the pane: " + e);
+        }
         uiService.removeToolbarItem(toolbarItem);
     }
 
@@ -196,6 +233,7 @@ public class Traffic implements IPlugin, LiveOverlay.Listener {
     // ------------------------------------------------------------------------ pane
 
     private void showPane() {
+        startIncidents();
         if (pane == null) {
             final View v = PluginLayoutInflater.inflate(pluginContext,
                     R.layout.main_layout, null);
@@ -212,6 +250,43 @@ public class Traffic implements IPlugin, LiveOverlay.Listener {
             refreshButton = v.findViewById(R.id.btn_refresh);
             intervalButton = v.findViewById(R.id.btn_interval);
             status = v.findViewById(R.id.status);
+            incidentsButton = v.findViewById(R.id.btn_incidents);
+            incidentsStatus = v.findViewById(R.id.status_incidents);
+            incidentsAddState = v.findViewById(R.id.btn_incidents_add_state);
+            incidentsAddState.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    final String code = incidents == null ? null : incidents.suggestedState();
+                    if (code != null)
+                        incidents.addState(code);
+                    render();
+                }
+            });
+            incidentsButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    toggleIncidents();
+                }
+            });
+            mainPage = v.findViewById(R.id.main_page);
+            incidentsPage = v.findViewById(R.id.incidents_page);
+            if (incidents != null)
+                incidentSettings = new IncidentSettings(pluginContext,
+                        MapView.getMapView(), incidentsPage, incidents);
+            v.findViewById(R.id.btn_incidents_settings).setOnClickListener(
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View view) {
+                            showIncidentSettings(true);
+                        }
+                    });
+            v.findViewById(R.id.btn_incidents_back).setOnClickListener(
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View view) {
+                            showIncidentSettings(false);
+                        }
+                    });
 
             sourceButton.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -230,8 +305,10 @@ public class Traffic implements IPlugin, LiveOverlay.Listener {
                     pr.edit().putBoolean(PREF_PERSIST, on).apply();
                     // Turning it on should capture what is on the map now,
                     // rather than waiting for the next deliberate toggle.
-                    if (on)
+                    if (on) {
                         remember(overlay != null && overlay.isOn());
+                        rememberIncidents(incidents != null && incidents.isOn());
+                    }
                     render();
                 }
             });
@@ -245,8 +322,10 @@ public class Traffic implements IPlugin, LiveOverlay.Listener {
             refreshButton.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
-                    if (overlay != null)
+                    if (overlay != null && overlay.isOn())
                         overlay.refreshNow();
+                    if (incidents != null && incidents.isOn())
+                        incidents.refreshNow();
                 }
             });
             intervalButton.setOnClickListener(new View.OnClickListener() {
@@ -343,6 +422,236 @@ public class Traffic implements IPlugin, LiveOverlay.Listener {
             Log.w(TAG, "could not restore " + chosen.label + ": " + failure);
     }
 
+    // ------------------------------------------------------------------- 511
+
+    private void startIncidents() {
+        if (incidents != null)
+            return;
+        final MapView mapView = MapView.getMapView();
+        if (mapView == null) {
+            // Can happen at a cold ATAK start. The 511 button tries again, so this is
+            // a delay, never a dead switch.
+            Log.w(TAG, "no map view yet; 511 starts on first use");
+            return;
+        }
+        incidents = new IncidentFeed(mapView, pluginContext);
+        incidents.addListener(this);
+        incidentDetails = new IncidentDetails(mapView, pluginContext, incidents);
+        incidents.addListener(incidentDetails);
+        final AtakBroadcast.DocumentedIntentFilter filter =
+                new AtakBroadcast.DocumentedIntentFilter();
+        filter.addAction(IncidentDetails.ACTION);
+        AtakBroadcast.getInstance().registerReceiver(incidentDetails, filter);
+        registerTap(mapView);
+
+        // 511 comes back the way it was left, across ATAK restarts and plugin updates,
+        // with no separate opt-in (operator, 2026-09-26: "should stay on persistent
+        // after restart"). The tiles keep their Persistent Overlay switch.
+        final android.content.SharedPreferences prefs = prefs();
+        if (prefs != null && prefs.getBoolean(PREF_INCIDENTS_ON, false)) {
+            final String failure = incidents.turnOn();
+            if (failure != null)
+                Log.w(TAG, "could not restore 511: " + failure);
+        }
+    }
+
+    /**
+     * A tap on a 511 icon opens its details in the pane, no radial (operator,
+     * 2026-11-05). The radial's only reading button was Details, so it was a step in
+     * the way; Bloodhound and range and bearing are still on ATAK's own tools.
+     *
+     * <p>ATAK asks this listener before it opens a radial; answering true stops the
+     * radial and tells ATAK the tap was handled, so no callout is left pinned to the
+     * map after Back (AirAware, 2026-10-09). Only our own items are claimed. The page
+     * opens a quarter second later because a pick from ATAK's Select Item list posts
+     * its own show-details, which would close a page opened inline. It goes through
+     * the same broadcast the radial's Details sent, so a tap, the radial (the
+     * fallback when there is no menu receiver) and the list reach one page.
+     */
+    private void registerTap(final MapView mapView) {
+        menuListener = new com.atakmap.android.menu.MapMenuEventListener() {
+            @Override
+            public boolean onShowMenu(final com.atakmap.android.maps.MapItem item) {
+                if (item == null || incidentDetails == null
+                        || item.getMetaString("traffic_incident", null) == null)
+                    return false;
+                final String uid = item.getUID();
+                mapView.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        final AtakBroadcast b = AtakBroadcast.getInstance();
+                        b.sendBroadcast(new android.content.Intent(
+                                "com.atakmap.android.maps.UNFOCUS"));
+                        b.sendBroadcast(new android.content.Intent(
+                                "com.atakmap.android.maps.HIDE_DETAILS"));
+                        b.sendBroadcast(new android.content.Intent(IncidentDetails.ACTION)
+                                .putExtra("targetUID", uid));
+                    }
+                }, 250);
+                return true;
+            }
+
+            @Override
+            public void onHideMenu(com.atakmap.android.maps.MapItem item) {
+            }
+        };
+        final com.atakmap.android.menu.MapMenuReceiver menus =
+                com.atakmap.android.menu.MapMenuReceiver.getInstance();
+        if (menus != null)
+            menus.addEventListener(menuListener);
+        else
+            Log.w(TAG, "no radial menu receiver; 511 taps keep the radial");
+    }
+
+    private void stopIncidents() {
+        if (menuListener != null) {
+            final com.atakmap.android.menu.MapMenuReceiver menus =
+                    com.atakmap.android.menu.MapMenuReceiver.getInstance();
+            if (menus != null)
+                menus.removeEventListener(menuListener);
+            menuListener = null;
+        }
+        if (incidentDetails != null) {
+            incidentDetails.closeIfOpen();
+            if (incidents != null)
+                incidents.removeListener(incidentDetails);
+            try {
+                AtakBroadcast.getInstance().unregisterReceiver(incidentDetails);
+            } catch (RuntimeException e) {
+                Log.w(TAG, "511 details receiver: " + e);
+            }
+            incidentDetails = null;
+        }
+        if (incidents != null) {
+            incidents.stop();
+            incidents = null;
+        }
+    }
+
+    private void toggleIncidents() {
+        startIncidents();
+        if (incidents == null) {
+            say("No map view -- cannot draw 511 incidents.");
+            return;
+        }
+        if (incidents.isOn()) {
+            incidents.turnOff();
+        } else {
+            final String failure = incidents.turnOn();
+            if (failure != null)
+                say("511 did not start.\n\n" + failure);
+        }
+        rememberIncidents(incidents.isOn());
+        render();
+    }
+
+    /** The 511 settings page in place of the main one, as IPAWS swaps its pages. */
+    private void showIncidentSettings(boolean show) {
+        if (incidentSettings == null && incidents != null && incidentsPage != null)
+            incidentSettings = new IncidentSettings(pluginContext, MapView.getMapView(),
+                    incidentsPage, incidents);
+        if (mainPage == null || incidentsPage == null || incidentSettings == null)
+            return;
+        if (show)
+            incidentSettings.refresh();
+        // Both pages share one scroller, so the settings page opened wherever the
+        // main page had been scrolled to: Back and States off the top (S22,
+        // 2026-09-26). Open it at the top; Back returns to where the main page was.
+        final android.widget.ScrollView scroller = scrollerOf(mainPage);
+        if (show && scroller != null)
+            mainScrollY = scroller.getScrollY();
+        mainPage.setVisibility(show ? View.GONE : View.VISIBLE);
+        incidentsPage.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (scroller != null) {
+            final int y = show ? 0 : mainScrollY;
+            scroller.post(new Runnable() {
+                @Override
+                public void run() {
+                    scroller.scrollTo(0, y);
+                }
+            });
+        }
+    }
+
+    /** The scroll view holding a page, or null. */
+    private static android.widget.ScrollView scrollerOf(View v) {
+        for (android.view.ViewParent p = v == null ? null : v.getParent(); p != null;
+                p = p.getParent())
+            if (p instanceof android.widget.ScrollView)
+                return (android.widget.ScrollView) p;
+        return null;
+    }
+
+    private void rememberIncidents(boolean on) {
+        final android.content.SharedPreferences prefs = prefs();
+        if (prefs != null)
+            prefs.edit().putBoolean(PREF_INCIDENTS_ON, on).apply();
+    }
+
+    @Override
+    public void onFeedChanged(IncidentFeed feed) {
+        render();
+    }
+
+    /** The 511 status line, from what the feed actually has, never from what was asked. */
+    private CharSequence incidentsLine() {
+        if (incidents == null || !incidents.isOn())
+            return "";
+        if (incidents.isGatedOut())
+            return pluginContext.getString(R.string.incidents_gated_fmt,
+                    IncidentSettings.gateLabel(incidents.gateMeters()));
+        if (!incidents.everReached())
+            return incidents.isStale() || incidents.lastFailedAt() > 0
+                    ? pluginContext.getString(R.string.incidents_unreachable)
+                    : pluginContext.getString(R.string.incidents_loading);
+        switch (incidents.coverage()) {
+            case NOT_COVERED:
+                return incidents.pickedStates().isEmpty()
+                        ? pluginContext.getString(R.string.incidents_no_states)
+                        : pluginContext.getString(R.string.incidents_not_covered);
+            case NOT_PICKED:
+                return pluginContext.getString(R.string.incidents_not_picked_fmt,
+                        incidents.suggestedStateName());
+            case ZOOM_IN:
+                return pluginContext.getString(R.string.incidents_zoom_in);
+            case GATED:
+                return pluginContext.getString(R.string.incidents_gated_fmt,
+                        IncidentSettings.gateLabel(incidents.gateMeters()));
+            case WAITING:
+                return pluginContext.getString(R.string.incidents_loading);
+            default:
+                break;
+        }
+        final String checked = shortClock.format(new Date(incidents.lastReachedAt()));
+        if (incidents.isStale()) {
+            final SpannableStringBuilder sb = new SpannableStringBuilder(
+                    pluginContext.getString(R.string.incidents_stale_fmt, checked));
+            sb.setSpan(new ForegroundColorSpan(
+                            pluginContext.getResources().getColor(R.color.state_off)),
+                    0, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            return sb;
+        }
+        // The area is said on the main screen too: a radius around the operator that
+        // hides most of the map is a choice they should not have to remember making.
+        final String where = incidents.isRadius()
+                ? IncidentSettings.scopeText(incidents) : incidents.shownNames();
+        final String line = pluginContext.getString(R.string.incidents_checked_fmt, where,
+                checked);
+        // Over a state they do not follow while one they do is still near: say so
+        // under the line, and the Add button below offers it.
+        return offersState() ? line + "\n" + pluginContext.getString(
+                R.string.incidents_not_picked_fmt, incidents.suggestedStateName()) : line;
+    }
+
+    /** The pane offers to add the state under the map: shown or not-picked, never gated. */
+    private boolean offersState() {
+        if (incidents == null || !incidents.isOn() || incidents.isGatedOut()
+                || !incidents.everReached() || incidents.suggestedState() == null)
+            return false;
+        final IncidentFeed.Coverage c = incidents.coverage();
+        return c == IncidentFeed.Coverage.NOT_PICKED || c == IncidentFeed.Coverage.SHOWN;
+    }
+
     private static android.content.SharedPreferences prefs() {
         final MapView mv = MapView.getMapView();
         return mv == null ? null
@@ -437,23 +746,37 @@ public class Traffic implements IPlugin, LiveOverlay.Listener {
         final boolean on = overlay != null && overlay.isOn();
         setState(toggleButton, on);
 
+        final boolean incidentsOn = incidents != null && incidents.isOn();
+        setState(incidentsButton, incidentsOn);
+        if (incidentsStatus != null)
+            incidentsStatus.setText(incidentsLine());
+        if (incidentsAddState != null) {
+            final boolean offer = offersState();
+            incidentsAddState.setVisibility(offer ? View.VISIBLE : View.GONE);
+            if (offer)
+                incidentsAddState.setText(pluginContext.getString(
+                        R.string.incidents_add_state_fmt, incidents.suggestedStateName()));
+        }
+
         if (persistButton != null) {
             final android.content.SharedPreferences pr = prefs();
             setState(persistButton, pr != null
                     && pr.getBoolean(PREF_PERSIST, false));
         }
-        refreshButton.setEnabled(on);
+        refreshButton.setEnabled(on || incidentsOn);
         intervalButton.setEnabled(on);
 
+        // The Traffic Overlay button already says ON or OFF; a second big state word
+        // under it said the same thing again (operator, 2026-11-05). Off, the line is
+        // gone; on, it carries only the refresh detail.
         if (!on) {
-            status.setText(state(R.string.state_off, R.color.state_off));
+            status.setVisibility(View.GONE);
             return;
         }
+        status.setVisibility(View.VISIBLE);
 
         final long every = overlay.getIntervalMs() / 1000L;
-        final SpannableStringBuilder sb =
-                new SpannableStringBuilder(state(R.string.state_on, R.color.state_on));
-        sb.append("\n");
+        final SpannableStringBuilder sb = new SpannableStringBuilder();
         if (overlay.isHoldingForScreen())
             sb.append("Holding while the screen is off; refreshes on wake.\n");
         else
@@ -481,24 +804,6 @@ public class Traffic implements IPlugin, LiveOverlay.Listener {
             sb.append("Waiting for the first tiles…");
         }
         status.setText(sb);
-    }
-
-    /**
-     * The state word, in its colour and larger than the detail beneath it.
-     *
-     * ON and OFF are what the operator reads first and often the only thing they read, so
-     * the word carries the answer by itself rather than needing the sentence after it.
-     */
-    private CharSequence state(int wordRes, int colorRes) {
-        final SpannableStringBuilder s =
-                new SpannableStringBuilder(pluginContext.getString(wordRes));
-        final int end = s.length();
-        s.setSpan(new ForegroundColorSpan(
-                        pluginContext.getResources().getColor(colorRes)),
-                0, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        s.setSpan(new StyleSpan(Typeface.BOLD), 0, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        s.setSpan(new RelativeSizeSpan(1.4f), 0, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        return s;
     }
 
     private void say(String message) {

@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The pane: the icon row pinned on top, page dots under it, and the pages in a
+     pager below (the SDK helloworld TabViewDropDown pattern, ATAK's own ViewPager).
+     A swipe or the arrow turns the page; each page scrolls on its own. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:layout_marginLeft="3dp"
+    android:layout_marginRight="3dp">
+
+        <!-- The icon row: what applies to every page (point modes, favorites,
+             units, wide), then the page controls. Refresh and Settings act on the
+             forecast only and live on the Forecast page.
+             44 dp targets on ATAK's own button background, white masks tinted green
+             for the mode in use (the Traffic toggle convention). Replaces the Source
+             and Where button rows, so the readout starts one row down. -->
+        <!-- baselineAligned off: a horizontal row lines its children up by their
+             text, and the page button's two-line "Fire Weather / Zones" was pushed
+             down by its first line, a gap over it and its foot below the row
+             (operator, 2026-09-29). Every button here is 44dp, so tops line up. -->
+        <LinearLayout
+            android:id="@+id/icon_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:baselineAligned="false"
+            android:paddingTop="4dp">
+
+            <ImageButton
+                android:id="@+id/mode_self"
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/self_position"
+                android:src="@drawable/ic_point_self" />
+
+            <ImageButton
+                android:id="@+id/mode_center"
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/map_center"
+                android:src="@drawable/ic_point_center" />
+
+            <ImageButton
+                android:id="@+id/mode_pick"
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/pick_point"
+                android:src="@drawable/ic_point_pick" />
+
+            <ImageButton
+                android:id="@+id/favorites_button"
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/favorites_title"
+                android:src="@drawable/ic_favorites" />
+
+            <Button
+                android:id="@+id/units_button"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="44dp"
+                android:layout_marginLeft="2dp"
+                android:layout_marginRight="2dp"
+                android:paddingLeft="4dp"
+                android:paddingRight="4dp"
+                android:text="@string/units_metric" />
+
+            <ImageButton
+                android:id="@+id/wide_button"
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/wide"
+                android:src="@drawable/ic_wide" />
+
+            <!-- Straight to the Layers page, from any page: the page everyone comes
+                 back to, and the picker was two taps away from it (operator,
+                 2026-10-05). Green while the Layers page is showing. -->
+            <ImageButton
+                android:id="@+id/layers_button"
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/tab_layers"
+                android:src="@drawable/ic_layers" />
+
+            <!-- The pages: back, the page showing (a tap lists all six), forward.
+                 At the right end, under the thumb that holds a phone in landscape.
+                 In this row rather than a row of their own so the pane keeps its
+                 height for the page (operator, 2026-09-27: "a drop down for the
+                 pages so i could have some more vertical space back"). -->
+            <ImageButton
+                android:id="@+id/page_prev"
+                style="@style/TakwerxIconButton"
+                android:scaleX="-1"
+                android:contentDescription="@string/caption_prev"
+                android:src="@drawable/ic_page_next" />
+
+            <!-- Two lines allowed, and the text shrinks to fit (set in code, API 26+):
+                 "Fire Weather Zones" does not fit one line at half width and was cut
+                 to "Fire Weath..." (operator, 2026-09-29). The short names stay one
+                 line at 13sp. -->
+            <Button
+                android:id="@+id/page_pick"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="2.4"
+                android:layout_height="44dp"
+                android:layout_marginLeft="2dp"
+                android:layout_marginRight="2dp"
+                android:paddingLeft="4dp"
+                android:paddingRight="4dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp"
+                android:singleLine="false"
+                android:maxLines="2"
+                android:lineSpacingMultiplier="0.9"
+                android:textSize="13sp"
+                android:text="@string/tab_forecast" />
+
+            <ImageButton
+                android:id="@+id/page_next"
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/caption_next"
+                android:src="@drawable/ic_page_next" />
+        </LinearLayout>
+
+        <!-- What each button above does, in words, one caption under each. Shown
+             only when the buttons are wide enough to carry it (the pane opened
+             wide, or a phone held upright); at half width the icons stand alone
+             (operator, 2026-09-27: "when its wide like this can we put what each
+             tool means underneath it"). -->
+        <LinearLayout
+            android:id="@+id/icon_captions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/cap_self"
+                style="@style/TakwerxIconCaption"
+                android:text="@string/caption_self" />
+
+            <TextView
+                android:id="@+id/cap_center"
+                style="@style/TakwerxIconCaption"
+                android:text="@string/caption_center" />
+
+            <TextView
+                android:id="@+id/cap_pick"
+                style="@style/TakwerxIconCaption"
+                android:text="@string/caption_pick" />
+
+            <TextView
+                android:id="@+id/cap_favorites"
+                style="@style/TakwerxIconCaption"
+                android:text="@string/caption_favorites" />
+
+            <TextView
+                android:id="@+id/cap_units"
+                style="@style/TakwerxIconCaption"
+                android:text="@string/caption_units" />
+
+            <TextView
+                android:id="@+id/cap_wide"
+                style="@style/TakwerxIconCaption"
+                android:text="@string/caption_full" />
+
+            <TextView
+                android:id="@+id/cap_layers"
+                style="@style/TakwerxIconCaption"
+                android:text="@string/tab_layers" />
+
+            <TextView
+                android:id="@+id/cap_prev"
+                style="@style/TakwerxIconCaption"
+                android:text="@string/caption_prev" />
+
+            <TextView
+                android:id="@+id/cap_page"
+                style="@style/TakwerxIconCaption"
+                android:layout_weight="2.4"
+                android:text="@string/caption_page" />
+
+            <TextView
+                android:id="@+id/cap_next"
+                style="@style/TakwerxIconCaption"
+                android:text="@string/caption_next" />
+        </LinearLayout>
+
+
+        <androidx.viewpager.widget.ViewPager
+            android:id="@+id/pager"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+</LinearLayout>

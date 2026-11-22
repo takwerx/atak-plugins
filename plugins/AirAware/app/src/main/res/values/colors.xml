@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    
+    <color name="white">#ffffff</color>
+    <color name="darker_gray">#121212</color>
+    <color name="heading_yellow">#dfb228</color>
+
+    <!-- ON and OFF, the same green and red every takwerx plugin uses. -->
+    <color name="state_on">#3ddc61</color>
+    <color name="state_off">#ff5b52</color>
+
+    <!-- The aviation convention: red for a restriction that is in effect, amber for one that
+         is scheduled. ForeFlight, Garmin Pilot and SkyVector all read this way. -->
+    <color name="tfr_active">#e01b24</color>
+    <color name="tfr_upcoming">#ffb300</color>
+    <color name="dim_text">#b0b0b0</color>
+    <!-- Map Depot's "tap to go there" green: one affordance, one color, across plugins. -->
+    <color name="action_green">#4caf50</color>
+
+    <color name="working">#FFC107</color>
+</resources>

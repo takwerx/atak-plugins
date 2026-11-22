@@ -1,10 +1,10 @@
 ATAK Plugin — Map Depot
 
-**Download Map Depot 1.6** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Map Depot 1.16** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.6/ATAK-Plugin-MapDepot-1.6--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.6/ATAK-Plugin-MapDepot-1.6--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.6/ATAK-Plugin-MapDepot-1.6--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.16/ATAK-Plugin-MapDepot-1.16--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.16/ATAK-Plugin-MapDepot-1.16--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.16/ATAK-Plugin-MapDepot-1.16--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/map-depot/releases
 
@@ -19,7 +19,7 @@ Map Depot downloads map data from inside ATAK. Without it, getting elevation or 
 map source onto a device means a web browser, the Downloads folder, and the Import
 Manager -- a sequence that is awkward on a phone and impossible with gloves on.
 
-Six kinds of data, each installed into the directory ATAK already scans, so
+Seven kinds of data, each installed into the directory ATAK already scans, so
 nothing has to be imported by hand afterwards:
 
   * Elevation. DTED2 by state or province. Every cell is verified against a
@@ -29,7 +29,26 @@ nothing has to be imported by hand afterwards:
 
   * Streaming base maps. MOBAC map source XML and streaming vector tile configs
     -- satellite, street, topographic, nautical, and transparent overlays such as
-    BLM roads and trails, FEMA flood hazard zones and current fire perimeters.
+    Google roads and labels, USGS contours, BLM roads and trails, FEMA flood
+    hazard zones, NEXRAD radar and current fire perimeters, sectioned by
+    kind with roads and points of interest first. An overlay installs into
+    ATAK's grg folder, where ATAK draws it over the base map and over any
+    disaster aerial, and the row carries a Hide/Show switch; a base map
+    installs into the map source folder, where it is one more map to pick.
+
+  * Disaster aerials. Post-event imagery from three sources in one list,
+    events of this year and last: NOAA's National Geodetic Survey flights
+    (15-30 cm), the Civil Air Patrol's flights for FEMA served by FEMA's
+    GeoPlatform (down to 9 cm), and Maxar Open Data satellite releases served
+    by Esri's Living Atlas (30 cm, CC BY-NC, before and after, cloud cover on
+    the row). Everything an agency publishes is listed, not graded. One
+    overlay per flight. Each flight can be added as a streaming overlay or
+    downloaded as an offline copy, an MBTiles pack the depot builds from the
+    agency's own tiles or image service at the flight's full detail, or a
+    step coarser to stay under about 500 MB, which draws with no signal. The
+    catalog is rebuilt nightly from each agency's own index, so flights added
+    during a storm appear the next day and their offline copies the morning
+    after. Outlines show where each flight on the phone is.
 
   * Offline public land vector tiles. US Forest Service vector basemap packages, one per
     national forest or grassland, fetched directly from ArcGIS Online.
@@ -61,12 +80,59 @@ nothing has to be imported by hand afterwards:
 Any folder in either archive can be pinned to the top of the list, so a crew
 assigned to a fire reaches it in one tap rather than four.
 
-The catalog is fetched at runtime and cached, so a device that has been to the
-depot once still shows what it holds when there is no signal. The two incident
-archives are read live, since what they hold changes through the day.
+The catalog is fetched at runtime and saved on the phone, so a device that has
+been to the depot once still shows what it holds when there is no signal. The
+three incident archives are read live, since what they hold changes through the
+day; with no signal their list is the maps already on the phone and the pinned
+fires.
 
 _________________________________________________________________
 STATUS
+
+Version 1.16: Satellite (Sentinel-2), a new section listing recent satellite
+passes over the map center or your position, in true color or as a fire view
+that makes fresh burn and active fire stand out. Tap a pass to see its outline
+and go there; Add Online streams it over the map. Every pass is held in both
+views, and one button flips them all.
+
+Version 1.14: the catalog reader accepted event ids and pack paths only up
+to 40 characters, which silently dropped one Maxar event and fourteen Civil
+Air Patrol and Maxar offline copies from the Disaster Aerials list; the
+limit is 64 now and they are listed. The landing page picture in the guide
+and manual shows every section, and the manual prints no question marks
+where it had arrows.
+
+Version 1.13: pictures from the signed build in the guide and manual
+(outlines, a flight with the roads overlay on top, the sectioned overlay
+list); the offline copy's digest check reshaped for the static scan; no
+change in what the plugin does.
+
+Version 1.12: Disaster Aerials, a new section listing post-disaster imagery
+by event from NOAA, the Civil Air Patrol and Maxar, each flight an overlay
+that draws over whatever map is selected, streamed or as an offline copy on
+the phone. Streaming overlays now install into ATAK's grg folder, so they
+switch on over the map instead of replacing it (before 1.12 picking one from
+the map list turned the imagery off). Three map sources by Joseph Elfelt
+(mappingsupport.com) join the catalog: USGS contour lines, NRL 133 Cities
+aerials and NEXRAD radar.
+
+Version 1.11: the plugin's lists come back with no network. The incident map
+list shows the maps on the phone and the pinned fires instead of an empty list,
+the saved catalog moves out of Android's cache folder (which the system empties
+when storage runs low) to atak/tools/mapdepot, and a reply from the depot that
+is not a catalog can no longer replace the saved copy. Each section says "No
+network" and how old its saved list is. Offline Public Land Vector Tiles is
+offered again on official ATAK-CIV 5.8.0.5, which fixed the start-up crash
+behind the 1.5 gate (TAK Product Center ATAK-21131); 5.8.0.4 stays gated.
+1.10 went to tak.gov once and was superseded before publication: its scan
+read a folder name in an error message as a system information leak.
+
+Version 1.9: a downloaded region that inflates to nothing is refused instead
+of hashed, and the hash is finalized with data in hand (tak.gov's Fortify
+scan flagged the digest on 1.7 and 1.8). 1.9 also carries the change 1.7 was
+built for: each ATAK target's APK has its own versionCode, so an MDM can hold
+all three builds and push each one as an update. 1.7 and 1.8 each went to
+tak.gov once and were superseded on the scan finding before publication.
 
 Version 1.6. Verified on ATAK-CIV 5.8.0.3 (SDK build) and, as the tak.gov-signed
 builds, on official ATAK-CIV 5.6.0.18 and 5.8.0.4 -- on the latter the gate,

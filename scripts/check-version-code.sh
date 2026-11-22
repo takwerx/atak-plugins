@@ -7,8 +7,12 @@
 # the MDM compare the integer versionCode; versionName is display only.
 #
 # What "an update" needs, checked here:
-#   - app/build.gradle derives versionCode from PLUGIN_VERSION
-#     (MAJOR*10000 + MINOR*100 + PATCH), never from git
+#   - app/build.gradle derives versionCode from PLUGIN_VERSION and the ATAK
+#     target, (MAJOR*10000 + MINOR*100 + PATCH) * 10000 + ATAK major*1000 +
+#     minor*10 + patch (1.3 on 5.8.0 -> 103005080), never from git. One code
+#     per target: an MDM handed two targets of one release under one code and
+#     two hashes reports an incompatible build (takwerx/feature-layer#1,
+#     2026-09-20); before that every target of a release carried one code
 #   - the version is above every release already signed (dist/signed/ keeps
 #     every tak.gov-signed APK), so a resubmission is a NEW version, not the
 #     same one again. --target narrows "already signed" to one ATAK target: a
@@ -16,8 +20,9 @@
 #     while no signed APK exists for it
 #   - --signed: this version's signed APKs are all present, one per target the
 #     README links (a missing target strands every device on that ATAK), each
-#     carries that code, the same package name and the same signing
-#     certificate as the last signed release
+#     carries that target's code, above the code in the last signed APK for
+#     that target, no two targets sharing one, the same package name and the
+#     same signing certificate as the last signed release
 #   - --live: no release on the plugin's public repo is this version or newer
 #
 #   scripts/check-version-code.sh <Plugin>                    # tree + dist/signed, no network
@@ -54,6 +59,22 @@ code_of() {
     printf "%d", $1*10000 + $2*100 + $3 }'
 }
 
+# "5.8.0" -> 5080: the ATAK target's share of the code. ATAK major <= 9,
+# minor <= 99, patch <= 9, or the digits run into each other.
+atak_code_of() {
+  printf '%s' "$1" | awk -F. '{
+    if ($1 !~ /^[0-9]+$/ || $1 > 9 || ($2 != "" && ($2 !~ /^[0-9]+$/ || $2 > 99)) || ($3 != "" && ($3 !~ /^[0-9]+$/ || $3 > 9))) exit 1
+    printf "%d", $1*1000 + $2*10 + $3 }'
+}
+# "1.3" on "5.8.0" -> 103005080: what the APK built for that target carries.
+full_code_of() {
+  local p a
+  p="$(code_of "$1")" || return 1
+  a="$(atak_code_of "$2")" || return 1
+  printf '%d' "$((p * 10000 + a))"
+}
+ATAKV="$(sed -nE "s/^[[:space:]]*ext\.ATAK_VERSION[[:space:]]*=[[:space:]]*['\"]([^'\"]+)['\"].*/\1/p" "$GRADLE" | head -1)"
+
 EXPECT="$(code_of "$VER")" || EXPECT=""
 if [ -z "$EXPECT" ] || [ "$EXPECT" -le 1 ]; then
   echo "check-version-code: FAIL ($PLUGIN): PLUGIN_VERSION '$VER' is not MAJOR.MINOR[.PATCH] digits" >&2; exit 1
@@ -61,6 +82,7 @@ fi
 
 fail=0
 finding() { echo "  FAIL: $*"; fail=1; }
+codes_desc=""
 
 # 1. The tree derives the code from PLUGIN_VERSION. submission-zip.sh proves the
 #    built APK agrees; this catches a plugin that never got the change.
@@ -68,6 +90,8 @@ grep -qE '^[[:space:]]*defaultConfig\.versionCode[[:space:]]*=[[:space:]]*PLUGIN
   || finding "app/build.gradle does not set defaultConfig.versionCode = PLUGIN_VERSION_CODE (the SDK's getVersionCode() is 1 at tak.gov)"
 grep -qE '^[[:space:]]*ext\.PLUGIN_VERSION_CODE[[:space:]]*=' "$GRADLE" \
   || finding "app/build.gradle does not define ext.PLUGIN_VERSION_CODE"
+grep -qE 'ATAK_VERSION\.tokenize' "$GRADLE" \
+  || finding "app/build.gradle's PLUGIN_VERSION_CODE does not fold in ATAK_VERSION: every target of a release would carry one code, and an MDM handed two of them reports an incompatible build (takwerx/feature-layer#1)"
 
 # 2. Above every release already signed. The version in the file name is the
 #    truth for builds from before the fix: they all read versionCode 1.
@@ -111,6 +135,20 @@ BT="$(ls -d "${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}"/buil
 AAPT="${BT:-/nonexistent}/aapt"
 KEYTOOL="${JAVA_HOME:-/opt/homebrew/opt/openjdk@17}/bin/keytool"
 pkg_of()  { "$AAPT" dump badging "$1" 2>/dev/null | sed -n "s/^package: name='\([^']*\)'.*/\1/p"; }
+# The newest signed APK of another version for one ATAK target: the build an
+# MDM already holds for that target, whose code this release has to beat.
+prev_signed_for_target() {
+  local best="" bestc=0 a b v t c
+  for a in "$SIGNED_DIR"/ATAK-Plugin-"$PLUGIN"-*--"$1"-civ-release.apk; do
+    [ -f "$a" ] || continue
+    b="$(basename "$a")"
+    v="$(printf '%s' "$b" | sed -nE "s/^ATAK-Plugin-$PLUGIN-([0-9.]+)--([0-9.]+)-civ-release\.apk$/\1/p")"
+    [ -n "$v" ] && [ "$v" != "$VER" ] || continue
+    c="$(code_of "$v")" || continue
+    if [ "$c" -gt "$bestc" ]; then bestc=$c; best=$a; fi
+  done
+  printf '%s' "$best"
+}
 code_in() { "$AAPT" dump badging "$1" 2>/dev/null | sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p"; }
 cert_of() { "$KEYTOOL" -printcert -jarfile "$1" 2>/dev/null | sed -n 's/^[[:space:]]*SHA256: //p' | head -1; }
 
@@ -125,7 +163,7 @@ if [ "$SIGNED" = 1 ]; then
     prev_pkg="$(pkg_of "$prev_apk")"
     [ -x "$KEYTOOL" ] && prev_cert="$(cert_of "$prev_apk")"
   fi
-  certs=""
+  certs=""; codes=""
   for t in $targets; do
     a="$SIGNED_DIR/ATAK-Plugin-$PLUGIN-$VER--$t-civ-release.apk"
     if [ ! -f "$a" ]; then
@@ -135,7 +173,22 @@ if [ "$SIGNED" = 1 ]; then
     [ -x "$AAPT" ] || continue
     before=$fail
     c="$(code_in "$a")"
-    [ "$c" = "$EXPECT" ] || finding "$(basename "$a") carries versionCode '${c:-?}', expected $EXPECT"
+    want="$(full_code_of "$VER" "$t")" || want=""
+    [ -n "$want" ] || finding "no versionCode can be derived for $VER on ATAK $t (the scheme takes ATAK major <= 9, minor <= 99, patch <= 9)"
+    [ -z "$want" ] || [ "$c" = "$want" ] || finding "$(basename "$a") carries versionCode '${c:-?}', expected $want for $VER on ATAK $t"
+    case " $codes " in
+      *" $c "*) finding "$(basename "$a") shares versionCode $c with another target of this release: an MDM handed both reports an incompatible build (takwerx/feature-layer#1)" ;;
+    esac
+    codes="$codes $c"
+    codes_desc="${codes_desc:+$codes_desc, }$c ($t)"
+    # An update on THIS target: above the code in the last signed APK for it.
+    pt="$(prev_signed_for_target "$t")"
+    if [ -n "$pt" ]; then
+      pc="$(code_in "$pt")"
+      if [ -n "$pc" ] && [ -n "$c" ] && [ "$c" -le "$pc" ] 2>/dev/null; then
+        finding "$(basename "$a") (code $c) is not above $(basename "$pt") (code $pc): no MDM would push it on ATAK $t"
+      fi
+    fi
     p="$(pkg_of "$a")"
     if [ -n "$prev_pkg" ] && [ "$p" != "$prev_pkg" ]; then
       finding "$(basename "$a") is package $p but the last signed release ($prev_ver) was $prev_pkg: a different app, not an update"
@@ -180,7 +233,11 @@ if [ "$LIVE" = 1 ]; then
 fi
 
 if [ "$fail" = 0 ]; then
-  echo "check-version-code: PASS ($PLUGIN $VER -> versionCode $EXPECT, an update over every signed release)"
+  if [ -z "$codes_desc" ]; then
+    t0="${TARGET:-$ATAKV}"
+    codes_desc="$(full_code_of "$VER" "$t0" 2>/dev/null || echo "${EXPECT}0000+target") on ATAK ${t0:-?}"
+  fi
+  echo "check-version-code: PASS ($PLUGIN $VER -> versionCode $codes_desc, an update over every signed release)"
   exit 0
 fi
 echo "check-version-code: FAIL ($PLUGIN $VER): an MDM could not push this as an update; fix the findings above, do not work around them" >&2

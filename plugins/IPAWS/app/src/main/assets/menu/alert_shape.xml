@@ -1,0 +1,8 @@
+<!-- buttons x buttonSpan must be 360, which is what every menu in ATAK's own
+     assets/menus does: 10 x 36, 9 x 40, 5 x 72. Three buttons at 90 left a
+     three-quarter circle with a bite out of it. -->
+<menu buttonRadius='65' buttonSpan='120' buttonWidth='120' buttonBg='bgs/button.xml'>
+    <button icon='icons/details.png' onClick='actions/showalert.xml' />
+    <button icon='icons/pairing_line.png' onClick='actions/pairingline.xml' />
+    <button icon='icons/polar_coord.png' onClick='actions/polarCoords.xml' />
+</menu>

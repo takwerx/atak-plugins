@@ -31,8 +31,15 @@
             android:layout_height="wrap_content"
             android:textSize="12sp"
             android:textColor="#4caf50"
-            android:text="tap to go there" />
+            android:text="tap for details" />
     </LinearLayout>
+    <Button
+        android:id="@+id/result_go"
+        style="@style/TakwerxButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="8dp"
+        android:text="Go" />
     <TextView
         android:id="@+id/result_dist"
         android:layout_width="wrap_content"

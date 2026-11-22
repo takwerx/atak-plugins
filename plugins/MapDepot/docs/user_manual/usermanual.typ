@@ -3,9 +3,9 @@
 
 #show: userguide.with(
    plugin-name: "Map Depot",
-   plugin-version: "1.6",
+   plugin-version: "1.14",
    platform: "ATAK",
-   platform-version: "5.7.0",
+   platform-version: "5.8.0",
 )
 
 #tak-slide[
@@ -29,7 +29,7 @@ itself where ATAK expects to find it.
 #toolbox.side-by-side(columns: (4fr, 8fr))[
   #image("02.png", width: 78%)
 ][
-  Six kinds of data, each on its own page:
+  Nine kinds of data, each on its own page:
 
   - *Elevation (DTED2)* -- terrain, by state or province. What viewsheds and
     elevation readouts need.
@@ -45,6 +45,10 @@ itself where ATAK expects to find it.
     neighborhood, as GeoPDFs.
   - *Drone IR Maps (UASWFC)* -- infrared products flown over a fire, as
     georeferenced PDFs and KMZs.
+  - *Disaster Aerials* -- the imagery flown after a hurricane, flood, fire
+    or tornado by NOAA, the Civil Air Patrol and Maxar, one overlay per flight.
+  - *Satellite (Sentinel-2)* -- recent satellite passes over the map center or
+    your position, in true color or as a fire view, streamed over the map.
 ]
 ]
 
@@ -132,12 +136,27 @@ caches what it has drawn.
 #toolbox.side-by-side(columns: (7fr, 5fr))[
   #image("18.png", width: 100%)
 ][
-  Some sources are *overlays* rather than base maps: roads, labels and points
-  of interest on a transparent background, drawn over whatever is underneath.
+  Some sources are *overlays* rather than base maps: roads, labels, contour
+  lines, flood zones or radar on a transparent background, drawn over whatever
+  is underneath. The *Overlay* category lists them.
 
-  This is what makes fresh imagery usable. Aerial imagery flown after an event
-  has no street names on it. An overlay puts them back without hiding the
-  imagery underneath.
+  An overlay is something you switch on, not something you switch to.
+  Adding one switches it on over the map you already have, and over any
+  disaster aerial, and any number can be on at once. The list is sectioned,
+  roads and points of interest first, and each added row keeps a *Hide*
+  button, so nobody has to find it under Overlay Manager.
+
+  Aerial imagery flown after an event has no street names on it. *Google
+  Roads and Labels (overlay)* puts them back without hiding the imagery.
+]
+]
+
+#tak-slide[
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("52.png", width: 92%)
+][
+  The overlay list under its headings, roads first. An added row carries
+  *Hide* and *Remove*; Hide switches the overlay off and keeps it.
 ]
 ]
 
@@ -485,13 +504,145 @@ covers before deciding to turn it on.
 ]
 
 #tak-slide[
+= Disaster Aerials
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("50.png", width: 92%)
+][
+  After a hurricane makes landfall, and after some floods, fires and
+  tornadoes, the damaged area gets flown and the imagery is public within a
+  day or two. Map Depot lists three sources in one list, this year and
+  last, newest first: NOAA's aerial flights, the Civil Air Patrol's flights
+  for FEMA, and Maxar's satellite releases with the cloud cover on the row.
+  What an agency publishes is listed, not graded; the crew judges. The
+  event button starts on All Events and says which agency each event is from.
+
+  Each flight is an overlay: it covers the area that was flown, at 15 to 30
+  cm a pixel, and draws over whatever map you have. Flights are listed newest
+  first; the button on the right switches to nearest the map or nearest you.
+  Tap a row before adding it and the map goes to where the flight is.
+
+  Two buttons on every flight: *Add Online* streams the imagery as you pan,
+  nothing lands on the phone; *Download*, with the copy's size in the row,
+  keeps a copy of the flight on the phone for when there is no signal, built
+  on the server at the flight's own detail and kept under about 500 MB.
+  Either way the button reads *Remove* once it is on the phone.
+]
+]
+
+#tak-slide[
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("51.png", width: 92%)
+][
+  Pick the event with the button under the search box; the count is how many
+  flights it has.
+
+  Added or downloaded, a row says *tap to go there*, and tapping it takes
+  the map to the flight. *Hide* turns it off without removing it. *Outlines*
+  draws an orange box with the flight's name around every flight on the
+  phone, so the imagery can be found before zooming in.
+
+  During a storm NOAA adds flights every day. The list says when the catalog
+  was last built; a flight flown after that appears the next day, its
+  offline copy the morning after.
+]
+]
+
+#tak-slide[
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("53.jpg", width: 100%)
+][
+  *Outlines On*: every flight on the phone gets an orange box, so the imagery
+  can be found on the map before zooming in. Two NOAA flights along the
+  Florida panhandle here.
+]
+]
+
+#tak-slide[
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("54.jpg", width: 100%)
+][
+  A flight has no street names on it. With the Google roads overlay added
+  from Streaming Base Maps, names and house numbers draw over the imagery,
+  which is how a crew finds an address in it.
+]
+]
+
+#tak-slide[
+= Satellite (Sentinel-2)
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("60.png", width: 92%)
+][
+  Recent satellite pictures of the ground, from the European Sentinel-2
+  satellites, for the last 14 days. Each row is one pass over one area,
+  named for the nearest town, with its date and how much of it is cloud.
+
+  The right-hand button sets where to look: *Newest First* around the map
+  center, *Near: Map Center*, or *Near: Me* around your own position.
+  Tapping it searches again from there. The left-hand button picks the view.
+]
+]
+
+#tak-slide[
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("61.png", width: 100%)
+][
+  Tap a row to go there. An orange box shows exactly the area the pass
+  covers, before you add anything. *Add Online* then streams the picture
+  over whatever map you have. It needs a signal; there is no offline copy.
+]
+]
+
+#tak-slide[
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("62.png", width: 100%)
+][
+  Added, the pass draws over the map and the row offers *Remove*. Every pass
+  you add is held in both views, so nothing more is downloaded to switch.
+]
+]
+
+#tak-slide[
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("64.png", width: 100%)
+][
+  *True Color* is the picture as the eye sees it. Farm fields, roads and
+  water are easy to read, about 10 meters to a pixel.
+]
+]
+
+#tak-slide[
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("65.png", width: 100%)
+][
+  *SWIR Fire View* is the same place in shortwave infrared. Healthy plants
+  show bright green and bare or burned ground shows brown. Active fire and a
+  fresh burn glow orange and red. Thin smoke mostly clears.
+]
+]
+
+#tak-slide[
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("63.png", width: 100%)
+][
+  The *View* button chooses which of the two to show. Under *Remove* each
+  added pass also has a button that flips every pass you added to the other
+  view at once. Clouds hide the ground in both views, so check the cloud
+  figure on the row. The satellites pass each place every few days.
+
+  Contains modified Copernicus Sentinel data.
+]
+]
+
+#tak-slide[
 = Finding what you have installed
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
   #image("11.png", width: 60%)
 ][
-  Every page has a filter button, next to *Back*, that cycles *All* →
-  *Installed* → *Available*. Set to *Installed*, the page becomes a list of
+  Every page has a filter button, next to *Back*, that cycles *All* --
+  *Installed* -- *Available*. Set to *Installed*, the page becomes a list of
   what is on this device.
 ]
 ]
@@ -534,11 +685,14 @@ indistinguishable from data put there by hand.
 
 #v(6pt)
 #toolbox.side-by-side(columns: (7fr, 5fr))[
-  - Elevation → `atak/DTED/`, one file per one-degree square.
-  - Streaming base maps → `atak/imagery/`, as map source files.
-  - Offline public land vector tiles → `atak/imagery/`, as vector tile packages.
-  - Forest Service map sheets → `atak/grg/`, as georeferenced PDFs.
-  - Incident and drone maps → `atak/grg/` for a PDF, `atak/overlays/` for a
+  - Elevation -- `atak/DTED/`, one file per one-degree square.
+  - Streaming base maps -- `atak/imagery/`, as map source files.
+  - Streaming overlays and disaster aerials -- `atak/grg/`, as map source
+    files, so ATAK lists them under Image Overlay; offline copies of
+    flights as MBTiles in the same folder.
+  - Offline public land vector tiles -- `atak/imagery/`, as vector tile packages.
+  - Forest Service map sheets -- `atak/grg/`, as georeferenced PDFs.
+  - Incident and drone maps -- `atak/grg/` for a PDF, `atak/overlays/` for a
     KMZ.
 
   #v(6pt)

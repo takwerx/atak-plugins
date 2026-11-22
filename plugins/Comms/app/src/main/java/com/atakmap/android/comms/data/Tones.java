@@ -9,8 +9,15 @@ import java.util.Map;
  *
  * <p>CAL FIRE numbers its tones, and so do FIRESCOPE, BLM, BIA and USFS in
  * California: "Tone 8" is 103.5 Hz on every one of their call plans. Operators say
- * both, so the plugin shows both, "103.5 (Tone 8)", everywhere a tone appears, and
- * the search matches either.
+ * both, so the plugin shows both, "Tone 8 (103.5)", wherever the catalog gives a
+ * tone its number, and the search matches either.
+ *
+ * <p>The number is the plan's, not the frequency's, so it comes from the catalog
+ * and is never looked up from the Hz. Boise's interagency plan numbers its tones
+ * too, and agrees with California for 1 to 8 and then does not: 100.0 Hz is Tone 9
+ * in California and Tone 11 in Boise, where Tone 9 is 179.9. A reverse lookup put
+ * "Tone 9" on Idaho sites, a number that exists in the local plan and opens
+ * nothing (takwerx/comms#2).
  */
 public final class Tones {
 
@@ -45,8 +52,11 @@ public final class Tones {
             put(e.getKey(), e.getValue());
     }
 
-    /** The CA standard number for a tone, or 0 when it has none. */
-    public static synchronized int numberOf(double hz) {
+    /**
+     * The California standard number for a tone, or 0 when it has none. Only for a
+     * site in California: anywhere else the number means a different frequency.
+     */
+    public static synchronized int californiaNumberOf(double hz) {
         if (Double.isNaN(hz))
             return 0;
         final Integer n = BY_TENTHS.get(Math.round(hz * 10));
@@ -58,12 +68,16 @@ public final class Tones {
         return d == null ? Double.NaN : d;
     }
 
-    /** "Tone 8 (103.5)", "103.5" for one outside the table, or the text as given. */
-    public static String describe(double hz, String text) {
+    /**
+     * "Tone 8 (103.5)" when the plan numbers it, "103.5" when it does not, or the
+     * text as given.
+     *
+     * @param number the plan's own number for this tone, or 0 for none
+     */
+    public static String describe(double hz, int number, String text) {
         if (!Double.isNaN(hz)) {
-            final int n = numberOf(hz);
             final String v = String.format(Locale.US, "%.1f", hz);
-            return n > 0 ? "Tone " + n + " (" + v + ")" : v;
+            return number > 0 ? "Tone " + number + " (" + v + ")" : v;
         }
         // OST is a property of a frequency, never of a repeater: the plan leaves the
         // tone to the operator. The repeater still has one fixed tone that opens it,
@@ -94,16 +108,19 @@ public final class Tones {
      * it). Never "site tone" -- a site's tone is never operator selectable.
      *
      * @param accessHz   the site's own tone in Hz, or NaN
+     * @param accessNum  the plan's number for it, or 0
      * @param accessText what the plan printed in place of the site's tone
      * @param netHz      the net-wide tone in Hz, used only when the site has none
+     * @param netNum     the plan's number for it, or 0
      * @param netText    what the plan printed for the net
      */
-    public static String line(double accessHz, String accessText, double netHz, String netText) {
+    public static String line(double accessHz, int accessNum, String accessText,
+            double netHz, int netNum, String netText) {
         if (!Double.isNaN(accessHz))
-            return describe(accessHz, accessText);
+            return describe(accessHz, accessNum, accessText);
         if (!Double.isNaN(netHz))
-            return describe(netHz, netText);
-        final String t = describe(Double.NaN, accessText != null && !accessText.isEmpty()
+            return describe(netHz, netNum, netText);
+        final String t = describe(Double.NaN, 0, accessText != null && !accessText.isEmpty()
                 ? accessText : netText);
         if ("none".equals(t))
             return NOT_LISTED;
@@ -116,12 +133,13 @@ public final class Tones {
      * Whether a query names this tone: "103.5", "103", "tone 8", "t8", "T-8".
      * A bare small number is not a tone query on its own; "8" would match half the
      * catalog through tone numbers alone.
+     *
+     * @param n the plan's own number for this tone, or 0 for none
      */
-    public static boolean matches(double hz, String q) {
+    public static boolean matches(double hz, int n, String q) {
         if (Double.isNaN(hz) || q == null || q.isEmpty())
             return false;
         final String s = q.trim().toLowerCase(Locale.US);
-        final int n = numberOf(hz);
         if (n > 0) {
             if (s.equals("tone " + n) || s.equals("tone" + n) || s.equals("t" + n)
                     || s.equals("t-" + n) || s.equals("pl " + n) || s.equals("pl" + n))

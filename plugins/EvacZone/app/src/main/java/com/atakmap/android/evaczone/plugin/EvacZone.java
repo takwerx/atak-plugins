@@ -2,7 +2,9 @@ package com.atakmap.android.evaczone.plugin;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.BroadcastReceiver;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.graphics.Color;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
@@ -19,6 +21,8 @@ import com.atak.plugins.impl.PluginLayoutInflater;
 import com.atakmap.android.evaczone.Catalog;
 import com.atakmap.android.evaczone.ZoneLayer;
 import com.atakmap.android.evaczone.ZoneManager;
+import com.atakmap.android.ipc.AtakBroadcast;
+import com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoPoint;
@@ -54,11 +58,14 @@ public class EvacZone implements IPlugin {
     private static final String TAG = "EvacZone";
     /** Key for the plugin's entry in ATAK's Tool Preferences. */
     private static final String PREFS_KEY = "evaczonePreference";
+    /** System broadcast that opens the pane, so other plugins (Sit Rep) can open it. */
+    public static final String ACTION_SHOW = "com.atakmap.android.evaczone.SHOW";
 
     IServiceController serviceController;
     Context pluginContext;
     IHostUIService uiService;
     ToolbarItem toolbarItem;
+    private BroadcastReceiver showReceiver;
     Pane pane;
     View paneView;
     ZoneManager manager;
@@ -110,6 +117,31 @@ public class EvacZone implements IPlugin {
             manager.start();
         }
         registerPreferences();
+        registerShowReceiver();
+    }
+
+    /** Open the pane on ACTION_SHOW, the same way the toolbar button does. */
+    private void registerShowReceiver() {
+        if (showReceiver != null)
+            return;
+        showReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (mapView == null) {
+                    showPane();
+                    return;
+                }
+                mapView.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        showPane();
+                    }
+                });
+            }
+        };
+        final DocumentedIntentFilter sf = new DocumentedIntentFilter();
+        sf.addAction(ACTION_SHOW, "Open the Evac Zone pane");
+        AtakBroadcast.getInstance().registerSystemReceiver(showReceiver, sf);
     }
 
     /**
@@ -148,6 +180,14 @@ public class EvacZone implements IPlugin {
 
     @Override
     public void onStop() {
+        if (showReceiver != null) {
+            try {
+                AtakBroadcast.getInstance().unregisterSystemReceiver(showReceiver);
+            } catch (Exception e) {
+                Log.w(TAG, "unregistering the show receiver failed", e);
+            }
+            showReceiver = null;
+        }
         // Close our pane: ATAK keeps a plugin's pane on screen across a reload, and a
         // pane whose buttons point at a stopped instance does nothing when tapped.
         if (pane != null && uiService != null) {
@@ -905,9 +945,14 @@ public class EvacZone implements IPlugin {
         // state's feed that is still on is not this state's news.
         final Map<String, Integer> totals = new LinkedHashMap<>();
         final Map<String, Integer> colors = new LinkedHashMap<>();
+        // Counts only where the status moves. Static maps (hurricane zones) say what each
+        // color is and nothing more: how many zones carry a letter tells a crew nothing.
+        boolean anyLive = false;
         for (ZoneLayer l : manager.snapshot()) {
             if (!l.isVisible() || (state != null && !l.source.st.equalsIgnoreCase(state)))
                 continue;
+            if ("live".equals(l.source.kind))
+                anyLive = true;
             // What is on the map, after the county and radius filters: the legend and
             // the map agree by construction.
             for (ZoneLayer.ZoneInfo z : l.zones) {
@@ -923,7 +968,7 @@ public class EvacZone implements IPlugin {
         // catalog's date are not the operator's concern; the only other line is one
         // that tells them why the map is empty and what to do about it.
         updateStatusLine();
-        legend.setText(legendText(totals, colors));
+        legend.setText(legendText(totals, colors, anyLive));
 
         final List<Catalog.Source> srcs = state == null ? new ArrayList<Catalog.Source>() : c.forState(state);
 
@@ -988,7 +1033,8 @@ public class EvacZone implements IPlugin {
      * "Order 37 · Warning 48 · Advisory 16", each label in its own color, in order of
      * severity: an Order is the first word whichever count arrived first.
      */
-    private static CharSequence legendText(Map<String, Integer> totals, Map<String, Integer> colors) {
+    private static CharSequence legendText(Map<String, Integer> totals, Map<String, Integer> colors,
+            boolean counts) {
         final List<Map.Entry<String, Integer>> entries = new ArrayList<>(totals.entrySet());
         final List<String> arrival = new ArrayList<>(totals.keySet());
         Collections.sort(entries, new java.util.Comparator<Map.Entry<String, Integer>>() {
@@ -1003,10 +1049,15 @@ public class EvacZone implements IPlugin {
         });
         final SpannableStringBuilder out = new SpannableStringBuilder();
         for (Map.Entry<String, Integer> e : entries) {
+            // A key with no counts has nothing to say about a zone the source never classed.
+            if (!counts && "(no status)".equals(e.getKey()))
+                continue;
             if (out.length() > 0)
                 out.append("  ·  ");
             final int start = out.length();
-            out.append(e.getKey()).append(' ').append(String.valueOf(e.getValue()));
+            out.append(e.getKey());
+            if (counts)
+                out.append(' ').append(String.valueOf(e.getValue()));
             final Integer col = colors.get(e.getKey());
             if (col != null)
                 out.setSpan(new ForegroundColorSpan(col), start, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
@@ -1051,7 +1102,7 @@ public class EvacZone implements IPlugin {
 
     /**
      * What the row promises before it is on (publisher, kind, count at catalog time) and
-     * what it holds once it is (count, age, STALE with the reason).
+     * what it holds once it is (count, age, and why it is old when a refresh failed).
      */
     private static String statusLine(Catalog.Source s, ZoneLayer l) {
         final StringBuilder sb = new StringBuilder();
@@ -1083,7 +1134,7 @@ public class EvacZone implements IPlugin {
         else
             sb.append(" · never refreshed");
         if (l.stale)
-            sb.append(" · STALE: ").append(l.status);
+            sb.append("\n").append(l.status).append(l.count > 0 ? ", showing what this device saved." : ".");
         else if (l.status.startsWith("capped"))
             sb.append(" · ").append(l.status);
         return sb.toString();

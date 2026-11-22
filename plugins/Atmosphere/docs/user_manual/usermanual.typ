@@ -1,0 +1,1270 @@
+#import "@preview/polylux:0.4.0": *
+#import "formatting.typ": *
+
+#show: userguide.with(
+   plugin-name: "Atmosphere",
+   plugin-version: "0.24",
+   platform: "ATAK",
+   platform-version: "5.8.0",
+)
+
+#let cap(body) = text(size: 9pt, fill: luma(90), body)
+
+#tak-slide[
+= Overview
+
+Atmosphere is the weather on the ATAK map for fire and hazmat crews: the
+forecast at a point, the fire weather planning forecast for a zone, the
+readings from the stations, gauges and buoys around you, and the pictures the
+weather services publish - radar, satellite, wind,
+rain, smoke, air quality, lightning, outlooks, the Santa Ana wildfire threat,
+power shutoffs, flooding, the sea and snow - each one a layer you switch on
+when you need it.
+
+#image("1.png", width: 90%)
+
+Open it from the ATAK toolbar, or from Tools if it is not on the bar.
+
+Everything it shows is read by this device from public services and stays on
+this device. Nothing is published to a server or to anyone else's map. The
+forecast asks the National Weather Service for the point you are reading; every
+map layer asks you once, naming its server, before it talks to the network.
+Warnings,
+watches and advisories are not here on purpose: they are the IPAWS Alerts
+plugin's job, and the two are meant to run side by side. The one exception is
+fire: a fire weather zone under a Red Flag Warning or a Fire Weather Watch is
+shaded, and the zones page lists them.
+]
+
+#tak-slide[
+= The first time
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("2.png", width: 100%)
+  #cap[A new install: the forecast from NWS, in US units.]
+][
+  There is nothing to set up. Atmosphere reads the forecast from the National
+  Weather Service (*NWS*) as soon as it opens, for the point you are reading,
+  rounded to about 100 m.
+
+  Outside the US, open *Forecast settings* and tap *Forecast from Open-Meteo*.
+]
+]
+
+#tak-slide[
+= The pane
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("3.png", width: 100%)
+][
+  The pane opens at half width. The top row is the same on every page:
+
+  - *My position*, *Map center* and *Pick a point* choose the point every
+    reading is for. The one in use is green. Map center follows the map: the
+    forecast and the fire weather zone are read again when the map stops. The
+    Weather Stations, River Gauges and Buoys lists are measured from this point
+    too, nearest first, and say which point in their status line.
+  - The star is *Favorites*: places kept by name.
+  - *Units* switches every number between US, metric and aviation units.
+  - *Full size* makes the pane full width and back.
+  - The stacked sheets are *Layers*: straight to the Layers page from any page.
+    It is green while Layers is showing.
+  - The arrows step through the pages; the name between them opens a list of
+    all nine.
+
+  Back closes the pane, or narrows a full-size one first.
+]
+]
+
+#tak-slide[
+= Full size, and the pages
+
+#toolbox.side-by-side(columns: (8fr, 4fr))[
+  #image("4.png", width: 100%)
+  #cap[At full size every button in the top row has its name under it.]
+][
+  #image("5.png", width: 100%)
+  #cap[Tap the page name for the list.]
+]
+
+#v(4pt)
+There are eleven pages: *Forecast*, the readout for a point; *Layers*, every
+map layer with its switch and settings; *Spot Weather Forecast*; *Fire Weather
+Zones*; *SAWTI*; *Fire Danger*; *Weather Stations*, *River Gauges* and *Buoys*
+as lists; *Storm Reports*; and *Rain Gauges*. Swipe, use the arrows, or pick
+from the list. A page whose data is a map layer starts with that layer's
+switch, the same as on the Layers page: turn it on or off from either.
+]
+
+#tak-slide[
+= Forecast: now
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("6.png", width: 100%)
+][
+  #image("9.png", width: 100%)
+]
+
+#v(4pt)
+The first page is the forecast for one point: your position, the map center,
+a point you tap on the map, or a favorite. The top line names the point and
+how old the reading is. *Now* is the numbers a briefing asks for, one glance
+each: temperature, humidity, the 20-foot wind and where it is from, gusts,
+mixing height, transport wind, wet bulb globe temperature and the chance of
+rain. Under them, the sky cover, then sunrise, sunset and the moon for the
+point. An element the forecast office does not issue says so. *Refresh* reads
+the forecast again.
+]
+
+#tak-slide[
+= Forecast: the hours ahead
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("7.png", width: 100%)
+  #cap[Next hours: one value at a time, picked with the buttons under it.]
+][
+  #image("8.png", width: 100%)
+  #cap[Show hourly table opens every value, hour by hour.]
+]
+
+#v(4pt)
+*Next hours* draws the next day and a half as a line with the sky above it and
+sunrise and sunset marked. The buttons under it pick which value the line
+shows. *Show hourly table* opens the whole table; *Hide hourly table* folds it
+away again, and it stays the way you left it.
+]
+
+#tak-slide[
+= Forecast: light
+
+#toolbox.side-by-side(columns: (5fr, 5fr, 4fr))[
+  #image("130.png", width: 100%)
+  #image("132.png", width: 100%)
+][
+  #image("131.png", width: 100%)
+][
+  *Show light* opens the light for the point, one day at a time; the arrows
+  step to the next or the day before. The bar runs midnight to midnight:
+  *day*, then *civil* twilight (work without lights), *nautical* (the horizon
+  still shows), *astronomical* and *night*. The white line is the moon above
+  the horizon, its phase drawn on it; the triangle is now.
+
+  Under the bar, every twilight, sunrise, sunset, moonrise and moonset in the
+  order they happen, with the compass direction of each rise and set, the day
+  length, and the moon's phase with its next four phases. All of it is
+  computed on the device, so it is there with no network. Times follow the
+  device's 12- or 24-hour setting.
+]
+]
+
+#tak-slide[
+= Forecast: the days ahead
+
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("10.png", width: 100%)
+][
+  *Next days* folds the hours into days, the numbers a shift is planned on:
+  the high and the low, the lowest humidity, the strongest wind and gust, and
+  the highest chance of rain.
+
+  The service it came from is credited under the table.
+]
+]
+
+#tak-slide[
+= The forecaster's synopsis
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("112.jpg", width: 100%)
+][
+  Under the days, the forecaster's own words: the Area Forecast Discussion for
+  the office covering the point, its *Synopsis* open and the other sections
+  the office writes (Short Term, Long Term, Discussion, Aviation, Marine, Fire
+  Weather) each behind a button that opens it in place.
+
+  It follows the point in the top row: Map center in another office's area
+  brings that office's discussion. The watches and warnings list stays with
+  IPAWS. It needs NWS as the forecast service.
+]
+]
+
+#tak-slide[
+= Forecast settings and favorites
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("11.png", width: 100%)
+  #cap[Forecast settings.]
+][
+  #image("14.png", width: 100%)
+  #cap[Favorites.]
+]
+
+#v(4pt)
+*Forecast settings* holds everything about the forecast: where it comes from,
+*NWS (United States)* or *Open-Meteo* for anywhere else, picked with one tap,
+and *What to show* in the Now tiles and the table. *Favorites* keeps places by
+name: *Add
+this place* saves the point being read, and picking one later reads the
+forecast there.
+]
+
+#tak-slide[
+= Layers
+
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("15.png", width: 100%)
+][
+  The *Layers* page lists every map layer under a heading for what it is
+  about: *Wind*, *Storms*, *Fire*, *Rain and rivers*, *Ocean*, *Snow* and
+  *Ground*, with *Spot
+  Weather Forecast* and *Weather Stations* at the top. Each row is a switch that shows
+  its state, green ON or red OFF, with the layer's icon beside it. *All on*
+  and *All off* switch every allowed layer at once.
+]
+
+#v(4pt)
+A layer that is ON grows an arrow at the end of its row: tap it for the
+layer's settings, its map key, and a status line that says what is on the map
+and what is not. The first time a layer is switched on it asks once, naming
+the server and what is sent: the area of the map, never your position.
+
+Tap anything Atmosphere draws and it opens straight away: a zone, spot
+request, gauge or buoy opens its page, anything else its details; a Fire Danger
+area opens from its name. There is no radial menu on Atmosphere's items. Labels
+stay level when you turn the map; a station's wind barb turns with it, because
+it is a direction.
+]
+
+#tak-slide[
+= In ATAK's Overlay Manager
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("66.png", width: 100%)
+][
+  #image("67.png", width: 100%)
+][
+  Every Atmosphere layer that draws on the map is a row inside one
+  *Atmosphere* row in ATAK's *Overlay Manager*, each with its own icon.
+
+  The eye beside a row hides that layer, or all of them at once, without
+  opening the plugin. A layer that is off shows 0 items.
+]
+]
+
+#tak-slide[
+= Radar
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("16.jpg", width: 100%)
+][
+  #image("17.png", width: 100%)
+][
+  *Radar* draws the radar mosaics of the National Weather Service over the
+  United States, Alaska, Hawaii, Puerto Rico and Guam, and Environment
+  Canada's over Canada. It picks the right one by itself as the map moves.
+
+  The time strip under it scrubs back through the last two to three hours of
+  frames. *Live* follows the newest. *Play* runs those hours as a loop, to show
+  which way the storm cells move; *Stop* or any time picked ends it. The
+  *Transparency* slider lets the map show through.
+]
+]
+
+#tak-slide[
+= Radar around the world
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("18.jpg", width: 100%)
+][
+  #image("19.png", width: 100%)
+][
+  Everywhere else - Mexico past the border radars, Central America, the
+  Caribbean beyond Puerto Rico, Europe, wherever a country publishes its
+  radar - the picture is RainViewer's composite of the world's public
+  weather radars. Frames are ten minutes apart, and the credit at the bottom
+  of the Layers page says so while it is drawn.
+
+  Far out at sea no radar reaches: that is what Satellite and Rain are for.
+]
+]
+
+#tak-slide[
+= Satellite
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("20.jpg", width: 100%)
+][
+  #image("21.png", width: 100%)
+][
+  *Satellite* draws the newest GOES picture, about ten minutes old.
+  *Infrared* shows the cloud tops day and night, brightest where they are
+  highest and coldest. *Visible* is the daylight picture and goes dark at
+  night.
+
+  It reaches where no radar does - the open Pacific and Atlantic - which is
+  where a hurricane at sea is read from.
+]
+]
+
+#tak-slide[
+= Wind
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("22.jpg", width: 100%)
+][
+  #image("23.png", width: 100%)
+][
+  *Wind* draws the forecast wind as moving streaks colored by speed, with the
+  key under the time strip in mph, kt or km/h. *Heat map* under the key draws
+  the same speed as a colored field beneath the streaks, in the key's colors.
+  Wind and *Radar* can be on together, the time strip under the one switched
+  on last; the heat map would paint over the radar, so turning one on turns
+  the other off.
+
+  The line under it reads the wind *Here*, at the pane's point: speed and
+  where it comes from. Outside the area being drawn it says so.
+
+  In 3D the streaks lie on the ground and follow it over ridges and down into
+  valleys, around the point the map looks at and out to a few screen widths;
+  the ground farther toward the horizon is left clear.
+
+  The height buttons further down draw the wind from 10 m up to the jet
+  stream.
+]
+]
+
+#tak-slide[
+= The wind as a heat map
+
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("116.jpg", width: 100%)
+][
+  *Heat map* under the Wind key paints the speed the streaks are drawn from as
+  a colored field beneath them, in the key's own colors, for the hour on the
+  time strip and the height picked. Off by default; the switch remembers.
+]
+]
+
+#tak-slide[
+= Rain
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("32.jpg", width: 100%)
+][
+  #image("33.png", width: 100%)
+][
+  *Rain* draws how hard the forecast model expects rain to fall, light to
+  violent, hour by hour for five days, everywhere on the map including far
+  out to sea, with the rate *Here* at the pane's point.
+
+  It is a forecast, not radar. Radar is what is falling now where a radar
+  can see it; Rain is what the model expects where nothing can.
+]
+]
+
+#tak-slide[
+= The Layers page folds
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("118.jpg", width: 100%)
+][
+  Each group on the Layers page folds to one line when its heading is tapped,
+  and stays folded until tapped again. A heading turns green with a count when
+  any layer under it is on, so a folded group still says what it is drawing.
+  *All on* and *All off* at the top switch every layer at once.
+]
+]
+
+#tak-slide[
+= Storm Reports
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("97.png", width: 100%)
+  #image("101.jpg", width: 100%)
+][
+  *Storm Reports* draws every report the NWS offices logged in the last three
+  days: a dot in its family's color (tornado red, wind orange, hail green,
+  flood blue, rain teal, snow and ice violet, landslide and debris flow brown,
+  other grey) with the NWS type and size in the pill: "Hail 1.75 in", "Gust
+  66 mph", "Tornado". The row under the switch picks 24, 48 or 72 hours.
+
+  Tap a dot for where, when, the office and its remarks. They are preliminary,
+  as spotters and the public told the offices; the surveyed tornado paths are
+  the next layer.
+]
+]
+
+#tak-slide[
+= The Storm Reports page
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("107.jpg", width: 100%)
+  #image("108.jpg", width: 100%)
+][
+  The *Storm Reports* page lists the reports and the tornado paths together,
+  under one row of buttons. The first reads where the list looks and how many
+  it holds, and opens the choices beneath it: *US*, *Near* the point in the
+  pane's top row, on the *Map* as it sits (read again whenever the map
+  settles), or by *State*. The next flips between *Newest* and *Closest*
+  first. *All Types* is a picker of switches for any mix of the eight families
+  and *Tornado*, which covers the dots and the paths; what you tick is what the
+  map draws. The last steps through the window: *24 h*, *48 h*, *72 h*.
+
+  A row flies the map to the report and opens its details in one tap. *Open
+  the list* under the layer's switch jumps here.
+]
+]
+
+#tak-slide[
+= Tornado Paths
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("98.png", width: 100%)
+  #image("102.jpg", width: 100%)
+][
+  *Tornado Paths* draws the track a survey team walked after a tornado, as a
+  line in the Damage Assessment Toolkit's color for its EF rating, EF0 aqua to
+  EF5 purple, EFU grey for a tornado with nothing to rate, with a level pill at
+  the touchdown. The row picks the last 2 days, 7 days, 30 days or year.
+
+  Tap a line for the rating, the office, when it was on the ground and for
+  how long, the path's length and width, the peak wind the damage implies,
+  injuries and deaths, and the survey team's words. A path appears a day or
+  more after the storm, once the office has walked it.
+]
+]
+
+#tak-slide[
+= Fire Weather Outlook
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("24.jpg", width: 100%)
+][
+  #image("25.png", width: 100%)
+][
+  *Fire Weather Outlook* draws where the Storm Prediction Center expects
+  elevated, critical or extreme fire weather, and dry thunderstorms, one day
+  at a time: *Day 1*, *Day 2*, *Day 3* or *All days*. Every area carries its
+  label in the middle of it.
+
+  From Day 3 the center gives a chance instead of a category: a 40% or 70%
+  chance of critical fire weather, a 10% or 40% chance of dry thunderstorms.
+]
+]
+
+#tak-slide[
+= Fire Weather Zones
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("71.jpg", width: 100%)
+][
+  #image("72.png", width: 100%)
+  #image("73.png", width: 100%)
+][
+  *Fire Weather Zones* draws the National Weather Service's fire weather zones
+  in the map view: purple outlines, each with its zone number, a starred zone
+  in yellow, a zone under a Red Flag Warning filled pink and one under a Fire
+  Weather Watch beige. Tap a zone for its forecast.
+
+  The two zoom settings under the layer's arrow decide when the zones and their
+  numbers draw; a view wider than a few states says to zoom in.
+]
+]
+
+#tak-slide[
+= A zone's fire weather forecast
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("68.png", width: 100%)
+][
+  #image("69.png", width: 100%)
+][
+  #image("70.png", width: 100%)
+]
+
+#v(4pt)
+The *Fire Weather Zones* page shows the zone the point you are reading is in,
+the zones under a Red Flag Warning or a Fire Weather Watch anywhere, a search
+by zone number (CAZ548, CA548 or 548) or by name, and your starred zones. Tap
+one for the office's Fire Weather Planning Forecast for that zone, as the
+office wrote it: western offices write it by period, eastern ones as a table;
+slide sideways for a wide line. The star keeps the zone on the page and yellow
+on the map. *Show the office discussion* opens the office's discussion for the
+day under it. A forecast more than a day old says so.
+]
+
+#tak-slide[
+= A zone's fire danger
+
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("96.png", width: 100%)
+][
+  Under the office and issue time, *Fire danger (ERC)* gives the Energy
+  Release Component for the area the zone is in: its name, yesterday's
+  observed value and today's forecast with their percentiles and which way
+  they are going, and the Burning Index.
+
+  ERC is published for these larger areas, Predictive Service Areas, not for
+  each zone. *ERC chart and details* opens the area on the Fire Danger page.
+]
+]
+
+#tak-slide[
+= SAWTI
+
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("80.jpg", width: 100%)
+][
+  #image("81.png", width: 100%)
+]
+
+#v(4pt)
+*SAWTI* draws the US Forest Service's Santa Ana Wildfire Threat Index for its
+four Southern California zones: LA-Ventura, Orange-Inland Empire, San Diego and
+Santa Barbara, where it rates Sundowner winds. It rates how hard a fire would be
+to fight if one started during an offshore wind: No Rating, Marginal, Moderate,
+High or Extreme. A rated zone is filled in its level's color, with its label in
+the same color; a No Rating zone is a blue outline. Each label starts with
+SAWTI, so it is not taken for another layer's area. The date buttons pick one
+of the four days the Forest Service shows. Tap a zone to open its page.
+]
+
+#tak-slide[
+= The SAWTI page
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("76.png", width: 100%)
+  #cap[The layer switch, the zone, the four days and the day's level.]
+][
+  #image("77.png", width: 100%)
+  #cap[The day's level and the site's three gauges.]
+]
+
+#v(4pt)
+The *SAWTI* page is the Forest Service site's forecast page. It opens on the
+zone the point you are reading is in; the zone button picks another and each
+day button shows that day's level. Then the site's three gauges, the
+forecaster's *Event Description* and *Recommended Actions*, and the county
+links. The page and the map show the same day, picking a day turns the layer
+on, and while the page is open its zone has a white outline on the map.
+]
+
+#tak-slide[
+= SAWTI: the page's zone on the map
+
+#align(center, image("123.jpg", width: 78%))
+
+#v(4pt)
+While the *SAWTI* page is open, the zone it shows is outlined in white on the
+map and keeps its level's color, so it stands out among the others. Leave the
+page and the outline goes.
+]
+
+#tak-slide[
+= SAWTI: all zones
+
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("78.png", width: 100%)
+][
+  #image("79.png", width: 100%)
+]
+
+#v(4pt)
+*All Zones* puts every zone and day side by side in the level colors; tap a
+square for that zone and day. The issue time is under it: the Forest Service
+posts a new index every morning and again when a forecaster updates it, and an
+issue more than a day old says so. When the wind and fuel numbers cannot be had,
+the gauges say *Not available* and the page asks again the next time you look.
+]
+
+#tak-slide[
+= Fire Danger
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("93.jpg", width: 100%)
+][
+  #image("92.png", width: 100%)
+][
+  *Fire Danger* shades every Predictive Service Area in the lower 48 by its
+  Energy Release Component (ERC), the index each GACC charts on its fuels
+  page: green below the 60th percentile, up to orange from the 90th, red from
+  the 97th and dark red above the 99.5th.
+
+  *Observed* is yesterday's value, *Forecast* today's; an area's value is the
+  average of its key fire weather stations, its percentile of every day of the
+  year, 2005 to 2022. Names show from a scale bar of about 75 miles in; tap a
+  name for the area. Alaska is not rated this way.
+]
+]
+
+#tak-slide[
+= An area's ERC chart
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("94.jpg", width: 100%)
+][
+  #image("95.jpg", width: 100%)
+]
+
+#v(4pt)
+The area opens on the *Fire Danger* page at full size: its ERC and Burning
+Index, observed and forecast, and its GACC's own ERC chart. *Tap the chart to
+enlarge* puts it on the whole screen: pinch to zoom, drag to move, double-tap
+to zoom in or back out. Some GACCs draw the chart's percentile bands for the
+fire season only, so a band there need not match the percentile above it. The
+Southern and Eastern Areas no longer publish ERC charts; their areas show the
+numbers only.
+]
+
+#tak-slide[
+= Fuel Moisture
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("115.jpg", width: 100%)
+][
+  *Fuel Moisture* draws the fuel samples crews cut and weigh every week or two:
+  every sampling site of the National Fuel Moisture Database in the state under
+  the map center, a dot colored by its newest live fuel's moisture, the fuel and
+  percent in the pill (*Chamise 58%*). Live fuel moisture is water as a percent
+  of the plant's dry weight, so it runs past 100; the colors are the chaparral
+  thresholds: 60% and under critical, 61 to 79 high, 80 to 99 moderate, 100 and
+  over low. Dead fuels are rated on their own breaks, the Texas A&M and Oklahoma
+  Mesonet figures (1 and 10 hour 6 / 9 / 15, 100 hour 10 / 13 / 18, 1000 hour
+  13 / 16 / 22); duff has no published scale and draws grey.
+
+  The first row picks how old a sample may be, *30 days*, *90 days* or *1 year*;
+  *Show* picks *Live fuels*, *Dead fuels* or *Both*. Tap a dot for every fuel
+  the site samples with its last value, date and years. Moving the map into
+  another state asks for that state. The database is the US Forest Service's,
+  through San Jose State University's fuel moisture portal.
+]
+]
+
+#tak-slide[
+= Lightning
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("83.jpg", width: 100%)
+][
+  #image("82.png", width: 100%)
+][
+  *Lightning* draws NOAA's lightning strike density: how many strikes the
+  ground networks counted in each 5-mile square in 15 minutes, from yellow
+  (under 1) to deep purple (over 150). It counts ground strikes and some cloud
+  flashes.
+
+  A new frame comes every 15 minutes and arrives 10 to 25 minutes after the
+  strikes; the line under the switch says which 15 minutes and how old. It
+  shows which storms are making lightning and whether they are building. It is
+  not a reason to call it safe to be outside.
+]
+]
+
+#tak-slide[
+= Power shutoffs (PSPS)
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("85.jpg", width: 100%)
+  #image("86.png", width: 100%)
+][
+  #image("84.png", width: 100%)
+][
+  *PSPS* draws California's Public Safety Power Shutoffs: a county a utility
+  has warned Cal OES may have a shutoff in amber, a circuit SCE or SDG&E is
+  watching for one in orange (*PSPS Watch*), and the areas a utility has shut
+  off in red, each named by its utility, such as "PG&E - PSPS". Tap one for
+  its circuit, customers out, the shutoff window and when power is expected
+  back. From about 10 miles in each area has its own label; farther out,
+  nearby areas share one, "SCE - PSPS (23)", and past 150 miles the colors
+  stand alone.
+
+  The line under the switch counts what is warned, watched and shut off, by
+  utility, and when it was updated; a source quiet for 45 minutes is said to
+  be unknown, never none. It comes from Cal OES (PG&E and the warned
+  counties), Southern California Edison and San Diego Gas & Electric through
+  takwerx's server, and does not cover PacifiCorp, Liberty, Bear Valley or any
+  other state: ask the utility.
+]
+]
+
+#tak-slide[
+= Smoke
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("26.jpg", width: 100%)
+][
+  #image("27.png", width: 100%)
+][
+  *Smoke* draws the forecast smoke hour by hour, at *Ground* level or through
+  the *Whole sky*, in the air quality colors, with the amount *Here* in
+  micrograms per cubic meter and what that means for breathing. It is the same
+  forecast at every zoom, so the smoke keeps its shape as you zoom; a view wider
+  than a few states is drawn for its middle.
+]
+]
+
+#tak-slide[
+= Air Quality
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("28.jpg", width: 100%)
+][
+  #image("29.png", width: 100%)
+][
+  *Air Quality* draws the EPA's air quality areas in the index colors, Good to
+  Hazardous, with the index *Here*. The line above the key says when it was
+  measured, and says so when the EPA has published nothing newer.
+]
+]
+
+#tak-slide[
+= Flash Flood Outlook
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("30.jpg", width: 100%)
+][
+  #image("31.png", width: 100%)
+][
+  *Flash Flood Outlook* draws the Weather Prediction Center's excessive
+  rainfall outlook for the next three days: the chance that rain will run
+  off faster than the ground and streams can take it, marginal, slight,
+  moderate or high. One day at a time, or all three.
+]
+]
+
+#tak-slide[
+= Rain Totals
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("109.jpg", width: 100%)
+][
+  *Rain Totals* draws the rain that fell as a picture, in the NWS's own colors
+  with the key under the switch. *Totals* picks the time: the last hour to 3
+  days from the NWS radar estimate at 1 km, updated every hour; 7 or 30 days,
+  since Oct 1 or Jan 1 from the River Forecast Centers' analysis of radar
+  corrected by the gauges (where it is not produced yet, the radar fills in
+  7 days and the rest is grey); or the hours
+  before a date and time, the radar estimate as it stood at that hour.
+
+  The radar is good at where it rained and fair on how much: a sprinkle shows
+  where a gauge caught nothing. Use it for where it rained and a gauge for how
+  much. The *Transparency* slider lets the map show through. Lower 48 only.
+]
+]
+
+#tak-slide[
+= Rain Gauges
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("110.jpg", width: 100%)
+  #image("111.jpg", width: 100%)
+][
+  *Rain Gauges* draws each measured gauge as a dot in the Rain Totals colors
+  for the same time, its name and inches in the pill. White ring: USGS. Dark
+  ring: airports, NWS observers, county flood control, RAWS. No volunteer
+  gauges. A gauge that missed part of the time, or disagrees with every gauge
+  around it, is left off and counted on the status line.
+
+  The *Rain Gauges* page has *Totals* at the top, then the gauges in the map's
+  view, *Most rain first* or *Closest*, each with *Go to*. At the bottom, the
+  forecast office's own rainfall report opens as a table, for the period the
+  forecaster names; it needs NWS as the forecast service.
+]
+]
+
+#tak-slide[
+= Gauges over the totals
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("113.jpg", width: 100%)
+  #cap[Both on Last 7 days: each dot on shading of its own color.]
+][
+  #image("122.jpg", width: 100%)
+  #cap[The office's rainfall report, opened on the Rain Gauges page.]
+]
+
+#v(4pt)
+With *Rain Totals* and *Rain Gauges* on the same time, a gauge that caught more
+or less than the radar shows stands out against the shading under it. The
+office's report is a table in the same colors, *Most rain first* or *Closest*.
+]
+
+#tak-slide[
+= Rain before a date and time
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #align(center, image("120.jpg", width: 72%))
+  #cap[Totals: the time the rain is added up for.]
+][
+  #align(center, image("121.jpg", width: 72%))
+  #cap[The day, the time, then how long before it.]
+]
+
+#v(4pt)
+*Before a date and time* adds up the rain in the 24 hours, 3 or 7 days before
+a moment you pick, such as when a fire started: the gauges exact to the hour,
+the radar picture for the hour at or before it. For 3 or 7 days the USGS and
+county gauges wait for the map to be zoomed in to about 150 miles across.
+The county gauges' hours, the airports and the radar go back 45 days: further
+back the county and RAWS gauges show whole days and the airports are left
+out, and the radar calendar starts 45 days back.
+]
+
+#tak-slide[
+= River Gauges
+
+#toolbox.side-by-side(columns: (4fr, 8fr))[
+  #image("34.jpg", width: 100%)
+][
+  #image("35.png", width: 100%)
+]
+
+#v(4pt)
+*River Gauges* draws the gauges around you, colored by the flood category they
+are in, no flooding through action, minor, moderate and major. Tap one for its
+record: the stage and flow now, the flood stages, and the hydrograph, observed
+and forecast, for the last day up to the last month. The *River Gauges* page lists
+the same gauges.
+]
+
+#tak-slide[
+= Flooded Ground
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("36.jpg", width: 100%)
+][
+  #image("37.png", width: 100%)
+][
+  *Flooded Ground* draws where the Weather Service's river model puts water
+  over the banks: *Now*, or at the worst of the *Next 5 days*.
+
+  The service calls it experimental. It is a model's estimate, not a survey,
+  and it covers only part of the country. What you can see wins. Zoom in to a
+  county-wide view or closer to see it.
+]
+]
+
+#tak-slide[
+= FEMA Flood Zones
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 5fr))[
+  #image("129.jpg", width: 100%)
+  #image("124.png", width: 100%)
+][
+  #image("125.png", width: 100%)
+][
+  *FEMA Flood Zones* draws FEMA's flood map. It is not a forecast: it does not
+  change with the weather. On top is the *floodway*, the channel and the land
+  that must stay open to carry a flood. Under it, the *coastal* zones with waves
+  (V, VE), the *1%* chance a year flood area (the 100-year flood, A zones), the
+  *0.2%* area (500-year), areas *behind a levee*, and zone *D*, not studied.
+
+  Tap a zone for what it means, with the base flood elevation or the flood
+  depth when FEMA gives one. Zoom in to the scale bar distance set under the
+  switch (3 mi by default) to see the zones. Where FEMA has no digital flood
+  map, the status line says so; that is not the same as no flood risk. Zones
+  this device has seen are kept for 30 days and draw with no network.
+]
+]
+
+#tak-slide[
+= Dam Failure Areas
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 5fr))[
+  #image("128.jpg", width: 100%)
+  #image("126.png", width: 100%)
+][
+  #image("127.png", width: 100%)
+][
+  *Dam Failure Areas* draws what would flood if a dam, its spillway, an outlet
+  or a saddle dam failed suddenly. The maps come from California's dam safety
+  office, so the layer is California only, and federal dams (Bureau of
+  Reclamation, Army Corps) are not in it. It is not a forecast.
+
+  The flood runs miles downstream, often into another dam's lake. Tap an area:
+  the details say where the dam is from that point, for example "16 mi east,
+  on Santa Ynez River", and which failures flood it. Zoom in to the scale bar
+  distance set under the switch (15 mi by default). The maps are from the
+  state's July 2020 copy and stay on this device for use with no network. An
+  area with nothing drawn is not safe from a dam failure.
+]
+]
+
+#tak-slide[
+= Streams Running High
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("39.jpg", width: 100%)
+][
+  #image("40.png", width: 100%)
+][
+  #image("41.png", width: 100%)
+]
+
+#v(4pt)
+*Streams Running High* draws every stretch of stream the same model has over
+its high-water mark, colored by how rare a flow that big is, a 1-in-2-year
+flow up to 1-in-50 or worse. Tap a line for the flow, the high-water mark and
+the 2 to 50-year flows. It follows the same *Now* / *Next 5 days* choice as
+the flooded ground.
+]
+
+#tak-slide[
+= Debris Flow
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("99.png", width: 100%)
+  #image("119.jpg", width: 100%)
+  #image("106.jpg", width: 100%)
+][
+  *Debris Flow* sits with the rivers because a debris flow is a flood of rock
+  and mud, and the trigger is a burst of rain over a burn. It marks every fire
+  the USGS has assessed in the last three years, and that is all it draws on
+  its own. Tap a marker for the fire's page: *Show the area* brings the map to
+  that burn and draws its perimeter and each stream basin, filled in USGS's
+  own colors, Low yellow, Moderate orange, High red, for one 15-minute burst of
+  rain at the rate the USGS set for that fire (24 mm/h, about an inch an
+  hour, for most).
+
+  Tap a basin for the likelihood of a debris flow, the volume it would carry,
+  the storm it is for and the fire; tap a fire for when it burned, when it was
+  assessed and the USGS record. A burn stays hazardous for two to five years.
+  This layer sends the area the map shows, never your position.
+]
+]
+
+#tak-slide[
+= Waves
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("42.jpg", width: 100%)
+][
+  #image("43.png", width: 100%)
+
+  *Waves* draws the wave forecast: the height of the seas as color in the
+  states mariners use, smooth to phenomenal, and the swell as crests moving
+  the way it runs, faster when the swell is longer. The line reads the seas
+  *Here*: height and state, where they come from and how often, and the swell
+  under them. A model's forecast, not a buoy's reading.
+]
+]
+
+#tak-slide[
+= Buoys
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("44.jpg", width: 100%)
+][
+  #image("45.png", width: 100%)
+][
+  *Buoys* draws the buoys and coastal stations as diamonds: yellow when the
+  reading is recent, red when the station has been silent for more than
+  eight hours. The *Buoys* page lists them nearest first. The button beside
+  the page name reads the filter in force and opens the others, each saying
+  how many it will show: wind, seas, rough water, favorites.
+]
+]
+
+#tak-slide[
+= A buoy's record
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("46.png", width: 100%)
+][
+  #image("47.png", width: 100%)
+][
+  Tap a buoy, on the map or in the list, for its readings, the sea state they
+  mean, the nearest tide station's highs and lows for today and tomorrow, and
+  the nearest current.
+
+  At the end of the record is the coastal waters forecast for the water it
+  sits in, or the offshore forecast for a buoy beyond the coastal zones.
+]
+]
+
+#tak-slide[
+= Beach Forecast and Sea Temperature
+
+#toolbox.side-by-side(columns: (3fr, 3fr, 3fr, 3fr))[
+  #image("48.jpg", width: 100%)
+][
+  #image("49.png", width: 100%)
+][
+  #image("50.jpg", width: 100%)
+][
+  #image("51.png", width: 100%)
+]
+
+#v(4pt)
+*Beach Forecast* draws the surf zone forecast along the coast in view: each
+beach area colored by rip current risk, low, moderate or high, with surf and
+water temperature behind a tap. *Sea Temperature* draws the sea surface
+temperature as a picture, with its scale in both units.
+]
+
+#tak-slide[
+= Hurricanes
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("52.jpg", width: 100%)
+][
+  #image("53.png", width: 100%)
+][
+  *Hurricanes* draws the National Hurricane Center's active storms: the
+  forecast track with its times, the cone, and the wind fields. The block
+  lists every storm with its strength; *Go to* frames it, and the arrow opens
+  its advisory and map choices. With no storm it says "No storms right now".
+  A storm NHC still lists but no longer forecasts, post-tropical or past its
+  final advisory, shows only a marker where it is, and the block says so.
+]
+]
+
+#tak-slide[
+= Snow
+
+*Avalanche Zones* draws the avalanche centers' forecast zones, filled by
+danger rating in the national danger scale colors, with the travel advice and
+the center's forecast link behind a tap. A zone out of season is not drawn;
+one in season but not yet rated is drawn as an outline.
+
+*Snow Stations* draws the mountain snow stations around the map: snow depth,
+water equivalent and temperature, colored by depth.
+
+*Snow Depth* draws the daily snow analysis as a picture, in the same depth
+classes, lower 48 only.
+]
+
+#tak-slide[
+= Earthquakes
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("100.png", width: 100%)
+  #image("104.jpg", width: 100%)
+  #image("105.jpg", width: 100%)
+][
+  *Earthquakes* draws the USGS feed the way USGS's own map does: a circle
+  sized by magnitude, colored by age (past hour red, past day orange, past
+  week yellow, older white), the magnitude in the pill on every one. The first
+  row picks the past hour, day, week or month (the month feed carries M2.5 and up
+  only); *Magnitude* picks All, M1+, M2.5+ or M4.5+.
+
+  For up to five of the largest quakes of M4.5 or more, the ShakeMap's
+  intensity contours are drawn in USGS's intensity colors with their Roman
+  numeral. Tap a quake for the magnitude, the place, the time, the depth, how
+  many felt it and how hard, the PAGER impact level, a tsunami flag, whether a
+  seismologist has reviewed it, and the USGS event page. Worldwide, every five
+  minutes.
+]
+]
+
+#tak-slide[
+= Weather Stations
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("54.jpg", width: 100%)
+][
+  #image("55.png", width: 100%)
+][
+  The station layer draws the weather stations around you with a barb for the
+  wind and the readings beside it: wind, gusts and humidity. A station is
+  colored by how close it is to the Red Flag criteria for its own fire weather
+  zone. The *Weather Stations* page lists them nearest first. The button beside
+  the page name reads the filter in force and opens the others, each saying how
+  many it will show.
+]
+]
+
+#tak-slide[
+= A station, and when stations draw
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("56.png", width: 100%)
+][
+  #image("57.png", width: 100%)
+][
+  Tap a station for the whole record: every reading, its fire weather zone and
+  that zone's Red Flag criteria. The star keeps it as a favorite.
+
+  *Draw on the map* picks which stations draw. The two zoom settings decide
+  when the stations and their readings appear: *Use this zoom* takes what the
+  scale bar reads now, *Always* never hides them.
+]
+]
+
+#tak-slide[
+= Utility stations
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("89.jpg", width: 100%)
+][
+  #image("88.png", width: 100%)
+][
+  In California, *Utility Stations ON* under the Weather Stations arrow adds
+  the stations SCE, SDG&E, PG&E and HPWREN run, from Cal OES. They draw on a
+  slate disc beside the blue fire weather stations, their names start with the
+  utility's, and they come in at their own zoom, 5 miles on the scale bar by
+  default: there are hundreds of them.
+]
+]
+
+#tak-slide[
+= A utility station
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("90.png", width: 100%)
+][
+  #image("87.png", width: 100%)
+][
+  A utility averages its wind over a minute or two, not ten as a fire weather
+  station does, so it reads higher than one beside it, and it has no fuel
+  moisture; its record says so at the top.
+
+  They are counted on their own line under the switch, with how many are at
+  criteria. A station that is also a fire weather station is drawn once, as
+  the fire weather station.
+]
+]
+
+#tak-slide[
+= Spot Weather Forecast
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("58.jpg", width: 100%)
+][
+  #image("59.png", width: 100%)
+][
+  #image("60.png", width: 100%)
+]
+
+#v(4pt)
+The *Spot Weather Forecast* layer draws every open spot forecast request: W
+for a wildfire, P for a prescribed fire, S for search and rescue. The *Spot
+Weather Forecast* page lists them under one row of buttons: the first reads
+where the list looks and how many it holds, and opens the choices beneath it
+(all, nearby, on the map, by state or region); the next flips between
+*Newest* and *Closest* first; and the magnifier at the end of the row opens a
+search by incident name, which a second tap closes and clears. Nearby and
+Closest measure from the point chosen in the top row. Tap one for the forecast
+the office wrote.
+]
+
+#tak-slide[
+= Spot types and the map key
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("74.png", width: 100%)
+][
+  #image("75.png", width: 100%)
+]
+
+#v(4pt)
+*All Types* on the page picks one kind of request, with how many there are of
+each; the kind picked applies to the map as well as the list. Under the
+layer's arrow the key shows each kind's icon and what the three colors mean.
+*Last 3 days only* keeps both to requests asked for or answered in the last
+three days.
+]
+
+#tak-slide[
+= Requesting a spot forecast
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("61.png", width: 100%)
+][
+  #image("62.png", width: 100%)
+]
+
+#v(4pt)
+*Request a spot forecast* prepares yours. Pick the point - *My position*,
+*Map center*, *Pick on map*, a *Favorite* or an *Address* - and copy it. The
+Weather Service's form cannot be filled in from here: *Open the form*, hold its
+USNG box, paste, and press *Plot USNG*.
+]
+
+#tak-slide[
+= By address
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("63.png", width: 100%)
+][
+  #image("64.png", width: 100%)
+][
+  #image("65.png", width: 100%)
+]
+
+#v(4pt)
+An address is looked up by the US Census Bureau first, and only then by the
+address finder chosen in ATAK's settings. You see what came back before it is
+used: *Use this point* makes it the point to copy, and the form takes it as a
+USNG string.
+]
+
+#tak-slide[
+= What the status lines say
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("38.png", width: 100%)
+][
+  Every layer says what it is doing, in words you can act on:
+
+  - "Getting the ..." - a request is out.
+  - "Zoom in to see ..." - the view is too wide for this layer to draw
+    honestly, so it draws nothing rather than a picture of the middle.
+  - "Drawn for the middle of the map" - the picture is smaller than the view.
+  - "The 800 biggest streams running high here; zoom in for the smaller ones"
+    - the answer was cut, and the small ones are what is missing.
+  - "No ... here" - the answer came back empty. That is an answer.
+  - A server error is said as one; the last good picture stays up and the
+    layer asks again on the next map move.
+]
+]
+
+#tak-slide[
+= What leaves the device
+
+Only what you ask for:
+
+- A *forecast* sends the point it is for, rounded to about 100 m, to the
+  service picked in *Forecast settings*: NWS unless you pick Open-Meteo.
+- A *map layer*, once you have allowed it, sends the area of the map it is drawing, never your position,
+  except the station, gauge and buoy layers, which send the point chosen at the
+  top of the pane, rounded the same way.
+- The *Fire Weather Zones* page finds your zone by sending the half-degree
+  square the point is in, about 30 miles across, never the point. The Red Flag
+  Warning and Fire Weather Watch list is one request for the whole country.
+- *SAWTI* and *PSPS* send nothing about where you are: each asks for its whole
+  set, and the SAWTI page finds your zone on this device. So do *Storm
+  Reports*, *Tornado Paths* and *Earthquakes*, which are whole national or
+  worldwide files; *Debris Flow*, *Rain Totals* and *Rain Gauges* send the
+  area the map shows, padded; *Fuel Moisture* sends the two-letter code of the
+  state under the map center, *Rain Gauges* the codes of the states under
+  the map, and both rain layers the 2-degree squares under it, with the dates,
+  found on this device. The office's rainfall report and the synopsis
+  find the office by the half-degree square the point is in, and only while
+  NWS is the forecast service.
+- An *address* you type goes to the US Census Bureau, and to ATAK's own
+  address finder if the Census has no answer.
+- Every request carries the plugin's name and version, which public services
+  require. No callsign, device identifier or TAK server detail is ever sent.
+
+All of it is outbound HTTPS: to the National Weather Service and its centers,
+NOAA and its Regional Climate Centers, the EPA, the USGS, the Forest Service,
+Environment Canada, RainViewer, the avalanche centers and takwerx's own
+server, which relays Cal OES, the utilities and the Iowa Environmental
+Mesonet, and to the one weather service you pick.
+]
+
+#tak-slide[
+= This manual
+
+This manual opens from ATAK's *Settings*, under *Tool Preferences*, *Specific
+Tool Preferences*, *Atmosphere*.
+
+Atmosphere is a data view. It publishes nothing, it records nothing, and it
+draws no warnings except the Red Flag Warnings and Fire Weather Watches on its
+fire weather zones: the IPAWS Alerts plugin draws the rest, on the same map,
+and the two are meant to run together.
+
+Feedback and bug reports: the issue tracker of the plugin's own repository,
+linked from its README.
+]

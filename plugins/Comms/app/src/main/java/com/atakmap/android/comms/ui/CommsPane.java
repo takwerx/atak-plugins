@@ -962,14 +962,17 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
             return true;
         if (q.matches("\\d{3}(\\.\\d*)?") && (n.rx.startsWith(q) || n.tx.startsWith(q)))
             return true;
-        return Tones.matches(n.rxTone, q) || Tones.matches(n.txTone, q);
+        // By frequency only: a tone number belongs to a site's plan, and a net on its
+        // own has no site.
+        return Tones.matches(n.rxTone, 0, q) || Tones.matches(n.txTone, 0, q);
     }
 
     /** The first channel on a site the query names, or null. */
     private static Channel matchChannel(Site s, String q) {
         for (Channel c : s.channels) {
             if (netMatches(c.net, q) || norm(c.callsign).contains(q)
-                    || Tones.matches(c.txTone, q) || Tones.matches(c.rxTone, q))
+                    || Tones.matches(c.effectiveTxTone(), c.effectiveTxToneNum(), q)
+                    || Tones.matches(c.effectiveRxTone(), c.effectiveRxToneNum(), q))
                 return c;
             if (q.matches("\\d{3}(\\.\\d*)?") && (c.rx().startsWith(q) || c.tx().startsWith(q)))
                 return c;
@@ -1285,23 +1288,24 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         // Designator and the tone that opens it. The FCC callsign is the licence
         // identifier for the station, not anything an operator sets on a radio, so it
         // stays in the catalog and off the screen.
-        b.append(" · ").append(toneLine(c.effectiveRxTone(), c.net.rxToneText,
-                c.effectiveTxTone(), c.net.txToneText));
+        b.append(" · ").append(toneLine(c));
         return b.toString();
     }
 
     static String netLine(Net n) {
-        return toneLine(n.rxTone, n.rxToneText, n.txTone, n.txToneText);
+        return Tones.line(n.txTone, 0, n.txToneText, n.rxTone, 0, n.rxToneText);
     }
 
     /**
      * The tone that opens this repeater, formatted where the tone table lives so a
      * test can reach it. The access tone is the one a mobile transmits, which is the
      * site's own; the receive tone belongs to the net and is the same everywhere on
-     * it, so it is not shown.
+     * it, so it is not shown. The number beside it is the one the site's own plan
+     * gives it, or none.
      */
-    static String toneLine(double rx, String rxText, double tx, String txText) {
-        return Tones.line(tx, txText, rx, rxText);
+    static String toneLine(Channel c) {
+        return Tones.line(c.effectiveTxTone(), c.effectiveTxToneNum(), c.net.txToneText,
+                c.effectiveRxTone(), c.effectiveRxToneNum(), c.net.rxToneText);
     }
 
     private static String netsSummary(Site s) {
@@ -1363,8 +1367,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
             ((TextView) row.findViewById(R.id.title)).setText(
                     netLabel(c.net.id));
             ((TextView) row.findViewById(R.id.line)).setText(
-                    toneLine(c.effectiveRxTone(), c.net.rxToneText,
-                            c.effectiveTxTone(), c.net.txToneText));
+                    toneLine(c));
             // Designator, tone, callsign, and nothing else. The plans' prose about
             // what a site covers is not something this plugin can stand behind, and
             // where a row came from is not ours to put on screen. Both are kept in

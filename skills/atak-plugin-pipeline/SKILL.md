@@ -41,8 +41,9 @@ failure, that failure is the reason the rule exists — not an illustration.
 
 Each step has a gate. Run the gate; do not work around one that fails.
 
-**0. Set up once.** SDK unpacked at `~/atak-sdk/ATAK-CIV-<version>/` (never
-committed — the license forbids redistribution), JDK 17, Android SDK,
+**0. Set up once.** The ATAK-CIV SDK from tak.gov, one per ATAK version you
+target, unpacked at `~/atak-sdk/ATAK-CIV-<version>/` (never committed — the
+license forbids redistribution), JDK 17, Android SDK,
 machine-local config in `~/.config/atak-plugins/`, signed APKs kept in
 `~/atak-dist/signed/`. → [references/setup.md](references/setup.md)
 
@@ -54,7 +55,9 @@ only, or the *release* build fails at submission time.
 scripts/new-plugin.sh <PluginName> "<Display Name>"
 ```
 
-→ [references/scaffold.md](references/scaffold.md)
+Give it a license in the first commit: a public repo without one is all rights
+reserved. → [references/scaffold.md](references/scaffold.md),
+[references/licensing.md](references/licensing.md)
 
 **2. Build it like ATAK.** ATAK's own button drawables and one button style, host
 context for windows, no Spinner, no ListView inside a ScrollView, distances in
@@ -79,7 +82,16 @@ tak.gov, plus `res/xml/preferences.xml`, a `PluginPreferenceFragment` and
 Preferences. The build the screenshots come from never ships — the next one
 carries the manual. → [references/manual.md](references/manual.md)
 
-**5. Bump the version and build a zip per ATAK target.**
+**5. Preflight the source.** [joshuafuller/atak-plugin-preflight](https://github.com/joshuafuller/atak-plugin-preflight)
+scans a plugin's source for what tak.gov's review will flag, before you spend a
+submission finding out. Clone it once; the zip script pulls the latest and runs
+it, and stops when it is not clean.
+
+```bash
+git clone https://github.com/joshuafuller/atak-plugin-preflight.git ~/atak-plugin-preflight
+```
+
+**6. Bump the version and build a zip per ATAK target.**
 
 ```bash
 scripts/submission-zip.sh <PluginName>     # one per ext.ATAK_VERSION, retarget sdk.path too
@@ -90,7 +102,17 @@ already signed for that target, verifies the zip's contents, scrubs it, then
 extracts it to a clean directory and builds it with `ATAK_CI=1` — a zip that
 fails there fails at tak.gov. → [references/submission.md](references/submission.md)
 
-**6. Publish the release.** Signed APKs land in `~/atak-dist/signed/`. One public
+**7. Take in what tak.gov returns.** Each return zip carries a Fortify scan of
+your source, a Dependency-Check and an SBOM beside the APK. Read them before
+anything is published.
+
+```bash
+scripts/takgov-intake.sh                   # files ~/atak-dist/inbox/*.zip, gates on the scans
+```
+
+→ [references/intake.md](references/intake.md)
+
+**8. Publish the release.** Signed APKs land in `~/atak-dist/signed/`. One public
 repo per plugin, README to the standard, download block re-stamped to this
 version, a GitHub Release per version with every target attached.
 
@@ -101,7 +123,7 @@ scripts/check-download-links.sh <Plugin> --live
 
 → [references/publishing.md](references/publishing.md)
 
-**7. Update the channel your users install from.** A GitHub Release is where a
+**9. Update the channel your users install from.** A GitHub Release is where a
 person downloads; a fleet gets what its market catalog or MDM offers, and nothing
 updates that on its own. A release is not shipped until that channel offers the
 new version on every target it was built for.
@@ -117,6 +139,7 @@ a monorepo of `plugins/<Name>/`; layout is resolved by `plugin_dir` in `env.sh`.
 | `scripts/new-plugin.sh` | scaffold from `samples/plugintemplate`, with every fix pre-applied |
 | `scripts/local-properties.sh` | write the gitignored `local.properties` for a plugin |
 | `scripts/submission-zip.sh` | build and verify a tak.gov source zip (the big gate) |
+| `scripts/takgov-intake.sh` | file what tak.gov returns, and gate on signer, versionCode and scans |
 | `scripts/check-version-code.sh` | is this release an update an MDM can push |
 | `scripts/check-download-links.sh` | do the README/guide links name this version, and resolve |
 | `scripts/publish-scrub.sh` | last look before anything leaves the machine |

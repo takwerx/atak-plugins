@@ -1,0 +1,44 @@
+# ATAK SDK artifacts — never commit (SDK license forbids redistribution)
+main.jar
+atak.apk
+atak-javadoc.jar
+atak-gradle-takdev.jar
+android_keystore
+
+# Signing material
+*.jks
+*.keystore
+*.p12
+keystore.properties
+
+# Machine-local paths and credentials
+local.properties
+
+# Unpacked by the takdev Gradle plugin at build time
+.takdev/
+
+# The manual PDF is built from docs/user_manual by typst -- tak.gov builds its own
+# from the source in the zip, and a committed one would go stale the moment the
+# manual changed.
+app/src/main/assets/usermanual.pdf
+
+# Build output
+.gradle/
+build/
+app/libs/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+
+# Submission zips
+dist/
+*.zip

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App -->
+    <string name="app_name">IPAWS Alerts</string>
+    <!-- description -->
+    <string name="app_desc">IPAWS Alerts</string>
+
+    <string name="heading_where">Where</string>
+    <string name="heading_severity">Severity</string>
+    <string name="status_waiting">Waiting for the first update</string>
+    <string name="refresh_now">Check now</string>
+    <string name="all_counties">All counties</string>
+    <string name="choose_states">Choose states</string>
+    <string name="all_severities">All severities</string>
+    <string name="heading_types">Types</string>
+    <string name="all_categories">All categories</string>
+    <string name="all_types">All types</string>
+    <string name="back">Back</string>
+    <string name="zoom_to">Zoom to</string>
+    <string name="d_headline">Headline</string>
+    <string name="d_what">What is happening</string>
+    <string name="d_do">What to do</string>
+    <string name="heading_alerts">Alerts</string>
+    <string name="heading_updates">Updates</string>
+    <string name="heading_notifications">Notifications</string>
+    <string name="heading_map">Map</string>
+    <string name="map_on">Alerts ON</string>
+    <string name="map_off">Alerts OFF</string>
+    <string name="zoom_gate">Zoom gate</string>
+    <string name="use_this_zoom">Use this zoom</string>
+    <string name="heading_distance">Distance from a point</string>
+    <string name="use_this_extent">Use this extent</string>
+    <string name="presets">Presets</string>
+    <string name="show_settings">Show settings</string>
+    <string name="settings">Settings</string>
+    <string name="notify_test">Send a test notification</string>
+    <string name="map_key_show">Show map key</string>
+    <string name="map_key_hide">Hide map key</string>
+    <string name="notify_off">Notify: OFF</string>
+    <string name="notify_on">Notify: ON</string>
+    <string name="manual_title">IPAWS Alerts user manual</string>
+    <string name="manual_summary">The map, the settings and notifications, with pictures</string>
+    <string name="prefs_summary">Public alerts on the map, filtered on this device</string>
+    <string name="heading_metadata">Metadata</string>
+</resources>

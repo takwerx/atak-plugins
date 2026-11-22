@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The list's header: the three things used in the field, then the two numbers
+     the pilot came for. Everything set once and left is on the Settings page. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <!-- Back to AirAware's own pane. The planner is a pane of its own, so without
+         this the only way back to the layer switches is the toolbar, and a pilot who
+         opened the planner to check a ceiling could not turn a layer off again. -->
+    <Button
+        android:id="@+id/btn_airaware"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="@string/back_to_airaware" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="6dp">
+
+        <Button
+            android:id="@+id/btn_islands"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content" />
+
+        <Button
+            android:id="@+id/btn_settings"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="@string/settings" />
+
+        <Button
+            android:id="@+id/btn_launch"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="@string/launch_point" />
+    </LinearLayout>
+
+    <!-- The ground under the marker. Bigger than the rest: it is the number the
+         pilot came for, and "0 AGL" beside it says it is the ground, not the
+         phone's GPS altitude. -->
+    <TextView
+        android:id="@+id/ground"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="10dp"
+        android:textColor="@color/white"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <!-- Two ways to get a ceiling, and the pilot picks which one they are in:
+         Air Attack gave one (type it, see what it does to the area), or they are
+         planning and need one to ask for (the highest ground plus the height they
+         fly above it). The map is painted against whichever is in force. -->
+    <TextView
+        style="@style/TakwerxSectionHeading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="10dp"
+        android:text="@string/section_mode" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btn_mode_given"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="@string/mode_given" />
+
+        <Button
+            android:id="@+id/btn_mode_plan"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="@string/mode_plan" />
+    </LinearLayout>
+
+    <!-- In "Air Attack gave me a ceiling": the typed ceiling, one button. -->
+    <Button
+        android:id="@+id/btn_given_value"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/request_heading"
+        style="@style/TakwerxSectionHeading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="10dp"
+        android:visibility="gone"
+        android:text="@string/section_ceiling_area" />
+
+    <TextView
+        android:id="@+id/request_lines"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="@color/white"
+        android:textSize="15sp"
+        android:lineSpacingExtra="3dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/request_total"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="4dp"
+        android:textColor="@color/white"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <!-- The number for the controller: the ceiling minus the launch ground. -->
+    <TextView
+        android:id="@+id/ceiling"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="4dp"
+        android:textColor="@color/white"
+        android:textSize="15sp"
+        android:visibility="gone" />
+
+    <!-- Filing is somebody else's web form, so this only takes the pilot to it.
+         LAANC is granted through FAA-approved suppliers, not by the FAA directly,
+         and anything LAANC does not cover goes through DroneZone instead, so the
+         button asks which rather than guessing. -->
+    <Button
+        android:id="@+id/btn_laanc"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/file_laanc" />
+
+    <Button
+        android:id="@+id/btn_notam"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="@string/notify_flight_service" />
+
+    <TextView
+        android:id="@+id/list_heading"
+        style="@style/TakwerxSectionHeading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="10dp"
+        android:visibility="gone"
+        android:text="@string/heading_obstacles" />
+
+</LinearLayout>

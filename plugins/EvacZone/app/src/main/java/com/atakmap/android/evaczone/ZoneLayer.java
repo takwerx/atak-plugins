@@ -720,12 +720,27 @@ public class ZoneLayer {
         } catch (Exception e) {
             Log.w(TAG, source.id + " refresh failed", e);
             stale = true;
-            status = "no update: " + e.getMessage();
+            status = plainReason(e);
         } finally {
             refreshing = false;
             if (progress != null)
                 progress.run();
         }
+    }
+
+    /**
+     * Why a refresh failed, in words a crew can act on. The exception itself goes to
+     * the log only: "Unable to resolve host cams.takwerx.org" on the status line read
+     * as a fault in the plugin when it was a device with no signal.
+     */
+    static String plainReason(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof java.net.UnknownHostException || t instanceof java.net.ConnectException
+                    || t instanceof java.net.NoRouteToHostException || t instanceof java.net.SocketTimeoutException
+                    || t instanceof javax.net.ssl.SSLException)
+                return "No network";
+        }
+        return "Source not answering";
     }
 
     /**
@@ -792,6 +807,10 @@ public class ZoneLayer {
         final boolean normalize = statusField != null && !isPoint;
         final Set<String> dates = info.dateFields;
         final String setName = source.layers.get(0) == lay ? info.name : source.layers.get(0).publisher;
+        // A static map is pre-drawn pieces that share a letter: Hillsborough's 834
+        // polygons are five zones, North Carolina's 66 are 21 counties' A to E. Keyed by
+        // name, all but the first of each letter were dropped; every piece is its own zone.
+        final boolean everyPiece = "static".equals(source.kind);
 
         Esri.query(lay.url, lay.layer, lay.where, Math.min(1000, info.maxRecordCount),
                 source.maxFeatures, lay.simplify, new Esri.FeatureSink() {
@@ -801,6 +820,7 @@ public class ZoneLayer {
                         final String name = Esri.firstNonEmpty(str(props, nameField), str(props, displayField), cls, info.name);
                         final String statusText = Esri.firstNonEmpty(str(props, statusField), cls);
                         final String zoneKey = isPoint ? lay.publisher + ":" + name + ":" + g.getEnvelope().minX + "," + g.getEnvelope().minY
+                                : everyPiece ? shortLabel(name) + "#" + seen[0]
                                 : shortLabel(name);
                         Pending existing = byKey.get(zoneKey);
                         if (existing == null && !authority && !isPoint && !isLine)
@@ -836,6 +856,18 @@ public class ZoneLayer {
                         } else {
                             style = renderer.styleFor(props);
                             key = statusText == null ? "(no status)" : statusText;
+                            if (!isLine && !isPoint)
+                                color = renderer.colorFor(props);
+                            // A static map the service draws one flat color (Lee County): the
+                            // letters are the only classes there are, so color by letter.
+                            if (everyPiece && !isLine && !isPoint && renderer.isFlat()) {
+                                final String letter = shortLabel(name);
+                                final Style byLetter = renderer.letterStyle(letter);
+                                if (byLetter != null) {
+                                    style = byLetter;
+                                    color = EsriRenderer.letterColor(letter);
+                                }
+                            }
                         }
                         Geometry geometry = g;
                         String featureName = name;
@@ -846,11 +878,29 @@ public class ZoneLayer {
                             at = labelPoint(g);
                             if (at != null) {
                                 final GeometryCollection gc = new GeometryCollection(2);
-                                gc.addGeometry(g);
+                                // A multipart zone's parts go in flat, beside the label point.
+                                if (g instanceof GeometryCollection) {
+                                    for (Geometry part : ((GeometryCollection) g).getGeometries())
+                                        gc.addGeometry(part);
+                                } else {
+                                    gc.addGeometry(g);
+                                }
                                 gc.addGeometry(at);
                                 geometry = gc;
                                 style = Styles.withNameLabel(style);
                                 featureName = shortLabel(name);
+                                // A static map whose rows name their county reads "A-Tyrrell"; a bare
+                                // letter repeated down a coast does not say whose zone it is.
+                                if (everyPiece) {
+                                    // The row's own county, else the county the whole map is for
+                                    // (Hillsborough and Lee publish one county each).
+                                    String cty = countyField != null && !props.isNull(countyField)
+                                            ? props.optString(countyField, "") : "";
+                                    if (cty.isEmpty() && lay.county != null)
+                                        cty = lay.county;
+                                    if (!cty.isEmpty())
+                                        featureName += "-" + cty;
+                                }
                             } else {
                                 style = Styles.silentLabel(style);
                             }

@@ -1,0 +1,105 @@
+package com.atakmap.android.sitrep.section;
+
+import com.atakmap.android.sitrep.Area;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * One line of the report and the one source behind it. One class per source (PLAN
+ * section 3), so an agency moving a service is a change to one file.
+ *
+ * <p>{@link #fetch} runs on a report worker and may take as long as its server does;
+ * it throws on any failure and the report says {@code Not available} for this
+ * section alone.
+ */
+public abstract class Section {
+
+    /** Stable id, the key a saved report keeps this section's answer under. */
+    public final String key;
+    /** The name at the head of the row: {@code Structures}. */
+    public final String name;
+    /**
+     * Live sections (alerts, weather, fires) change by the hour: a saved one is shown
+     * with its age and re-run by Refresh. Reference sections (people, structures,
+     * history) are kept as fetched.
+     */
+    public final boolean live;
+    /** Where the numbers come from, for the line behind the tap. No source names on the head. */
+    public final String source;
+    /**
+     * The takwerx plugin that shows this section's data on the map, as a closing
+     * line: {@code See them on the map in AirAware.} Null when none does (operator,
+     * 2026-11-13).
+     */
+    public String seeIn;
+    /**
+     * The plugin {@link #seeIn} names: its display name, its package, and the SHOW
+     * action when it answers one. Loaded with an action, the line is an Open button;
+     * not installed, it is a Get button to the plugin page (operator, 2026-11-13).
+     */
+    public String openName, openPackage, openAction;
+    /** A second plugin for the same data (Alerts: Atmosphere and IPAWS Alerts). */
+    public String alsoName, alsoPackage, alsoAction;
+
+    protected Section(String key, String name, boolean live, String source) {
+        this.key = key;
+        this.name = name;
+        this.live = live;
+        this.source = source;
+    }
+
+    /**
+     * Starts a group line: {@code GROUP + "Residential: 1,925"}. The indented lines
+     * after it are the group's body, folded closed under it on the report page.
+     */
+    public static final String GROUP = "\u00A7 ";
+
+    /**
+     * Joins a line's text and a web page: {@code link("  1959 Decker Fire", url)}. The
+     * report shows the text, and a tap opens the page in the device's browser. Only
+     * https pages are opened.
+     */
+    public static final String LINK = "\u0001";
+
+    public static String link(String text, String url) {
+        return text + LINK + url;
+    }
+
+    public abstract Result fetch(Area area) throws Exception;
+
+    /**
+     * The same, for a section that also looks around the area: things within the
+     * operator's Nearby distance (PLAN section 3, "One Nearby radius").
+     */
+    public Result fetch(Area area, int nearbyMiles) throws Exception {
+        return fetch(area);
+    }
+
+    /** What a section found. */
+    public static final class Result {
+        /** The head's value, read after the name: {@code 2,018; 1,925 residential}. */
+        public final String value;
+        /** A few words for the report's row in the list, or null: {@code 1,925 residential}. */
+        public final String summary;
+        /** The detail lines under the head. */
+        public final List<String> lines = new ArrayList<>();
+        /**
+         * Set when the source does not cover this place ({@code Not published for this
+         * state}): a different fact from "none found".
+         */
+        public boolean notPublishedHere;
+        /** Places for the map, as {@link com.atakmap.android.sitrep.Report.Answer#points}. */
+        public org.json.JSONArray points;
+
+        public Result(String value, String summary) {
+            this.value = value;
+            this.summary = summary;
+        }
+
+        public Result line(String s) {
+            lines.add(s);
+            return this;
+        }
+    }
+}

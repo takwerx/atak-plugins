@@ -1,0 +1,9185 @@
+package com.atakmap.android.atmosphere.ui;
+
+import android.app.AlertDialog;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.SharedPreferences;
+import android.text.style.ClickableSpan;
+import android.text.method.LinkMovementMethod;
+import android.text.Spanned;
+import android.text.SpannableString;
+import android.net.Uri;
+import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.PointF;
+import android.graphics.Typeface;
+import android.view.Gravity;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewParent;
+import android.widget.HorizontalScrollView;
+import android.widget.ScrollView;
+import android.widget.Button;
+import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.viewpager.widget.PagerAdapter;
+import androidx.viewpager.widget.ViewPager;
+
+import com.atakmap.android.atmosphere.astro.Astro;
+import com.atakmap.android.atmosphere.astro.Light;
+import com.atakmap.android.atmosphere.compat.MapCompat;
+import com.atakmap.android.atmosphere.data.Favorites;
+import com.atakmap.android.atmosphere.data.Nhc;
+import com.atakmap.android.atmosphere.data.ParamSelection;
+import com.atakmap.android.atmosphere.data.WeatherClient;
+import com.atakmap.android.atmosphere.model.Reading;
+import com.atakmap.android.atmosphere.model.SeriesEntry;
+import com.atakmap.android.atmosphere.model.Snapshot;
+import com.atakmap.android.atmosphere.net.EgressPolicy;
+import com.atakmap.android.atmosphere.data.AirNow;
+import com.atakmap.android.atmosphere.overlay.AirQualityOverlay;
+import com.atakmap.android.atmosphere.overlay.SpotOverlay;
+import com.atakmap.android.atmosphere.compat.ScaleBar;
+import com.atakmap.android.atmosphere.data.RedFlag;
+import com.atakmap.android.atmosphere.overlay.BuoyOverlay;
+import com.atakmap.android.atmosphere.overlay.GaugeOverlay;
+import com.atakmap.android.atmosphere.overlay.StationOverlay;
+import com.atakmap.android.atmosphere.overlay.AvalancheOverlay;
+import com.atakmap.android.atmosphere.overlay.BeachOverlay;
+import com.atakmap.android.atmosphere.overlay.SnotelOverlay;
+import com.atakmap.android.atmosphere.overlay.HighFlowOverlay;
+import com.atakmap.android.atmosphere.overlay.FloodedGroundOverlay;
+import com.atakmap.android.atmosphere.overlay.FloodZoneOverlay;
+import com.atakmap.android.atmosphere.overlay.DamAreaOverlay;
+import com.atakmap.android.atmosphere.overlay.SatelliteOverlay;
+import com.atakmap.android.atmosphere.overlay.SnowOverlay;
+import com.atakmap.android.atmosphere.overlay.SstOverlay;
+import com.atakmap.android.atmosphere.overlay.FireWxOutlookOverlay;
+import com.atakmap.android.atmosphere.overlay.SawtiOverlay;
+import com.atakmap.android.atmosphere.overlay.ErcOverlay;
+import com.atakmap.android.atmosphere.overlay.LightningOverlay;
+import com.atakmap.android.atmosphere.overlay.Origin;
+import com.atakmap.android.atmosphere.overlay.PspsOverlay;
+import com.atakmap.android.atmosphere.overlay.StormReportsOverlay;
+import com.atakmap.android.atmosphere.overlay.TornadoPathsOverlay;
+import com.atakmap.android.atmosphere.overlay.DebrisFlowOverlay;
+import com.atakmap.android.atmosphere.overlay.QuakesOverlay;
+import com.atakmap.android.atmosphere.overlay.FuelMoistureOverlay;
+import com.atakmap.android.atmosphere.overlay.RainTotalsOverlay;
+import com.atakmap.android.atmosphere.overlay.RainGaugesOverlay;
+import com.atakmap.android.atmosphere.overlay.FireZoneOverlay;
+import com.atakmap.android.atmosphere.overlay.FloodOutlookOverlay;
+import com.atakmap.android.atmosphere.overlay.RadarOverlay;
+import com.atakmap.android.atmosphere.overlay.WorldRadar;
+import com.atakmap.android.atmosphere.overlay.WaveOverlay;
+import com.atakmap.android.atmosphere.overlay.RainOverlay;
+import com.atakmap.android.atmosphere.waves.NomadsWaves;
+import com.atakmap.android.atmosphere.rain.NomadsRain;
+import com.atakmap.android.atmosphere.overlay.SmokeOverlay;
+import com.atakmap.android.atmosphere.overlay.TropicalOverlay;
+import com.atakmap.android.atmosphere.overlay.WindScaleView;
+import com.atakmap.android.atmosphere.overlay.WindOverlay;
+import com.atakmap.android.atmosphere.smoke.NomadsSmoke;
+import com.atakmap.android.atmosphere.wind.NomadsWind;
+import com.atakmap.android.atmosphere.plugin.R;
+import com.atakmap.android.atmosphere.source.SourceRegistry;
+import com.atakmap.android.atmosphere.source.WxParam;
+import com.atakmap.android.atmosphere.source.WxSourceDef;
+import com.atakmap.android.atmosphere.units.Quantity;
+import com.atakmap.android.atmosphere.units.UnitSystem;
+import com.atakmap.android.atmosphere.units.Units;
+import com.atakmap.android.maps.MapEvent;
+import com.atakmap.android.maps.MapEventDispatcher;
+import com.atakmap.android.maps.MapView;
+import com.atakmap.coremap.maps.coords.GeoPoint;
+import com.atakmap.coremap.maps.coords.GeoPointMetaData;
+
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.TimeZone;
+
+/**
+ * The plugin pane: pick a source, pick a place, read the weather.
+ *
+ * <p>Everything shown here comes from a source definition — the labels, the units, which
+ * variables exist. Nothing in this class knows the name of a weather provider.
+ *
+ * <p>Anonymous listeners rather than lambdas: this code ships in release builds, where
+ * the SDK documents lambdas breaking under proguard.
+ */
+public final class AtmospherePane {
+
+    private static final String PREF_SOURCE = "weather.source.selected";
+    private static final String PREF_UNITS = "weather.units";
+    /** Which point the readout is for: a {@link PointMode} name. */
+    private static final String PREF_MODE = "weather.position.mode";
+    /** The picked point as "lat,lon", kept so a picked point survives a reopen. */
+    private static final String PREF_PICKED = "weather.position.picked";
+    /** The name of the favorite being read, when one is; absent for map center or self. */
+    private static final String PREF_FAVORITE = "weather.position.favorite";
+    private static final String PREF_TREND = "weather.trend.kind";
+    private static final String PREF_HOURS_TABLE = "weather.hours.table";
+    private static final String PREF_RADAR_OPEN = "weather.radar.open";
+    private static final String PREF_TROPICAL_OPEN = "weather.tropical.open";
+    private static final String PREF_WIND_OPEN = "weather.wind.open";
+    private static final String PREF_WAVES_OPEN = "weather.waves.open";
+    private final Button wavesToggle;
+    private final ImageButton wavesExpand;
+    private final LinearLayout wavesSettings;
+    private final WindScaleView wavesScale;
+    private final TextView wavesReading;
+    private boolean wavesOpen = true;
+    private WaveOverlay waves;
+    private int wavesHours;
+    private static final String PREF_RAIN_OPEN = "weather.rain.open";
+    private final Button rainToggle;
+    private final ImageButton rainExpand;
+    private final LinearLayout rainSettings;
+    private final WindScaleView rainScale;
+    private final TextView rainReading;
+    private boolean rainOpen = true;
+    private RainOverlay rain;
+    private int rainHours;
+    private static final String PREF_SMOKE_OPEN = "weather.smoke.open";
+    private static final String PREF_AIR_OPEN = "weather.air.open";
+    private static final String PREF_STATIONS_OPEN = "weather.layers.stations.open";
+    private static final String PREF_GAUGES_OPEN = "weather.layers.gauges.open";
+    private static final String PREF_BUOYS_OPEN = "weather.layers.buoys.open";
+    private static final String PREF_STATIONS_GUIDE_OPEN = "weather.layers.stations.guide";
+    private static final String PREF_SPOT_OPEN = "weather.spotlayer.open";
+
+    private final View root;
+    private final Context pluginContext;
+    private final SourceRegistry registry;
+    private final EgressPolicy egress;
+    private final WeatherClient client;
+
+    private final ImageButton modeSelf;
+    private final ImageButton modeCenter;
+    private final ImageButton modePick;
+    private final ImageButton favoritesButton;
+    private final Button unitsButton;
+    private final ImageButton wideButton;
+    /** The captions under the icon row, and the two whose words follow the state. */
+    private LinearLayout iconCaptions;
+    private TextView wideCaption;
+    private View iconRow;
+    private final ViewPager pager;
+    /** Back, the page showing (a tap lists them all), forward; in the top row. */
+    private final ImageButton pagePrev, pageNext;
+    /** Straight to the Layers page from wherever the pane is; green while it shows. */
+    private final ImageButton layersButton;
+    private final Button pagePick;
+    private static final int[] TAB_NAMES = { R.string.tab_forecast, R.string.tab_layers,
+            R.string.tab_spots, R.string.tab_zones, R.string.tab_sawti, R.string.tab_erc,
+            R.string.tab_stations,
+            R.string.tab_gauges, R.string.tab_buoys, R.string.tab_reports, R.string.tab_rain };
+    /** Where the Layers page sits in {@link #TAB_NAMES} and the pager. */
+    private static final int LAYERS_PAGE = 1;
+    private final View[] pages;
+    /** Page 3, its own class; the pane only hosts it. */
+    private final SpotPage spotPage;
+    /** Fire weather zones and their planning forecast, beside the spot forecasts. */
+    private final FireZonePage zonePage;
+    /** SAWTI, the Forest Service site's forecast page, beside the fire weather zones. */
+    private final SawtiPage sawtiPage;
+    /** One area's fire danger with its GACC chart, opened wide from a tap on the map. */
+    private final ErcPage ercPage;
+    /** The storm reports as a list, the map layer's own data narrowed by where and type. */
+    private final ReportsPage reportsPage;
+    /** The office's rainfall report and the USGS gauges as a list. */
+    private final RainPage rainPage;
+    /** The forecaster's discussion under the days on the Forecast page. */
+    private final DiscussionBlock discussion;
+    private final Button refreshButton;
+    private final Button settingsButton;
+    private final TextView positionText;
+    private final TextView statusText;
+    private final TextView currentHeading;
+    private final LinearLayout currentContainer;
+    private final TextView seriesHeading;
+    private final HorizontalScrollView trendScroll;
+    private final LinearLayout trendHost;
+    private final LinearLayout trendChips;
+    private final TrendStripView trend;
+    /** The Light section: one local day of twilight and moon for the point. */
+    private final LinearLayout lightContainer;
+    private final TextView lightDay;
+    /** Days from today the Light section shows; the stepper moves it. */
+    private int lightOffset;
+    private static final String PREF_LIGHT_OPEN = "weather.light.open";
+    /** The Light section opens under its button, as the hourly table does; closed until opened, then remembered. */
+    private boolean lightOpen;
+    private Kind trendKind = Kind.TEMP;
+    private final Button hoursTableButton;
+    private final View hoursTable;
+    private final LinearLayout hoursLegend;
+    private final LinearLayout hoursContainer;
+    private boolean hoursTableOpen;
+    private final TextView daysHeading;
+    private final View daysStrip;
+    private final LinearLayout daysLegend;
+    private final LinearLayout daysContainer;
+    private final TextView attributionText;
+    private final TextView layersAttribution;
+    private final Button radarToggle;
+    private final View scrubber;
+    private final TextView scrubberLabel;
+    private final LinearLayout tropicalSettings;
+    private final ImageButton tropicalExpand;
+    private final Button tropicalToggle;
+    private final TextView tropicalStatus;
+    private final LinearLayout tropicalRows;
+    private final LinearLayout tropicalScale;
+    private TropicalOverlay tropical;
+    private boolean tropicalOpen = true;
+    private static final String PREF_AVALANCHE_OPEN = "weather.avalanche.open";
+    private final LinearLayout avalancheSettings;
+    private final ImageButton avalancheExpand;
+    private final Button avalancheToggle;
+    private final TextView avalancheStatus;
+    private final LinearLayout avalancheLegend;
+    private AvalancheOverlay avalanche;
+    private boolean avalancheOpen = true;
+    private static final String PREF_FIREWX_OPEN = "weather.firewx.open";
+    private final LinearLayout firewxSettings;
+    private final ImageButton firewxExpand;
+    private final Button firewxToggle;
+    private final TextView firewxStatus;
+    private final LinearLayout firewxLegend;
+    private final LinearLayout firewxDayRow;
+    private FireWxOutlookOverlay firewx;
+    private boolean firewxOpen = true;
+    private static final String PREF_SAWTI_OPEN = "weather.sawti.open";
+    private static final String PREF_ERC_OPEN = "weather.erc.open";
+    private LinearLayout ercSettings, ercLegend, ercDayRow;
+    private ImageButton ercExpand;
+    private Button ercToggle;
+    private TextView ercStatus;
+    private ErcOverlay erc;
+    private boolean ercOpen = true;
+    private final LinearLayout sawtiSettings;
+    private final ImageButton sawtiExpand;
+    private final Button sawtiToggle;
+    private final TextView sawtiStatus;
+    private final LinearLayout sawtiLegend;
+    private final LinearLayout sawtiDayRow;
+    private SawtiOverlay sawti;
+    private boolean sawtiOpen = true;
+    private static final String PREF_LIGHTNING_OPEN = "weather.lightning.open";
+    private final LinearLayout lightningSettings;
+    private final ImageButton lightningExpand;
+    private final Button lightningToggle;
+    private final TextView lightningStatus;
+    private final LinearLayout lightningLegend;
+    private LightningOverlay lightning;
+    private boolean lightningOpen = true;
+    private static final String PREF_PSPS_OPEN = "weather.psps.open";
+    private final LinearLayout pspsSettings;
+    private final ImageButton pspsExpand;
+    private final Button pspsToggle;
+    private final TextView pspsStatus;
+    private final LinearLayout pspsLegend;
+    private PspsOverlay psps;
+    private boolean pspsOpen = true;
+    private static final String PREF_REPORTS_OPEN = "weather.reports.open";
+    private final LinearLayout reportsSettings;
+    private final ImageButton reportsExpand;
+    private final Button reportsToggle;
+    private final TextView reportsStatus;
+    private final LinearLayout reportsLegend;
+    private final LinearLayout reportsDayRow;
+    private StormReportsOverlay reports;
+    private boolean reportsOpen = true;
+    private static final String PREF_TORNADO_OPEN = "weather.tornado.open";
+    private final LinearLayout tornadoSettings;
+    private final ImageButton tornadoExpand;
+    private final Button tornadoToggle;
+    private final TextView tornadoStatus;
+    private final LinearLayout tornadoLegend;
+    private final LinearLayout tornadoDayRow;
+    private TornadoPathsOverlay tornado;
+    private boolean tornadoOpen = true;
+    private static final String PREF_DEBRISFLOW_OPEN = "weather.debrisflow.open";
+    private final LinearLayout debrisflowSettings;
+    private final ImageButton debrisflowExpand;
+    private final Button debrisflowToggle;
+    private final TextView debrisflowStatus;
+    private final LinearLayout debrisflowLegend;
+    private DebrisFlowOverlay debrisflow;
+    private boolean debrisflowOpen = true;
+    private static final String PREF_QUAKES_OPEN = "weather.quakes.open";
+    private final LinearLayout quakesSettings;
+    private final ImageButton quakesExpand;
+    private final Button quakesToggle;
+    private final TextView quakesStatus;
+    private final LinearLayout quakesLegend;
+    private final LinearLayout quakesDayRow;
+    private final LinearLayout quakesChoiceRow;
+    private QuakesOverlay quakes;
+    private boolean quakesOpen = true;
+    private static final String PREF_FUEL_OPEN = "weather.fuel.open";
+    private final LinearLayout fuelSettings;
+    private final ImageButton fuelExpand;
+    private final Button fuelToggle;
+    private final TextView fuelStatus;
+    private final LinearLayout fuelLegend;
+    private final LinearLayout fuelDayRow;
+    private final LinearLayout fuelChoiceRow;
+    private FuelMoistureOverlay fuel;
+    private boolean fuelOpen = true;
+    private static final String PREF_RAINTOTALS_OPEN = "weather.raintotals.open";
+    private final LinearLayout raintotalsSettings;
+    private final ImageButton raintotalsExpand;
+    private final Button raintotalsToggle;
+    private final TextView raintotalsStatus;
+    private final LinearLayout raintotalsLegend;
+    private final LinearLayout raintotalsWindowRow;
+    private final android.widget.SeekBar raintotalsTransparency;
+    private final TextView raintotalsTransparencyLabel;
+    private RainTotalsOverlay raintotals;
+    private boolean raintotalsOpen = true;
+    private static final String PREF_RAINGAUGES_OPEN = "weather.raingauges.open";
+    private final LinearLayout raingaugesSettings;
+    private final ImageButton raingaugesExpand;
+    private final Button raingaugesToggle;
+    private final TextView raingaugesStatus;
+    private final LinearLayout raingaugesLegend;
+    private final Button raingaugesWindow;
+    private RainGaugesOverlay raingauges;
+    private boolean raingaugesOpen = true;
+    private static final String PREF_FIREZONES_OPEN = "weather.firezones.open";
+    private final LinearLayout firezonesSettings;
+    private final ImageButton firezonesExpand;
+    private final Button firezonesToggle;
+    private final TextView firezonesStatus;
+    private final LinearLayout firezonesLegend;
+    private final LinearLayout firezonesGateRow, firezonesLabelGateRow;
+    private final TextView firezonesGateText, firezonesLabelGateText;
+    private FireZoneOverlay fireZones;
+    private boolean firezonesOpen = true;
+    private static final String PREF_FLOOD_OPEN = "weather.flood.open";
+    private final LinearLayout floodSettings;
+    private final ImageButton floodExpand;
+    private final Button floodToggle;
+    private final TextView floodStatus;
+    private final LinearLayout floodLegend;
+    private final LinearLayout floodDayRow;
+    private FloodOutlookOverlay flood;
+    private boolean floodOpen = true;
+    private static final String PREF_BEACH_OPEN = "weather.beach.open";
+    private final LinearLayout beachSettings;
+    private final ImageButton beachExpand;
+    private final Button beachToggle;
+    private final TextView beachStatus;
+    private final LinearLayout beachLegend;
+    private BeachOverlay beach;
+    private boolean beachOpen = true;
+    private static final String PREF_HIGHFLOW_OPEN = "weather.highflow.open";
+    private final LinearLayout highflowSettings;
+    private final ImageButton highflowExpand;
+    private final Button highflowToggle;
+    private final TextView highflowStatus;
+    private final LinearLayout highflowLegend;
+    private final LinearLayout highflowWhenRow;
+    private HighFlowOverlay highflow;
+    private boolean highflowOpen = true;
+    private static final String PREF_FLOODGROUND_OPEN = "weather.floodground.open";
+    private final LinearLayout floodgroundSettings;
+    private final ImageButton floodgroundExpand;
+    private final Button floodgroundToggle;
+    private final TextView floodgroundStatus;
+    private final LinearLayout floodgroundLegend;
+    private final LinearLayout floodgroundWhenRow;
+    private FloodedGroundOverlay floodground;
+    private boolean floodgroundOpen = true;
+    private static final String PREF_FLOODZONES_OPEN = "weather.floodzones.open";
+    private final LinearLayout floodzonesSettings;
+    private final ImageButton floodzonesExpand;
+    private final Button floodzonesToggle;
+    private final TextView floodzonesStatus;
+    private final LinearLayout floodzonesLegend;
+    private final LinearLayout floodzonesGateRow;
+    private final TextView floodzonesGateText;
+    private FloodZoneOverlay floodzones;
+    private boolean floodzonesOpen = true;
+    private static final String PREF_DAMAREAS_OPEN = "weather.damareas.open";
+    private final LinearLayout damareasSettings;
+    private final ImageButton damareasExpand;
+    private final Button damareasToggle;
+    private final TextView damareasStatus;
+    private final LinearLayout damareasLegend;
+    private final LinearLayout damareasGateRow;
+    private final TextView damareasGateText;
+    private DamAreaOverlay damareas;
+    private boolean damareasOpen = true;
+    private static final String PREF_SATELLITE_OPEN = "weather.satellite.open";
+    private final LinearLayout satelliteSettings;
+    private final ImageButton satelliteExpand;
+    private final Button satelliteToggle;
+    private final TextView satelliteStatus;
+    private final LinearLayout satelliteBandRow;
+    private SatelliteOverlay satellite;
+    private boolean satelliteOpen = true;
+    private static final String PREF_SNOW_OPEN = "weather.snow.open";
+    private final LinearLayout snowSettings;
+    private final ImageButton snowExpand;
+    private final Button snowToggle;
+    private final TextView snowStatus;
+    private final LinearLayout snowLegend;
+    private SnowOverlay snow;
+    private boolean snowOpen = true;
+    private static final String PREF_SST_OPEN = "weather.sst.open";
+    private final LinearLayout sstSettings;
+    private final ImageButton sstExpand;
+    private final Button sstToggle;
+    private final TextView sstStatus;
+    private final LinearLayout sstLegend;
+    private SstOverlay sst;
+    private boolean sstOpen = true;
+    private static final String PREF_SNOTEL_OPEN = "weather.snotel.open";
+    private final LinearLayout snotelSettings;
+    private final ImageButton snotelExpand;
+    private final Button snotelToggle;
+    private final TextView snotelStatus;
+    private final LinearLayout snotelLegend;
+    private SnotelOverlay snotel;
+    private boolean snotelOpen = true;
+    /** Which storms are showing their own list of maps. By storm id, not by slot. */
+    private final Set<String> stormOpen = new HashSet<>();
+    private final LinearLayout radarSettings;
+    private final android.widget.SeekBar radarTransparency;
+    private final TextView radarTransparencyLabel;
+    /** The strip's Play/Stop button, keyed apart from Live, the days and the hours. */
+    private static final String PLAY_TAG = "play";
+    private final LinearLayout windSettings;
+    private final ImageButton radarExpand;
+    private final ImageButton windExpand;
+    /** Whether each layer is showing its own settings. Folded away, a layer is a row. */
+    private boolean radarOpen;
+    private boolean windOpen = true;
+    private final LinearLayout scrubberDays;
+    private final LinearLayout scrubberHours;
+    /** The times the picker offers, and which of them is on the map. */
+    private final List<Long> whenTimes = new ArrayList<>();
+    private int whenIndex = -1;
+    /** The index that means "right now": hour 0 for wind, the last frame for radar. */
+    private int whenLive = -1;
+    /**
+     * True while the strip is following now rather than a time somebody picked. Live,
+     * Today and Tomorrow are one choice of three, so exactly one of them is ever lit
+     * (operator, 2026-09-22: "how can i have live and today both checked with 6pm,
+     * this makes no sense, its live or today or tomorrow"). The hours belong to a day,
+     * so they are only up when a day is the choice.
+     */
+    private boolean liveMode = true;
+    /** Start of the day whose hours are laid out, so a repaint need not rebuild. */
+    private long whenDay = Long.MIN_VALUE;
+    private RadarOverlay radar;
+    private List<String> radarFrames = new ArrayList<>();
+    private final Button windToggle;
+    private final Button windHeatToggle;
+    private final View windScaleHost;
+    private final WindScaleView windScale;
+    private final LinearLayout windUnitRow;
+    private final View windLevelBlock;
+    private final TextView windLevelLabel;
+    private final TextView windReading;
+    private final LinearLayout windLevelRows;
+    private WindOverlay wind;
+    private int windHours;
+    private final Button smokeToggle;
+    private final ImageButton smokeExpand;
+    private final LinearLayout smokeSettings;
+    private final WindScaleView smokeScale;
+    private final TextView smokeReading;
+    private final LinearLayout smokeHeightRow;
+    private boolean smokeOpen = true;
+    private SmokeOverlay smoke;
+    private int smokeHours;
+    private final Button airToggle;
+    private final ImageButton airExpand;
+    private final LinearLayout airSettings;
+    private final TextView airStatus;
+    private final LinearLayout airScale;
+    private final TextView airReading;
+    private boolean airOpen = true;
+    private AirQualityOverlay air;
+    private final Button spotToggle;
+    private final ImageButton spotExpand;
+    private final Button spotOpenOnly;
+    private final TextView spotLayerStatus;
+    private final LinearLayout spotLegend;
+    private final View spotSettings;
+    private SpotOverlay spotLayer;
+    private StationOverlay stationLayer;
+    private StationPage stationPage;
+    private TextView stationsStatus, stationsBasis;
+    private Button stationsToggle;
+    private ImageButton stationsExpand;
+    private View stationsSettings;
+    private LinearLayout stationsDistanceRow, stationsLegend;
+    private LinearLayout stationsGateRow, stationsLabelGateRow, stationsShowRow;
+    private TextView stationsGateText, stationsLabelGateText, stationsUtilityGateText;
+    private LinearLayout stationsUtilityGateRow;
+    private View stationsUtilitySettings;
+    private Button stationsUtility;
+    private Button stationsLabels, stationsGuideToggle;
+    private ImageButton stationsGuideExpand;
+    private LinearLayout stationsGuide;
+    private boolean stationsGuideOpen;
+    private boolean stationsOpen;
+    private GaugeOverlay gaugeLayer;
+    private GaugePage gaugePage;
+    private LinearLayout gaugesShowRow, gaugesGateRow, gaugesLabelGateRow;
+    private TextView gaugesGateText, gaugesLabelGateText;
+    private Button gaugesLabels;
+    private TextView gaugesStatus;
+    private Button gaugesToggle;
+    private ImageButton gaugesExpand;
+    private View gaugesSettings;
+    private LinearLayout gaugesDistanceRow, gaugesLegend;
+    private boolean gaugesOpen;
+    private BuoyOverlay buoyLayer;
+    private BuoyPage buoyPage;
+    private LinearLayout buoysShowRow, buoysGateRow, buoysLabelGateRow;
+    private TextView buoysGateText, buoysLabelGateText;
+    private Button buoysLabels;
+    private TextView buoysStatus;
+    private Button buoysToggle;
+    private ImageButton buoysExpand;
+    private View buoysSettings;
+    private LinearLayout buoysDistanceRow, buoysLegend;
+    private boolean buoysOpen;
+    private boolean spotOpen = true;
+
+    private final List<WxSourceDef> sources;
+
+    private WxSourceDef selected;
+    private UnitSystem units;
+    /** Where the readout is for. */
+    public enum PointMode {
+        SELF, CENTER, PICKED, FAVORITE;
+
+        static PointMode fromName(String n) {
+            if (n != null)
+                for (PointMode m : values())
+                    if (m.name().equals(n)) return m;
+            return CENTER;
+        }
+    }
+
+    private PointMode mode = PointMode.CENTER;
+    /** The point picked on the map, when the mode is PICKED. */
+    private GeoPoint pickedPoint;
+    /** The saved place being read, when the mode is FAVORITE. */
+    private Favorites.Place favorite;
+    private final Favorites favorites;
+    /** True between the Pick tap and the map tap; the map listeners are pushed. */
+    private boolean pickArmed;
+    private MapEventDispatcher.MapEventDispatchListener pickListener;
+    /** The drop-down hosting this pane, for the wide toggle; set after construction. */
+    private AtmosphereDropDown host;
+    private Snapshot snapshot;
+
+    public AtmospherePane(View root, Context pluginContext, SourceRegistry registry,
+            EgressPolicy egress, WeatherClient client) {
+
+        this.root = root;
+        this.pluginContext = pluginContext;
+        this.registry = registry;
+        this.egress = egress;
+        this.client = client;
+        this.sources = registry.sources();
+
+        // The pages are their own layouts, inflated here and handed to the pager;
+        // every id below is looked up across the root and the pages.
+        final LayoutInflater inflater = LayoutInflater.from(pluginContext);
+        spotPage = new SpotPage(pluginContext, MapView.getMapView(), egress,
+                new SpotPage.Host() {
+                    @Override
+                    public GeoPoint point() {
+                        return AtmospherePane.this.point();
+                    }
+
+                    @Override
+                    public String pointLabel() {
+                        return modeLabel();
+                    }
+
+                    @Override
+                    public String pointWords() {
+                        return paneOrigin.words();
+                    }
+
+                    @Override
+                    public UnitSystem units() {
+                        return units;
+                    }
+
+                    @Override
+                    public void setSpotKind(String letter) {
+                        if (spotLayer != null) {
+                            spotLayer.setKind(letter);
+                        } else {
+                            final SharedPreferences p = MapCompat.prefs();
+                            if (p != null)
+                                p.edit().putString("weather.layer.spot.kind", letter).apply();
+                        }
+                    }
+                });
+        zonePage = new FireZonePage(pluginContext, mapView(), egress, new FireZonePage.Host() {
+            @Override
+            public GeoPoint point() {
+                return AtmospherePane.this.point();
+            }
+
+            @Override
+            public String pointLabel() {
+                return modeLabel();
+            }
+
+            @Override
+            public void starsChanged() {
+                if (fireZones != null)
+                    fireZones.restyle();
+            }
+
+            @Override
+            public void showErc(com.atakmap.android.atmosphere.data.Erc.Psa psa) {
+                AtmospherePane.this.showErc(psa);
+            }
+        });
+        ercPage = new ErcPage(pluginContext, egress);
+        reportsPage = new ReportsPage(pluginContext, MapView.getMapView(), egress,
+                new ReportsPage.Host() {
+                    @Override
+                    public UnitSystem units() {
+                        return units;
+                    }
+
+                    @Override
+                    public GeoPoint point() {
+                        return AtmospherePane.this.point();
+                    }
+
+                    @Override
+                    public String pointLabel() {
+                        return modeLabel();
+                    }
+
+                    @Override
+                    public void askToAllowReports() {
+                        AtmospherePane.this.askToAllowReports();
+                    }
+
+                    @Override
+                    public void setReportsOn(boolean on) {
+                        if (reports != null) {
+                            reports.setOn(on);
+                            updateLayerControls();
+                        }
+                    }
+
+                    @Override
+                    public void setTornadoOn(boolean on) {
+                        if (tornado != null) {
+                            tornado.setOn(on);
+                            updateLayerControls();
+                        }
+                    }
+                });
+        rainPage = new RainPage(pluginContext, MapView.getMapView(), egress, new RainPage.Host() {
+            @Override
+            public GeoPoint point() {
+                return AtmospherePane.this.point();
+            }
+
+            @Override
+            public String pointLabel() {
+                return modeLabel();
+            }
+
+            @Override
+            public boolean nwsPicked() {
+                return selected != null && "nws".equals(selected.id);
+            }
+
+            @Override
+            public void askToAllowGauges() {
+                askToAllowRaingauges();
+            }
+
+            @Override
+            public void setGaugesOn(boolean on) {
+                if (raingauges != null) {
+                    raingauges.setOn(on);
+                    updateLayerControls();
+                }
+            }
+        });
+        sawtiPage = new SawtiPage(pluginContext, mapView(), egress, new SawtiPage.Host() {
+            @Override
+            public GeoPoint point() {
+                return AtmospherePane.this.point();
+            }
+
+            @Override
+            public String mapDate() {
+                final com.atakmap.android.atmosphere.data.Sawti.Forecast f = sawti == null ? null : sawti.forecast();
+                final List<String> dates = f == null ? null : f.dates();
+                final int d = sawti == null ? 0 : sawti.day();
+                return dates == null || d < 1 || d > dates.size() ? null : dates.get(d - 1);
+            }
+
+            @Override
+            public void showOnMap(String date) {
+                if (sawti == null || date == null)
+                    return;
+                // Picking a day is asking to see it: the layer comes on, by its own
+                // switch, so a first time asks for the allow (operator, 2026-10-14). A
+                // layer that was off has no forecast yet: the day waits for it.
+                sawtiPendingDate = date;
+                applySawtiPendingDate();
+                if (!sawti.isOn())
+                    sawtiToggle.performClick();
+            }
+
+            @Override
+            public void zoneShown(int zone) {
+                sawtiZone = zone;
+                updateSawtiOutline();
+            }
+        });
+        stationPage = new StationPage(pluginContext, mapView(), new StationPage.Host() {
+            @Override
+            public UnitSystem units() {
+                return units;
+            }
+        });
+        gaugePage = new GaugePage(pluginContext, mapView(), new GaugePage.Host() {
+            @Override
+            public UnitSystem units() {
+                return units;
+            }
+
+            @Override
+            public EgressPolicy egress() {
+                return egress;
+            }
+        });
+        buoyPage = new BuoyPage(pluginContext, mapView(), new BuoyPage.Host() {
+            @Override
+            public UnitSystem units() {
+                return units;
+            }
+
+            @Override
+            public EgressPolicy egress() {
+                return egress;
+            }
+        });
+        pages = new View[] {
+                inflater.inflate(R.layout.page_forecast, null),
+                inflater.inflate(R.layout.page_layers, null),
+                spotPage.view(),
+                zonePage.view(),
+                sawtiPage.view(),
+                ercPage.view(),
+                stationPage.view(),
+                gaugePage.view(),
+                buoyPage.view(),
+                reportsPage.view(),
+                rainPage.view()
+        };
+        wireGroupFolds(pages[LAYERS_PAGE]);
+        addPageSwitch(spotPage.view(), R.id.spot_toggle);
+        addPageSwitch(zonePage.view(), R.id.firezones_toggle);
+        addPageSwitch(sawtiPage.view(), R.id.sawti_toggle);
+        addPageSwitch(ercPage.view(), R.id.erc_toggle);
+        addPageSwitch(stationPage.view(), R.id.stations_toggle, stationPage.filterHead());
+        addPageSwitch(gaugePage.view(), R.id.gauges_toggle, gaugePage.filterHead());
+        addPageSwitch(buoyPage.view(), R.id.buoys_toggle, buoyPage.filterHead());
+        addPageSwitch(reportsPage.view(), R.id.reports_toggle);
+        addPageSwitch(rainPage.view(), R.id.raingauges_toggle);
+        pager = root.findViewById(R.id.pager);
+        pagePrev = root.findViewById(R.id.page_prev);
+        pageNext = root.findViewById(R.id.page_next);
+        pagePick = root.findViewById(R.id.page_pick);
+        layersButton = root.findViewById(R.id.layers_button);
+        // A long page name shrinks to fit two lines rather than being cut off; the
+        // short ones stay at 13sp. Older Android keeps 13sp and the ellipsis.
+        if (pagePick != null && android.os.Build.VERSION.SDK_INT >= 26)
+            pagePick.setAutoSizeTextTypeUniformWithConfiguration(9, 13, 1,
+                    android.util.TypedValue.COMPLEX_UNIT_SP);
+        iconCaptions = root.findViewById(R.id.icon_captions);
+        wideCaption = root.findViewById(R.id.cap_wide);
+        iconRow = root.findViewById(R.id.icon_row);
+        wireCaptions(iconRow);
+        wirePager();
+
+        modeSelf = find(R.id.mode_self);
+        modeCenter = find(R.id.mode_center);
+        modePick = find(R.id.mode_pick);
+        favoritesButton = find(R.id.favorites_button);
+        unitsButton = find(R.id.units_button);
+        wideButton = find(R.id.wide_button);
+        refreshButton = find(R.id.refresh_button);
+        settingsButton = find(R.id.settings_button);
+        positionText = find(R.id.position_text);
+        statusText = find(R.id.status_text);
+        currentHeading = find(R.id.current_heading);
+        currentContainer = find(R.id.current_container);
+        seriesHeading = find(R.id.series_heading);
+        trendScroll = find(R.id.trend_scroll);
+        trendHost = find(R.id.trend_host);
+        trendChips = find(R.id.trend_chips);
+        trend = new TrendStripView(pluginContext);
+        trendHost.addView(trend);
+        com.atakmap.android.atmosphere.units.Clock.refresh(pluginContext);
+        lightContainer = find(R.id.light_container);
+        lightDay = find(R.id.light_day);
+        final Button lightButton = find(R.id.light_button);
+        final View lightBody = find(R.id.light_body);
+        final SharedPreferences lightPrefs = MapCompat.prefs();
+        lightOpen = lightPrefs != null && lightPrefs.getBoolean(PREF_LIGHT_OPEN, false);
+        final Runnable showLightFold = new Runnable() {
+            @Override
+            public void run() {
+                lightButton.setText(lightOpen ? R.string.hide_light : R.string.show_light);
+                lightBody.setVisibility(lightOpen ? View.VISIBLE : View.GONE);
+            }
+        };
+        showLightFold.run();
+        lightButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                lightOpen = !lightOpen;
+                rememberFold(PREF_LIGHT_OPEN, lightOpen);
+                showLightFold.run();
+                if (lightOpen)
+                    renderLight();
+            }
+        });
+        ((Button) find(R.id.light_prev)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                lightOffset = Math.max(-30, lightOffset - 1);
+                renderLight();
+            }
+        });
+        ((Button) find(R.id.light_next)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                lightOffset = Math.min(60, lightOffset + 1);
+                renderLight();
+            }
+        });
+        hoursTableButton = find(R.id.hours_table_button);
+        hoursTable = find(R.id.hours_table);
+        hoursLegend = find(R.id.hours_legend);
+        hoursContainer = find(R.id.hours_container);
+        daysHeading = find(R.id.days_heading);
+        daysStrip = find(R.id.days_strip);
+        daysLegend = find(R.id.days_legend);
+        daysContainer = find(R.id.days_container);
+        attributionText = find(R.id.attribution_text);
+        discussion = new DiscussionBlock(pluginContext, egress, (LinearLayout) find(R.id.discussion_block),
+                new DiscussionBlock.Host() {
+                    @Override
+                    public GeoPoint point() {
+                        return AtmospherePane.this.point();
+                    }
+
+                    @Override
+                    public String pointLabel() {
+                        return modeLabel();
+                    }
+
+                    @Override
+                    public boolean nwsPicked() {
+                        return selected != null && "nws".equals(selected.id);
+                    }
+                });
+        layersAttribution = find(R.id.layers_attribution);
+        radarToggle = find(R.id.radar_toggle);
+        windToggle = find(R.id.wind_toggle);
+        windHeatToggle = find(R.id.wind_heat_toggle);
+        windScaleHost = find(R.id.wind_scale_host);
+        windScale = new WindScaleView(pluginContext);
+        ((LinearLayout) windScaleHost).addView(windScale);
+        windUnitRow = new LinearLayout(pluginContext);
+        windUnitRow.setOrientation(LinearLayout.HORIZONTAL);
+        ((LinearLayout) windScaleHost).addView(windUnitRow);
+        buildWindUnitRow();
+        windLevelBlock = find(R.id.wind_level_block);
+        windLevelLabel = find(R.id.wind_level_label);
+        windReading = find(R.id.wind_reading);
+        windLevelRows = find(R.id.wind_level_rows);
+        buildWindLevelRows();
+        scrubber = find(R.id.scrubber);
+        scrubberLabel = find(R.id.scrubber_label);
+        tropicalSettings = find(R.id.tropical_settings);
+        tropicalExpand = find(R.id.tropical_expand);
+        tropicalToggle = find(R.id.tropical_toggle);
+        tropicalStatus = find(R.id.tropical_status);
+        tropicalRows = find(R.id.tropical_rows);
+        tropicalScale = find(R.id.tropical_scale);
+        avalancheSettings = find(R.id.avalanche_settings);
+        avalancheExpand = find(R.id.avalanche_expand);
+        avalancheToggle = find(R.id.avalanche_toggle);
+        avalancheStatus = find(R.id.avalanche_status);
+        avalancheLegend = find(R.id.avalanche_legend);
+        firewxSettings = find(R.id.firewx_settings);
+        firewxExpand = find(R.id.firewx_expand);
+        firewxToggle = find(R.id.firewx_toggle);
+        firewxStatus = find(R.id.firewx_status);
+        firewxLegend = find(R.id.firewx_legend);
+        firewxDayRow = find(R.id.firewx_day_row);
+        sawtiSettings = find(R.id.sawti_settings);
+        sawtiExpand = find(R.id.sawti_expand);
+        sawtiToggle = find(R.id.sawti_toggle);
+        sawtiStatus = find(R.id.sawti_status);
+        sawtiLegend = find(R.id.sawti_legend);
+        sawtiDayRow = find(R.id.sawti_day_row);
+        ercSettings = find(R.id.erc_settings);
+        ercExpand = find(R.id.erc_expand);
+        ercToggle = find(R.id.erc_toggle);
+        ercStatus = find(R.id.erc_status);
+        ercLegend = find(R.id.erc_legend);
+        ercDayRow = find(R.id.erc_day_row);
+        lightningSettings = find(R.id.lightning_settings);
+        lightningExpand = find(R.id.lightning_expand);
+        lightningToggle = find(R.id.lightning_toggle);
+        lightningStatus = find(R.id.lightning_status);
+        lightningLegend = find(R.id.lightning_legend);
+        pspsSettings = find(R.id.psps_settings);
+        pspsExpand = find(R.id.psps_expand);
+        pspsToggle = find(R.id.psps_toggle);
+        pspsStatus = find(R.id.psps_status);
+        pspsLegend = find(R.id.psps_legend);
+        reportsSettings = find(R.id.reports_settings);
+        reportsExpand = find(R.id.reports_expand);
+        reportsToggle = find(R.id.reports_toggle);
+        reportsStatus = find(R.id.reports_status);
+        reportsLegend = find(R.id.reports_legend);
+        reportsDayRow = find(R.id.reports_day_row);
+        tornadoSettings = find(R.id.tornado_settings);
+        tornadoExpand = find(R.id.tornado_expand);
+        tornadoToggle = find(R.id.tornado_toggle);
+        tornadoStatus = find(R.id.tornado_status);
+        tornadoLegend = find(R.id.tornado_legend);
+        tornadoDayRow = find(R.id.tornado_day_row);
+        debrisflowSettings = find(R.id.debrisflow_settings);
+        debrisflowExpand = find(R.id.debrisflow_expand);
+        debrisflowToggle = find(R.id.debrisflow_toggle);
+        debrisflowStatus = find(R.id.debrisflow_status);
+        debrisflowLegend = find(R.id.debrisflow_legend);
+        quakesSettings = find(R.id.quakes_settings);
+        quakesExpand = find(R.id.quakes_expand);
+        quakesToggle = find(R.id.quakes_toggle);
+        quakesStatus = find(R.id.quakes_status);
+        quakesLegend = find(R.id.quakes_legend);
+        quakesDayRow = find(R.id.quakes_day_row);
+        quakesChoiceRow = find(R.id.quakes_choice_row);
+        fuelSettings = find(R.id.fuel_settings);
+        fuelExpand = find(R.id.fuel_expand);
+        fuelToggle = find(R.id.fuel_toggle);
+        fuelStatus = find(R.id.fuel_status);
+        fuelLegend = find(R.id.fuel_legend);
+        fuelDayRow = find(R.id.fuel_day_row);
+        fuelChoiceRow = find(R.id.fuel_choice_row);
+        raintotalsSettings = find(R.id.raintotals_settings);
+        raintotalsExpand = find(R.id.raintotals_expand);
+        raintotalsToggle = find(R.id.raintotals_toggle);
+        raintotalsStatus = find(R.id.raintotals_status);
+        raintotalsLegend = find(R.id.raintotals_legend);
+        raintotalsWindowRow = find(R.id.raintotals_window_row);
+        raintotalsTransparency = find(R.id.raintotals_transparency);
+        raintotalsTransparencyLabel = find(R.id.raintotals_transparency_label);
+        raingaugesSettings = find(R.id.raingauges_settings);
+        raingaugesExpand = find(R.id.raingauges_expand);
+        raingaugesToggle = find(R.id.raingauges_toggle);
+        raingaugesStatus = find(R.id.raingauges_status);
+        raingaugesLegend = find(R.id.raingauges_legend);
+        raingaugesWindow = find(R.id.raingauges_window);
+        firezonesSettings = find(R.id.firezones_settings);
+        firezonesExpand = find(R.id.firezones_expand);
+        firezonesToggle = find(R.id.firezones_toggle);
+        firezonesStatus = find(R.id.firezones_status);
+        firezonesLegend = find(R.id.firezones_legend);
+        firezonesGateRow = find(R.id.firezones_gate_row);
+        firezonesGateText = find(R.id.firezones_gate_text);
+        firezonesLabelGateRow = find(R.id.firezones_label_gate_row);
+        firezonesLabelGateText = find(R.id.firezones_label_gate_text);
+        floodSettings = find(R.id.flood_settings);
+        floodExpand = find(R.id.flood_expand);
+        floodToggle = find(R.id.flood_toggle);
+        floodStatus = find(R.id.flood_status);
+        floodLegend = find(R.id.flood_legend);
+        floodDayRow = find(R.id.flood_day_row);
+        beachSettings = find(R.id.beach_settings);
+        beachExpand = find(R.id.beach_expand);
+        beachToggle = find(R.id.beach_toggle);
+        beachStatus = find(R.id.beach_status);
+        beachLegend = find(R.id.beach_legend);
+        highflowSettings = find(R.id.highflow_settings);
+        highflowExpand = find(R.id.highflow_expand);
+        highflowToggle = find(R.id.highflow_toggle);
+        highflowStatus = find(R.id.highflow_status);
+        highflowLegend = find(R.id.highflow_legend);
+        highflowWhenRow = find(R.id.highflow_when_row);
+        floodgroundSettings = find(R.id.floodground_settings);
+        floodgroundExpand = find(R.id.floodground_expand);
+        floodgroundToggle = find(R.id.floodground_toggle);
+        floodgroundStatus = find(R.id.floodground_status);
+        floodgroundLegend = find(R.id.floodground_legend);
+        floodgroundWhenRow = find(R.id.floodground_when_row);
+        floodzonesSettings = find(R.id.floodzones_settings);
+        floodzonesExpand = find(R.id.floodzones_expand);
+        floodzonesToggle = find(R.id.floodzones_toggle);
+        floodzonesStatus = find(R.id.floodzones_status);
+        floodzonesLegend = find(R.id.floodzones_legend);
+        floodzonesGateRow = find(R.id.floodzones_gate_row);
+        floodzonesGateText = find(R.id.floodzones_gate_text);
+        damareasSettings = find(R.id.damareas_settings);
+        damareasExpand = find(R.id.damareas_expand);
+        damareasToggle = find(R.id.damareas_toggle);
+        damareasStatus = find(R.id.damareas_status);
+        damareasLegend = find(R.id.damareas_legend);
+        damareasGateRow = find(R.id.damareas_gate_row);
+        damareasGateText = find(R.id.damareas_gate_text);
+        satelliteSettings = find(R.id.satellite_settings);
+        satelliteExpand = find(R.id.satellite_expand);
+        satelliteToggle = find(R.id.satellite_toggle);
+        satelliteStatus = find(R.id.satellite_status);
+        satelliteBandRow = find(R.id.satellite_band_row);
+        snowSettings = find(R.id.snow_settings);
+        snowExpand = find(R.id.snow_expand);
+        snowToggle = find(R.id.snow_toggle);
+        snowStatus = find(R.id.snow_status);
+        snowLegend = find(R.id.snow_legend);
+        sstSettings = find(R.id.sst_settings);
+        sstExpand = find(R.id.sst_expand);
+        sstToggle = find(R.id.sst_toggle);
+        sstStatus = find(R.id.sst_status);
+        sstLegend = find(R.id.sst_legend);
+        snotelSettings = find(R.id.snotel_settings);
+        snotelExpand = find(R.id.snotel_expand);
+        snotelToggle = find(R.id.snotel_toggle);
+        snotelStatus = find(R.id.snotel_status);
+        snotelLegend = find(R.id.snotel_legend);
+        buildStormScale();
+        radarSettings = find(R.id.radar_settings);
+        radarTransparency = find(R.id.radar_transparency);
+        radarTransparencyLabel = find(R.id.radar_transparency_label);
+        windSettings = find(R.id.wind_settings);
+        radarExpand = find(R.id.radar_expand);
+        windExpand = find(R.id.wind_expand);
+        wavesToggle = find(R.id.waves_toggle);
+        wavesExpand = find(R.id.waves_expand);
+        wavesSettings = find(R.id.waves_settings);
+        wavesScale = new WindScaleView(pluginContext);
+        ((LinearLayout) find(R.id.waves_scale_host)).addView(wavesScale);
+        wavesReading = find(R.id.waves_reading);
+        rainToggle = find(R.id.rain_toggle);
+        rainExpand = find(R.id.rain_expand);
+        rainSettings = find(R.id.rain_settings);
+        rainScale = new WindScaleView(pluginContext);
+        ((LinearLayout) find(R.id.rain_scale_host)).addView(rainScale);
+        rainReading = find(R.id.rain_reading);
+        smokeToggle = find(R.id.smoke_toggle);
+        smokeExpand = find(R.id.smoke_expand);
+        smokeSettings = find(R.id.smoke_settings);
+        smokeScale = new WindScaleView(pluginContext);
+        ((LinearLayout) find(R.id.smoke_scale_host)).addView(smokeScale);
+        smokeReading = find(R.id.smoke_reading);
+        smokeHeightRow = find(R.id.smoke_height_row);
+        buildSmokeHeightRow();
+        airToggle = find(R.id.air_toggle);
+        airExpand = find(R.id.air_expand);
+        airSettings = find(R.id.air_settings);
+        airStatus = find(R.id.air_status);
+        airScale = find(R.id.air_scale);
+        airReading = find(R.id.air_reading);
+        buildAirScale();
+        spotToggle = find(R.id.spot_toggle);
+        spotExpand = find(R.id.spot_expand);
+        spotOpenOnly = find(R.id.spot_open_only);
+        spotLayerStatus = find(R.id.spot_layer_status);
+        stationsStatus = find(R.id.stations_status);
+        stationsBasis = find(R.id.stations_basis);
+        stationsToggle = find(R.id.stations_toggle);
+        stationsExpand = find(R.id.stations_expand);
+        stationsSettings = find(R.id.stations_settings);
+        stationsDistanceRow = find(R.id.stations_distance_row);
+        stationsLegend = find(R.id.stations_legend);
+        stationsGateRow = find(R.id.stations_gate_row);
+        stationsShowRow = find(R.id.stations_show_row);
+        stationsLabelGateRow = find(R.id.stations_label_gate_row);
+        stationsGateText = find(R.id.stations_gate_text);
+        stationsLabelGateText = find(R.id.stations_label_gate_text);
+        stationsLabels = find(R.id.stations_labels);
+        stationsUtility = find(R.id.stations_utility);
+        stationsUtilitySettings = find(R.id.stations_utility_settings);
+        stationsUtilityGateRow = find(R.id.stations_utility_gate_row);
+        stationsUtilityGateText = find(R.id.stations_utility_gate_text);
+        stationsGuide = find(R.id.stations_guide);
+        stationsGuideToggle = find(R.id.stations_guide_toggle);
+        stationsGuideExpand = find(R.id.stations_guide_expand);
+        gaugesToggle = find(R.id.gauges_toggle);
+        gaugesExpand = find(R.id.gauges_expand);
+        gaugesSettings = find(R.id.gauges_settings);
+        gaugesStatus = find(R.id.gauges_status);
+        gaugesDistanceRow = find(R.id.gauges_distance_row);
+        gaugesLegend = find(R.id.gauges_legend);
+        gaugesShowRow = find(R.id.gauges_show_row);
+        gaugesGateRow = find(R.id.gauges_gate_row);
+        gaugesLabelGateRow = find(R.id.gauges_label_gate_row);
+        gaugesGateText = find(R.id.gauges_gate_text);
+        gaugesLabelGateText = find(R.id.gauges_label_gate_text);
+        gaugesLabels = find(R.id.gauges_labels);
+        gaugesLabels.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (gaugeLayer == null)
+                    return;
+                gaugeLayer.setLabels(!gaugeLayer.hasLabels());
+                updateLayerControls();
+            }
+        });
+        buoysToggle = find(R.id.buoys_toggle);
+        buoysExpand = find(R.id.buoys_expand);
+        buoysSettings = find(R.id.buoys_settings);
+        buoysStatus = find(R.id.buoys_status);
+        buoysDistanceRow = find(R.id.buoys_distance_row);
+        buoysLegend = find(R.id.buoys_legend);
+        buoysShowRow = find(R.id.buoys_show_row);
+        buoysGateRow = find(R.id.buoys_gate_row);
+        buoysLabelGateRow = find(R.id.buoys_label_gate_row);
+        buoysGateText = find(R.id.buoys_gate_text);
+        buoysLabelGateText = find(R.id.buoys_label_gate_text);
+        buoysLabels = find(R.id.buoys_labels);
+        buoysLabels.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (buoyLayer == null)
+                    return;
+                buoyLayer.setLabels(!buoyLayer.hasLabels());
+                updateLayerControls();
+            }
+        });
+        ((Button) find(R.id.buoys_open_list)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openPage(buoyPage == null ? null : buoyPage.view());
+            }
+        });
+        ((Button) find(R.id.gauges_open_list)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openPage(gaugePage == null ? null : gaugePage.view());
+            }
+        });
+        spotLegend = find(R.id.spot_legend);
+        spotSettings = find(R.id.spot_settings);
+        scrubberDays = find(R.id.scrubber_days);
+        scrubberHours = find(R.id.scrubber_hours);
+        wireLayers();
+
+        final SharedPreferences prefs = MapCompat.prefs();
+        // US units until someone picks otherwise, the same default every layer
+        // already had (operator, 2026-09-28: "this is like a north american tool
+        // ... for like first start up").
+        units = UnitSystem.fromName(prefs == null ? null
+                : prefs.getString(PREF_UNITS, null), UnitSystem.IMPERIAL);
+        favorites = new Favorites(MapCompat.atakContext());
+        favorite = favorites.byName(prefs == null ? null : prefs.getString(PREF_FAVORITE, null));
+        pickedPoint = parsePoint(prefs == null ? null : prefs.getString(PREF_PICKED, null));
+        mode = PointMode.fromName(prefs == null ? null : prefs.getString(PREF_MODE, null));
+        // A mode whose point is gone (favorite removed, nothing picked) falls back.
+        if ((mode == PointMode.FAVORITE && favorite == null)
+                || (mode == PointMode.PICKED && pickedPoint == null))
+            mode = PointMode.CENTER;
+        trendKind = Kind.fromName(prefs == null ? null : prefs.getString(PREF_TREND, null));
+        hoursTableOpen = prefs != null && prefs.getBoolean(PREF_HOURS_TABLE, false);
+        // Open the first time a layer is used, so its controls are found; after that
+        // the operator's own choice stands.
+        radarOpen = prefs == null || prefs.getBoolean(PREF_RADAR_OPEN, true);
+        tropicalOpen = prefs == null || prefs.getBoolean(PREF_TROPICAL_OPEN, true);
+        tropicalExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                tropicalOpen = !tropicalOpen;
+                rememberFold(PREF_TROPICAL_OPEN, tropicalOpen);
+                updateLayerControls();
+            }
+        });
+        snotelOpen = prefs == null || prefs.getBoolean(PREF_SNOTEL_OPEN, true);
+        snotelExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                snotelOpen = !snotelOpen;
+                rememberFold(PREF_SNOTEL_OPEN, snotelOpen);
+                updateLayerControls();
+            }
+        });
+        highflowOpen = prefs == null || prefs.getBoolean(PREF_HIGHFLOW_OPEN, true);
+        highflowExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                highflowOpen = !highflowOpen;
+                rememberFold(PREF_HIGHFLOW_OPEN, highflowOpen);
+                updateLayerControls();
+            }
+        });
+        floodgroundOpen = prefs == null || prefs.getBoolean(PREF_FLOODGROUND_OPEN, true);
+        floodgroundExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                floodgroundOpen = !floodgroundOpen;
+                rememberFold(PREF_FLOODGROUND_OPEN, floodgroundOpen);
+                updateLayerControls();
+            }
+        });
+        floodzonesOpen = prefs == null || prefs.getBoolean(PREF_FLOODZONES_OPEN, true);
+        floodzonesExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                floodzonesOpen = !floodzonesOpen;
+                rememberFold(PREF_FLOODZONES_OPEN, floodzonesOpen);
+                updateLayerControls();
+            }
+        });
+        damareasOpen = prefs == null || prefs.getBoolean(PREF_DAMAREAS_OPEN, true);
+        damareasExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                damareasOpen = !damareasOpen;
+                rememberFold(PREF_DAMAREAS_OPEN, damareasOpen);
+                updateLayerControls();
+            }
+        });
+        satelliteOpen = prefs == null || prefs.getBoolean(PREF_SATELLITE_OPEN, true);
+        satelliteExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                satelliteOpen = !satelliteOpen;
+                rememberFold(PREF_SATELLITE_OPEN, satelliteOpen);
+                updateLayerControls();
+            }
+        });
+        snowOpen = prefs == null || prefs.getBoolean(PREF_SNOW_OPEN, true);
+        snowExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                snowOpen = !snowOpen;
+                rememberFold(PREF_SNOW_OPEN, snowOpen);
+                updateLayerControls();
+            }
+        });
+        sstOpen = prefs == null || prefs.getBoolean(PREF_SST_OPEN, true);
+        sstExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                sstOpen = !sstOpen;
+                rememberFold(PREF_SST_OPEN, sstOpen);
+                updateLayerControls();
+            }
+        });
+        beachOpen = prefs == null || prefs.getBoolean(PREF_BEACH_OPEN, true);
+        beachExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                beachOpen = !beachOpen;
+                rememberFold(PREF_BEACH_OPEN, beachOpen);
+                updateLayerControls();
+            }
+        });
+        floodOpen = prefs == null || prefs.getBoolean(PREF_FLOOD_OPEN, true);
+        floodExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                floodOpen = !floodOpen;
+                rememberFold(PREF_FLOOD_OPEN, floodOpen);
+                updateLayerControls();
+            }
+        });
+        firewxOpen = prefs == null || prefs.getBoolean(PREF_FIREWX_OPEN, true);
+        firewxExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                firewxOpen = !firewxOpen;
+                rememberFold(PREF_FIREWX_OPEN, firewxOpen);
+                updateLayerControls();
+            }
+        });
+        sawtiOpen = prefs == null || prefs.getBoolean(PREF_SAWTI_OPEN, true);
+        sawtiExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                sawtiOpen = !sawtiOpen;
+                rememberFold(PREF_SAWTI_OPEN, sawtiOpen);
+                updateLayerControls();
+            }
+        });
+        ercOpen = prefs == null || prefs.getBoolean(PREF_ERC_OPEN, true);
+        ercExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                ercOpen = !ercOpen;
+                rememberFold(PREF_ERC_OPEN, ercOpen);
+                updateLayerControls();
+            }
+        });
+        lightningOpen = prefs == null || prefs.getBoolean(PREF_LIGHTNING_OPEN, true);
+        lightningExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                lightningOpen = !lightningOpen;
+                rememberFold(PREF_LIGHTNING_OPEN, lightningOpen);
+                updateLayerControls();
+            }
+        });
+        pspsOpen = prefs == null || prefs.getBoolean(PREF_PSPS_OPEN, true);
+        pspsExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pspsOpen = !pspsOpen;
+                rememberFold(PREF_PSPS_OPEN, pspsOpen);
+                updateLayerControls();
+            }
+        });
+        reportsOpen = prefs == null || prefs.getBoolean(PREF_REPORTS_OPEN, true);
+        reportsExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                reportsOpen = !reportsOpen;
+                rememberFold(PREF_REPORTS_OPEN, reportsOpen);
+                updateLayerControls();
+            }
+        });
+        tornadoOpen = prefs == null || prefs.getBoolean(PREF_TORNADO_OPEN, true);
+        tornadoExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                tornadoOpen = !tornadoOpen;
+                rememberFold(PREF_TORNADO_OPEN, tornadoOpen);
+                updateLayerControls();
+            }
+        });
+        debrisflowOpen = prefs == null || prefs.getBoolean(PREF_DEBRISFLOW_OPEN, true);
+        debrisflowExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                debrisflowOpen = !debrisflowOpen;
+                rememberFold(PREF_DEBRISFLOW_OPEN, debrisflowOpen);
+                updateLayerControls();
+            }
+        });
+        quakesOpen = prefs == null || prefs.getBoolean(PREF_QUAKES_OPEN, true);
+        quakesExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                quakesOpen = !quakesOpen;
+                rememberFold(PREF_QUAKES_OPEN, quakesOpen);
+                updateLayerControls();
+            }
+        });
+        fuelOpen = prefs == null || prefs.getBoolean(PREF_FUEL_OPEN, true);
+        fuelExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                fuelOpen = !fuelOpen;
+                rememberFold(PREF_FUEL_OPEN, fuelOpen);
+                updateLayerControls();
+            }
+        });
+        raingaugesOpen = prefs == null || prefs.getBoolean(PREF_RAINGAUGES_OPEN, true);
+        raingaugesExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                raingaugesOpen = !raingaugesOpen;
+                rememberFold(PREF_RAINGAUGES_OPEN, raingaugesOpen);
+                updateLayerControls();
+            }
+        });
+        raintotalsOpen = prefs == null || prefs.getBoolean(PREF_RAINTOTALS_OPEN, true);
+        raintotalsExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                raintotalsOpen = !raintotalsOpen;
+                rememberFold(PREF_RAINTOTALS_OPEN, raintotalsOpen);
+                updateLayerControls();
+            }
+        });
+        firezonesOpen = prefs == null || prefs.getBoolean(PREF_FIREZONES_OPEN, true);
+        firezonesExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                firezonesOpen = !firezonesOpen;
+                rememberFold(PREF_FIREZONES_OPEN, firezonesOpen);
+                updateLayerControls();
+            }
+        });
+        avalancheOpen = prefs == null || prefs.getBoolean(PREF_AVALANCHE_OPEN, true);
+        avalancheExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                avalancheOpen = !avalancheOpen;
+                rememberFold(PREF_AVALANCHE_OPEN, avalancheOpen);
+                updateLayerControls();
+            }
+        });
+        windOpen = prefs == null || prefs.getBoolean(PREF_WIND_OPEN, true);
+        radarExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                radarOpen = !radarOpen;
+                rememberFold(PREF_RADAR_OPEN, radarOpen);
+                updateLayerControls();
+            }
+        });
+        windExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                windOpen = !windOpen;
+                rememberFold(PREF_WIND_OPEN, windOpen);
+                updateLayerControls();
+            }
+        });
+        wavesOpen = prefs == null || prefs.getBoolean(PREF_WAVES_OPEN, true);
+        rainOpen = prefs == null || prefs.getBoolean(PREF_RAIN_OPEN, true);
+        smokeOpen = prefs == null || prefs.getBoolean(PREF_SMOKE_OPEN, true);
+        airOpen = prefs == null || prefs.getBoolean(PREF_AIR_OPEN, true);
+        spotOpen = prefs == null || prefs.getBoolean(PREF_SPOT_OPEN, true);
+        stationsOpen = prefs == null || prefs.getBoolean(PREF_STATIONS_OPEN, true);
+        gaugesOpen = prefs == null || prefs.getBoolean(PREF_GAUGES_OPEN, true);
+        buoysOpen = prefs == null || prefs.getBoolean(PREF_BUOYS_OPEN, true);
+        buoysExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                buoysOpen = !buoysOpen;
+                rememberFold(PREF_BUOYS_OPEN, buoysOpen);
+                updateLayerControls();
+            }
+        });
+        buoysToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (buoyLayer == null)
+                    return;
+                if (buoyLayer.isOn()) {
+                    buoyLayer.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(BuoyOverlay.LAYER_ID)) {
+                    buoyLayer.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowBuoys();
+                }
+            }
+        });
+        gaugesExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                gaugesOpen = !gaugesOpen;
+                rememberFold(PREF_GAUGES_OPEN, gaugesOpen);
+                updateLayerControls();
+            }
+        });
+        gaugesToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (gaugeLayer == null)
+                    return;
+                if (gaugeLayer.isOn()) {
+                    gaugeLayer.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(GaugeOverlay.LAYER_ID)) {
+                    gaugeLayer.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowGauges();
+                }
+            }
+        });
+        stationsExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                stationsOpen = !stationsOpen;
+                rememberFold(PREF_STATIONS_OPEN, stationsOpen);
+                updateLayerControls();
+            }
+        });
+        final View.OnClickListener guide = new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                stationsGuideOpen = !stationsGuideOpen;
+                rememberFold(PREF_STATIONS_GUIDE_OPEN, stationsGuideOpen);
+                updateLayerControls();
+            }
+        };
+        ((Button) find(R.id.layers_all_off)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                allLayers(false);
+            }
+        });
+        ((Button) find(R.id.layers_all_on)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                allLayers(true);
+            }
+        });
+        stationsGuideToggle.setOnClickListener(guide);
+        stationsGuideExpand.setOnClickListener(guide);
+        stationsGuideOpen = prefs != null && prefs.getBoolean(PREF_STATIONS_GUIDE_OPEN, false);
+        ((Button) find(R.id.stations_open_list)).setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        openPage(stationPage == null ? null : stationPage.view());
+                    }
+                });
+        ((Button) find(R.id.spot_open_list)).setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        openPage(spotPage == null ? null : spotPage.view());
+                    }
+                });
+        stationsLabels.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (stationLayer == null)
+                    return;
+                stationLayer.setLabels(!stationLayer.hasLabels());
+                updateLayerControls();
+            }
+        });
+        stationsUtility.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (stationLayer == null)
+                    return;
+                if (!stationLayer.isUtilityOn()
+                        && !egress.isLayerEnabled(StationOverlay.UTILITY_ID)) {
+                    askToAllowUtilityStations();
+                    return;
+                }
+                stationLayer.setUtilityOn(!stationLayer.isUtilityOn());
+                updateLayerControls();
+            }
+        });
+        stationsToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (stationLayer == null)
+                    return;
+                if (stationLayer.isOn()) {
+                    stationLayer.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(StationOverlay.LAYER_ID)) {
+                    stationLayer.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowStations();
+                }
+            }
+        });
+        spotExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                spotOpen = !spotOpen;
+                rememberFold(PREF_SPOT_OPEN, spotOpen);
+                updateLayerControls();
+            }
+        });
+        spotOpenOnly.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (spotLayer == null)
+                    return;
+                spotLayer.setRecentOnly(!spotLayer.isRecentOnly());
+                // One setting, both surfaces: the list reads the same preference, so
+                // it has to be told to redraw when this changes.
+                spotPage.onFilterChanged();
+                updateLayerControls();
+            }
+        });
+        airExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                airOpen = !airOpen;
+                rememberFold(PREF_AIR_OPEN, airOpen);
+                updateLayerControls();
+            }
+        });
+        wavesExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                wavesOpen = !wavesOpen;
+                rememberFold(PREF_WAVES_OPEN, wavesOpen);
+                updateLayerControls();
+            }
+        });
+        rainExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                rainOpen = !rainOpen;
+                rememberFold(PREF_RAIN_OPEN, rainOpen);
+                updateLayerControls();
+            }
+        });
+        smokeExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                smokeOpen = !smokeOpen;
+                rememberFold(PREF_SMOKE_OPEN, smokeOpen);
+                updateLayerControls();
+            }
+        });
+        updateHoursTableButton();
+        hoursTableButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                hoursTableOpen = !hoursTableOpen;
+                final SharedPreferences p = MapCompat.prefs();
+                if (p != null)
+                    p.edit().putBoolean(PREF_HOURS_TABLE, hoursTableOpen).apply();
+                updateHoursTableButton();
+                render();
+            }
+        });
+
+        loadSelectedSource(prefs);
+        wireButtons();
+        updateUnitsButton();
+        updateModeIcons();
+        showSourceProblemsIfAny();
+    }
+
+    /** Called every time the pane is shown, so a stale pane never lingers. */
+    public void onShown() {
+        refresh(false);
+        final MapView mv = MapView.getMapView();
+        if (mv != null && !followingMap) {
+            mv.addOnMapMovedListener(mapMoved);
+            followingMap = true;
+        }
+        // The frame list ages while the pane is closed; a stale one is re-read.
+        if (radar != null && radar.isOn())
+            radar.refreshFrames(false);
+        // An advisory is six-hourly, so this is cheap and only runs when somebody
+        // has actually opened the pane to look.
+        if (tropical != null && tropical.isOn())
+            tropical.refresh(false);
+        if (air != null && air.isOn())
+            air.refresh(false);
+        if (avalanche != null && avalanche.isOn())
+            avalanche.refresh(false);
+        if (firewx != null && firewx.isOn())
+            firewx.refresh(false);
+        if (sawti != null && sawti.isOn())
+            sawti.refresh(false);
+        if (erc != null && erc.isOn())
+            erc.refresh(false);
+        if (lightning != null && lightning.isOn())
+            lightning.refresh(false);
+        if (psps != null && psps.isOn())
+            psps.refresh(false);
+        if (reports != null && reports.isOn())
+            reports.refresh(false);
+        if (tornado != null && tornado.isOn())
+            tornado.refresh(false);
+        if (debrisflow != null && debrisflow.isOn())
+            debrisflow.refresh(false);
+        if (quakes != null && quakes.isOn())
+            quakes.refresh(false);
+        if (fuel != null && fuel.isOn())
+            fuel.refresh(false);
+        if (raintotals != null && raintotals.isOn())
+            raintotals.refresh(false);
+        if (raingauges != null && raingauges.isOn())
+            raingauges.refresh(false);
+        if (fireZones != null && fireZones.isOn())
+            fireZones.refresh();
+        if (flood != null && flood.isOn())
+            flood.refresh(false);
+        if (beach != null && beach.isOn())
+            beach.refresh(false);
+        if (highflow != null && highflow.isOn())
+            highflow.refresh(false);
+        if (floodground != null && floodground.isOn())
+            floodground.refresh(false);
+        if (floodzones != null && floodzones.isOn())
+            floodzones.refresh();
+        if (damareas != null && damareas.isOn())
+            damareas.refresh();
+        if (satellite != null && satellite.isOn())
+            satellite.refresh(false);
+        if (snow != null && snow.isOn())
+            snow.refresh(false);
+        if (snotel != null && snotel.isOn())
+            snotel.refresh(false);
+        if (sst != null && sst.isOn())
+            sst.refresh(false);
+        if (pages[pager.getCurrentItem()] == spotPage.view())
+            spotPage.onShown();
+        if (pages[pager.getCurrentItem()] == reportsPage.view())
+            reportsPage.onShown();
+        if (pages[pager.getCurrentItem()] == rainPage.view())
+            rainPage.onShown();
+        if (pages[pager.getCurrentItem()] == zonePage.view())
+            zonePage.onShown();
+        if (pages[pager.getCurrentItem()] == sawtiPage.view())
+            sawtiPage.onShown();
+        paneShowing = true;
+        updateSawtiOutline();
+        updateLayerControls();
+    }
+
+    /** A view by id, in the root or on any page. */
+    private <T extends View> T find(int id) {
+        T v = root.findViewById(id);
+        if (v != null)
+            return v;
+        for (View page : pages) {
+            v = page.findViewById(id);
+            if (v != null)
+                return v;
+        }
+        throw new IllegalStateException("no view with id " + id);
+    }
+
+    /**
+     * Pages in ATAK's own ViewPager (the SDK helloworld TabViewDropDown pattern):
+     * the forecast first, the layers a swipe or the arrow away. Plain views, not
+     * fragments: a fragment needs the host activity's FragmentManager and the
+     * plugin class loader, which is a release-proguard risk for nothing.
+     */
+    private void wirePager() {
+        pager.setAdapter(new PagerAdapter() {
+            @Override
+            public int getCount() {
+                return pages.length;
+            }
+
+            @Override
+            public boolean isViewFromObject(View view, Object object) {
+                return view == object;
+            }
+
+            @Override
+            public Object instantiateItem(ViewGroup container, int position) {
+                container.addView(pages[position]);
+                return pages[position];
+            }
+
+            @Override
+            public void destroyItem(ViewGroup container, int position, Object object) {
+                container.removeView((View) object);
+            }
+        });
+        pager.addOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
+            @Override
+            public void onPageSelected(int position) {
+                updatePageDots(position);
+                if (pages[position] == spotPage.view())
+                    spotPage.onShown();
+                if (pages[position] == reportsPage.view())
+                    reportsPage.onShown();
+                if (pages[position] == rainPage.view())
+                    rainPage.onShown();
+                if (pages[position] == zonePage.view())
+                    zonePage.onShown();
+                if (pages[position] == sawtiPage.view())
+                    sawtiPage.onShown();
+                updateSawtiOutline();
+                // A list page re-reads its layer when it comes into view: the tile
+                // counts are otherwise as old as the last redraw, and the operator
+                // saw "Red Flag (1)" over a list of two (2026-09-26).
+                if (stationPage != null && pages[position] == stationPage.view())
+                    stationPage.refresh();
+                if (gaugePage != null && pages[position] == gaugePage.view())
+                    gaugePage.refresh();
+                if (buoyPage != null && pages[position] == buoyPage.view())
+                    buoyPage.refresh();
+            }
+        });
+        pagePrev.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (pager.getCurrentItem() > 0)
+                    pager.setCurrentItem(pager.getCurrentItem() - 1, true);
+            }
+        });
+        pageNext.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (pager.getCurrentItem() < pages.length - 1)
+                    pager.setCurrentItem(pager.getCurrentItem() + 1, true);
+            }
+        });
+        pagePick.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showPagePicker();
+            }
+        });
+        if (layersButton != null)
+            layersButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    openPage(pages[LAYERS_PAGE]);
+                }
+            });
+        updatePageDots(0);
+    }
+
+    /** Every page by name, the one showing checked; a tap goes there. MapView context, never the plugin's. */
+    private void showPagePicker() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        final String[] names = new String[pages.length];
+        for (int i = 0; i < names.length; i++)
+            names[i] = pluginContext.getString(i < TAB_NAMES.length ? TAB_NAMES[i] : R.string.empty);
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.page_pick_title))
+                .setSingleChoiceItems(names, pager.getCurrentItem(), new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                        pager.setCurrentItem(which, true);
+                    }
+                })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    /**
+     * The picker names the page showing, with a mark that says it opens a list; an
+     * arrow with nowhere to go is grayed out, so the ends of the pages read as ends.
+     */
+    private void updatePageDots(int current) {
+        if (pagePick == null)
+            return;
+        pagePick.setText(pluginContext.getString(current < TAB_NAMES.length ? TAB_NAMES[current]
+                : R.string.empty) + " \u25BE");
+        pagePrev.setEnabled(current > 0);
+        pagePrev.setAlpha(current > 0 ? 1f : 0.35f);
+        pageNext.setEnabled(current < pages.length - 1);
+        pageNext.setAlpha(current < pages.length - 1 ? 1f : 0.35f);
+        if (layersButton != null)
+            layersButton.setColorFilter(current == LAYERS_PAGE
+                    ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+    }
+
+    /**
+     * The captions show whenever the buttons are wide enough to carry them,
+     * measured, not guessed from the pane's state: the pane opened wide in
+     * landscape and a phone held upright both qualify. Decided after each layout
+     * of the row, and posted, since changing visibility inside a layout pass asks
+     * for another one.
+     */
+    private void wireCaptions(final View iconRow) {
+        if (iconRow == null || iconCaptions == null)
+            return;
+        iconRow.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            @Override
+            public void onLayoutChange(View v, int left, int top, int right, int bottom,
+                    int oldLeft, int oldTop, int oldRight, int oldBottom) {
+                if (right - left == oldRight - oldLeft)
+                    return;
+                v.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        updateCaptions(iconRow);
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * The drop-down changed size. The row's own layout listener catches the width;
+     * this catches the full/half words, whose state the drop-down learns only now.
+     */
+    public void onPaneResized() {
+        final View row = iconRow;
+        if (row != null)
+            row.post(new Runnable() {
+                @Override
+                public void run() {
+                    updateCaptions(row);
+                }
+            });
+    }
+
+    /**
+     * Captions show only when every one of them fits whole under its button: a
+     * row of "My posit..." and "Map cen..." explains nothing (half width with six
+     * buttons, XCover 2026-09-27, where a plain width rule let them through).
+     * Measured with each caption's own paint, so the text size and the words
+     * decide, not a guess.
+     */
+    private static float weightOf(View v) {
+        final ViewGroup.LayoutParams lp = v.getLayoutParams();
+        return lp instanceof LinearLayout.LayoutParams && ((LinearLayout.LayoutParams) lp).weight > 0
+                ? ((LinearLayout.LayoutParams) lp).weight : 1f;
+    }
+
+    private void updateCaptions(View iconRow) {
+        final int buttons = ((ViewGroup) iconRow).getChildCount();
+        if (buttons == 0 || iconRow.getWidth() == 0)
+            return;
+        if (wideCaption != null)
+            wideCaption.setText(host != null && host.isWide() ? R.string.caption_half
+                    : R.string.caption_full);
+        // Each caption gets its button's share of the row (the page picker is two
+        // shares wide) less the two margins.
+        float shares = 0;
+        for (int i = 0; i < iconCaptions.getChildCount(); i++)
+            shares += weightOf(iconCaptions.getChildAt(i));
+        final float perShare = iconRow.getWidth() / Math.max(1f, shares);
+        // One size for the whole row, the largest at which every caption fits:
+        // with the page controls in the row, "Pick a point" no longer fits at 12
+        // sp even with the pane wide (XCover, 2026-09-27), and mixed sizes read
+        // as a mistake. Below 10 sp they are too small to read in a truck; hidden.
+        boolean fits = false;
+        for (float sp = 12f; sp >= 10f && !fits; sp -= 0.5f) {
+            fits = true;
+            for (int i = 0; i < iconCaptions.getChildCount(); i++) {
+                final View c = iconCaptions.getChildAt(i);
+                if (!(c instanceof TextView))
+                    continue;
+                final TextView t = (TextView) c;
+                t.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, sp);
+                if (t.getPaint().measureText(t.getText().toString())
+                        > perShare * weightOf(c) - dp(4))
+                    fits = false;
+            }
+        }
+        iconCaptions.setVisibility(fits ? View.VISIBLE : View.GONE);
+    }
+
+    /** The drop-down hosting this pane; the wide toggle needs it. */
+    public void setHost(AtmosphereDropDown host) {
+        this.host = host;
+    }
+
+    /** The radar overlay, owned by the plugin; the pane drives and reads it. */
+    public void setRadar(RadarOverlay overlay) {
+        radar = overlay;
+        if (radar == null)
+            return;
+        radar.setListener(new RadarOverlay.Listener() {
+            @Override
+            public void onFrames(List<String> times, int shown) {
+                radarFrames = times;
+                // The strip is the radar's only while it owns it: with Wind switched
+                // on after it, the strip stays on the wind's hours (#6).
+                if (stripLayer() == TimeLayer.RADAR) {
+                    setWhenTimes(radarTimes(), shown, Math.max(0, times.size() - 1));
+                    stripShowing = TimeLayer.RADAR;
+                }
+                updateLayerControls();
+            }
+
+            @Override
+            public void onFrameShown(int index, String time) {
+                if (stripLayer() != TimeLayer.RADAR)
+                    return;
+                showWhen(index);
+                scrubberLabel.setText(frameLabel(index, time));
+            }
+
+            @Override
+            public void onStatus(String status) {
+                if (stripLayer() != TimeLayer.RADAR)
+                    return;
+                if (!status.isEmpty())
+                    scrubberLabel.setText(status);
+                else if (radar != null) {
+                    final int i = radar.frameIndex();
+                    scrubberLabel.setText(frameLabel(i,
+                            i < 0 || i >= radarFrames.size() ? null : radarFrames.get(i)));
+                }
+            }
+
+            @Override
+            public void onPlaying(boolean playing) {
+                if (stripLayer() != TimeLayer.RADAR || radar == null)
+                    return;
+                // Playing hides the hours, as Live does; stopped, the frame it
+                // stopped on is green among them, or Live when it is the newest.
+                liveMode = playing || radar.frameIndex() == whenLive;
+                buildWhenPicker();
+            }
+        });
+        radarTransparency.setMax(RadarOverlay.MAX_TRANSPARENCY);
+        radarTransparency.setProgress(radar.transparency());
+        radarTransparencyLabel.setText(pluginContext.getString(R.string.raintotals_opacity_heading)
+                + " " + radar.transparency() + "%");
+        // The bar owns the touch from down to up, or the pager takes a sideways drag
+        // as a page turn. Applied on every tick: the renderer fades what it holds.
+        radarTransparency.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, android.view.MotionEvent e) {
+                final int a = e.getActionMasked();
+                if (a == android.view.MotionEvent.ACTION_DOWN)
+                    v.getParent().requestDisallowInterceptTouchEvent(true);
+                else if (a == android.view.MotionEvent.ACTION_UP
+                        || a == android.view.MotionEvent.ACTION_CANCEL)
+                    v.getParent().requestDisallowInterceptTouchEvent(false);
+                return false;
+            }
+        });
+        radarTransparency.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(android.widget.SeekBar bar, int progress, boolean fromUser) {
+                radarTransparencyLabel.setText(pluginContext.getString(
+                        R.string.raintotals_opacity_heading) + " " + progress + "%");
+                if (fromUser && radar != null)
+                    radar.setTransparency(progress);
+            }
+
+            @Override
+            public void onStartTrackingTouch(android.widget.SeekBar bar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(android.widget.SeekBar bar) {
+            }
+        });
+        updateLayerControls();
+    }
+
+    /** The wind overlay, owned by the plugin; shares the scrubber with the radar. */
+    public void setWind(WindOverlay overlay) {
+        wind = overlay;
+        if (wind == null)
+            return;
+        wind.setListener(new WindOverlay.Listener() {
+            @Override
+            public void onFrames(List<String> labels, int shown) {
+                windHours = Math.max(0, labels.size() - 1);
+                if (stripLayer() == TimeLayer.WIND) {
+                    setWhenTimes(windTimes(), shown, 0);
+                    stripShowing = TimeLayer.WIND;
+                }
+                updateLayerControls();
+            }
+
+            @Override
+            public void onFrameShown(int index, long validTime) {
+                if (!wind.isOn())
+                    return;
+                // The strip and its line only while the strip is the wind's; the
+                // level and the reading are the wind's own, whoever has the strip.
+                if (stripLayer() == TimeLayer.WIND) {
+                    showWhen(index);
+                    scrubberLabel.setText(windLabel(index, validTime));
+                }
+                // The model can change with the height, so the level line follows.
+                updateWindLevel();
+                // And the reading, which is read off the grid now on the map: it
+                // said "outside the area being drawn" over Hurricane Polo after the
+                // map had moved there and the grid had followed (S22, 2026-09-27).
+                updateWindReading();
+            }
+
+            @Override
+            public void onStatus(String status) {
+                if (!wind.isOn())
+                    return;
+                if (stripLayer() == TimeLayer.WIND) {
+                    if (!status.isEmpty())
+                        scrubberLabel.setText(status);
+                    else
+                        scrubberLabel.setText(
+                                windLabel(wind.hourIndex(), wind.validTime(wind.hourIndex())));
+                }
+                updateWindReading();
+            }
+        });
+        updateLayerControls();
+    }
+
+    /**
+     * The smoke overlay, owned by the plugin. A forecast from the same runs as the
+     * wind, so it shares the strip and the wind's way of naming an hour.
+     */
+    public void setSmoke(SmokeOverlay overlay) {
+        smoke = overlay;
+        if (smoke == null)
+            return;
+        smoke.setListener(new SmokeOverlay.Listener() {
+            @Override
+            public void onFrames(List<String> labels, int shown) {
+                smokeHours = Math.max(0, labels.size() - 1);
+                if (stripLayer() == TimeLayer.SMOKE) {
+                    setWhenTimes(smokeTimes(), shown, 0);
+                    stripShowing = TimeLayer.SMOKE;
+                }
+                updateLayerControls();
+            }
+
+            @Override
+            public void onFrameShown(int index, long validTime) {
+                if (!smoke.isOn())
+                    return;
+                if (stripLayer() == TimeLayer.SMOKE) {
+                    showWhen(index);
+                    scrubberLabel.setText(windLabel(index, validTime));
+                }
+                // A new hour is a new picture, so the number at the point moves too.
+                updateSmokeReading();
+            }
+
+            @Override
+            public void onStatus(String status) {
+                if (!smoke.isOn())
+                    return;
+                if (stripLayer() == TimeLayer.SMOKE) {
+                    if (!status.isEmpty())
+                        scrubberLabel.setText(status);
+                    else
+                        scrubberLabel.setText(
+                                windLabel(smoke.hourIndex(), smoke.validTime(smoke.hourIndex())));
+                }
+                updateSmokeReading();
+            }
+        });
+        updateLayerControls();
+    }
+
+    /** SNOTEL stations, owned by the plugin. Not time-enabled. */
+    public void setSnotel(SnotelOverlay overlay) {
+        snotel = overlay;
+        if (snotel == null)
+            return;
+        snotel.setListener(new SnotelOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                snotelStatus.setText(status);
+                snotelStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        snotelLegend.removeAllViews();
+        for (String[] row : SnotelOverlay.LEGEND)
+            snotelLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        updateLayerControls();
+    }
+
+    /** FEMA's flood zones, owned by the plugin. The regulatory map, not a forecast. */
+    public void setFloodZones(FloodZoneOverlay overlay) {
+        floodzones = overlay;
+        if (floodzones == null)
+            return;
+        floodzones.setListener(new FloodZoneOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                floodzonesStatus.setText(status);
+                floodzonesStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        floodzonesLegend.removeAllViews();
+        for (String[] row : FloodZoneOverlay.LEGEND)
+            floodzonesLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        updateLayerControls();
+    }
+
+    /** California's dam failure areas, owned by the plugin. California only. */
+    public void setDamAreas(DamAreaOverlay overlay) {
+        damareas = overlay;
+        if (damareas == null)
+            return;
+        damareas.setListener(new DamAreaOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                damareasStatus.setText(status);
+                damareasStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        damareasLegend.removeAllViews();
+        for (String[] row : DamAreaOverlay.LEGEND)
+            damareasLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        updateLayerControls();
+    }
+
+    /**
+     * Modeled flooded ground, owned by the plugin. Not time-enabled; its horizon
+     * (now or the next five days) is the flood layers' shared one.
+     */
+    public void setFloodedGround(FloodedGroundOverlay overlay) {
+        floodground = overlay;
+        if (floodground == null)
+            return;
+        floodground.setListener(new FloodedGroundOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                floodgroundStatus.setText(status);
+                floodgroundStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        floodgroundLegend.removeAllViews();
+        for (String[] row : FloodedGroundOverlay.LEGEND)
+            floodgroundLegend.addView(legendLine(row[0], Color.parseColor(row[1])));
+        buildFloodWhenRow();
+        updateLayerControls();
+    }
+
+    /** Streams running high, owned by the plugin. Not time-enabled; the flood layers' horizon. */
+    public void setHighFlow(HighFlowOverlay overlay) {
+        highflow = overlay;
+        if (highflow == null)
+            return;
+        highflow.setListener(new HighFlowOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                highflowStatus.setText(status);
+                highflowStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        highflowLegend.removeAllViews();
+        for (com.atakmap.android.atmosphere.data.HighFlow.Category k
+                : com.atakmap.android.atmosphere.data.HighFlow.Category.values())
+            highflowLegend.addView(legendLine(k.words, k.color));
+        buildFloodWhenRow();
+        updateLayerControls();
+    }
+
+    /** The flood layers' horizon as the map is drawing it. */
+    private int floodHorizon() {
+        if (floodground != null)
+            return floodground.horizon();
+        if (highflow != null)
+            return highflow.horizon();
+        return FloodedGroundOverlay.horizonPref();
+    }
+
+    /** One choice for every flood layer: the picture and the streams follow together. */
+    private void setFloodHorizon(int value) {
+        if (floodground != null)
+            floodground.setHorizon(value);
+        if (highflow != null)
+            highflow.setHorizon(value);
+        buildFloodWhenRow();
+    }
+
+    /** Now / Next 5 days on both flood blocks, the chosen one in green. */
+    private void buildFloodWhenRow() {
+        buildFloodWhenRow(floodgroundWhenRow);
+        buildFloodWhenRow(highflowWhenRow);
+    }
+
+    private void buildFloodWhenRow(final LinearLayout row) {
+        row.removeAllViews();
+        final String[] labels = { pluginContext.getString(R.string.flood_when_now),
+                pluginContext.getString(R.string.flood_when_5day) };
+        final int[] values = { FloodedGroundOverlay.HORIZON_NOW, FloodedGroundOverlay.HORIZON_5DAY };
+        final int current = floodHorizon();
+        for (int i = 0; i < labels.length; i++) {
+            final int value = values[i];
+            final Button b = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, row, false);
+            b.setText(labels[i]);
+            b.setTextSize(12);
+            b.setTextColor(current == value
+                    ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    setFloodHorizon(value);
+                }
+            });
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = dp(4);
+            b.setLayoutParams(lp);
+            row.addView(b);
+        }
+    }
+
+    /** The GOES satellite picture, owned by the plugin. Not time-enabled: the newest frame. */
+    public void setSatellite(SatelliteOverlay overlay) {
+        satellite = overlay;
+        if (satellite == null)
+            return;
+        satellite.setListener(new SatelliteOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                satelliteStatus.setText(status);
+                satelliteStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        buildSatelliteBandRow();
+        updateLayerControls();
+    }
+
+    /** Infrared / Visible, the chosen one in green. */
+    private void buildSatelliteBandRow() {
+        final LinearLayout row = satelliteBandRow;
+        row.removeAllViews();
+        final String[] labels = { pluginContext.getString(R.string.satellite_infrared),
+                pluginContext.getString(R.string.satellite_visible) };
+        final int[] values = { SatelliteOverlay.INFRARED, SatelliteOverlay.VISIBLE };
+        final int current = satellite == null ? SatelliteOverlay.INFRARED : satellite.band();
+        for (int i = 0; i < labels.length; i++) {
+            final int value = values[i];
+            final Button b = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, row, false);
+            b.setText(labels[i]);
+            b.setTextSize(12);
+            b.setTextColor(current == value
+                    ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (satellite != null)
+                        satellite.setBand(value);
+                    buildSatelliteBandRow();
+                }
+            });
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = dp(4);
+            b.setLayoutParams(lp);
+            row.addView(b);
+        }
+    }
+
+    /** NOHRSC's snow depth, owned by the plugin. Not time-enabled. */
+    public void setSnow(SnowOverlay overlay) {
+        snow = overlay;
+        if (snow == null)
+            return;
+        snow.setListener(new SnowOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                snowStatus.setText(status);
+                snowStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        snowLegend.removeAllViews();
+        for (String[] row : SnowOverlay.LEGEND)
+            snowLegend.addView(legendLine(row[0], Color.parseColor(row[1])));
+        updateLayerControls();
+    }
+
+    /**
+     * Sea surface temperature, owned by the plugin. Not time-enabled. The legend
+     * is nowCOAST's own graphic, fetched once when the block is bound.
+     */
+    public void setSst(SstOverlay overlay) {
+        sst = overlay;
+        if (sst == null)
+            return;
+        sst.setListener(new SstOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                sstStatus.setText(status);
+                sstStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        updateLayerControls();
+    }
+
+    private boolean sstLegendAsked;
+
+    /** The legend graphic is asked for once the layer is allowed, never before. */
+    private void ensureSstLegend() {
+        if (sstLegendAsked || sst == null || !egress.isLayerEnabled(SstOverlay.LAYER_ID))
+            return;
+        sstLegendAsked = true;
+        com.atakmap.android.atmosphere.net.Http.getBitmap(SstOverlay.LEGEND_URL, egress.userAgent(),
+                new com.atakmap.android.atmosphere.net.Http.BitmapCallback() {
+                    @Override
+                    public void onSuccess(android.graphics.Bitmap bitmap) {
+                        if (bitmap == null)
+                            return;
+                        final android.widget.ImageView iv = new android.widget.ImageView(pluginContext);
+                        iv.setImageBitmap(bitmap);
+                        iv.setAdjustViewBounds(true);
+                        iv.setScaleType(android.widget.ImageView.ScaleType.FIT_START);
+                        iv.setContentDescription("Sea surface temperature scale, Fahrenheit above, Celsius below");
+                        sstLegend.removeAllViews();
+                        sstLegend.addView(iv, new LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                    }
+
+                    @Override
+                    public void onFailure(String error) {
+                        sstLegendAsked = false;
+                    }
+                });
+    }
+
+    /** The NWS beach forecast, owned by the plugin. Not time-enabled. */
+    public void setBeach(BeachOverlay overlay) {
+        beach = overlay;
+        if (beach == null)
+            return;
+        beach.setListener(new BeachOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                beachStatus.setText(status);
+                beachStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        beachLegend.removeAllViews();
+        for (String[] row : BeachOverlay.LEGEND)
+            beachLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        updateLayerControls();
+    }
+
+    /** WPC's excessive rainfall outlook, owned by the plugin. Not time-enabled. */
+    public void setFlood(FloodOutlookOverlay overlay) {
+        flood = overlay;
+        if (flood == null)
+            return;
+        flood.setListener(new FloodOutlookOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                floodStatus.setText(status);
+                floodStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        floodLegend.removeAllViews();
+        for (String[] row : FloodOutlookOverlay.LEGEND)
+            floodLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        buildDayRow(floodDayRow, flood);
+        updateLayerControls();
+    }
+
+    /** SPC's fire weather outlook, owned by the plugin. Not time-enabled. */
+    public void setFireZones(FireZoneOverlay overlay) {
+        fireZones = overlay;
+        if (fireZones == null)
+            return;
+        fireZones.setListener(new FireZoneOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                firezonesStatus.setText(status);
+                firezonesStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        firezonesLegend.removeAllViews();
+        for (String[] row : FireZoneOverlay.LEGEND)
+            firezonesLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        updateLayerControls();
+    }
+
+    public void setFireWx(FireWxOutlookOverlay overlay) {
+        firewx = overlay;
+        if (firewx == null)
+            return;
+        firewx.setListener(new FireWxOutlookOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                firewxStatus.setText(status);
+                firewxStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        firewxLegend.removeAllViews();
+        for (String[] row : FireWxOutlookOverlay.LEGEND)
+            firewxLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        buildDayRow(firewxDayRow, firewx);
+        updateLayerControls();
+    }
+
+    /**
+     * The Santa Ana Wildfire Threat Index. Its day row is rebuilt with each answer,
+     * because the buttons name the dates the forecast covers.
+     */
+    /** Fire danger by Predictive Service Area; the day row reads Observed and Forecast with their dates. */
+    public void setErc(ErcOverlay overlay) {
+        erc = overlay;
+        if (erc == null)
+            return;
+        erc.setListener(new ErcOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                ercStatus.setText(status);
+                ercStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+                buildDayRow(ercDayRow, erc);
+            }
+        });
+        ercLegend.removeAllViews();
+        for (String[] row : ErcOverlay.LEGEND)
+            ercLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        buildDayRow(ercDayRow, erc);
+        updateLayerControls();
+    }
+
+    public void setSawti(SawtiOverlay overlay) {
+        sawti = overlay;
+        if (sawti == null)
+            return;
+        sawti.setListener(new SawtiOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                sawtiStatus.setText(status);
+                sawtiStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+                applySawtiPendingDate();
+                buildDayRow(sawtiDayRow, sawti);
+            }
+        });
+        updateSawtiOutline();
+        sawtiLegend.removeAllViews();
+        for (String[] row : SawtiOverlay.LEGEND)
+            sawtiLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        buildDayRow(sawtiDayRow, sawti);
+        updateLayerControls();
+    }
+
+    /** Public Safety Power Shutoffs, California, from Cal OES. */
+    public void setPsps(PspsOverlay overlay) {
+        psps = overlay;
+        if (psps == null)
+            return;
+        psps.setListener(new PspsOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                pspsStatus.setText(status);
+                pspsStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        pspsLegend.removeAllViews();
+        for (String[] row : PspsOverlay.LEGEND)
+            pspsLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        updateLayerControls();
+    }
+
+    /** Storm reports: the status line under the switch and the key. */
+    public void setReports(StormReportsOverlay overlay) {
+        reports = overlay;
+        if (reports == null)
+            return;
+        reports.setListener(new StormReportsOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                reportsStatus.setText(status);
+                reportsStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        reportsLegend.removeAllViews();
+        for (String[] row : StormReportsOverlay.LEGEND)
+            reportsLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        buildDayRow(reportsDayRow, reports);
+        reportsPage.setOverlay(reports);
+        reports.setDataListener(new Runnable() {
+            @Override
+            public void run() {
+                buildDayRow(reportsDayRow, reports);
+                reportsPage.onDataChanged();
+            }
+        });
+        final View openList = find(R.id.reports_open_list);
+        if (openList != null)
+            openList.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    openPage(reportsPage.view());
+                }
+            });
+        updateLayerControls();
+    }
+
+    /** Tornado paths: the status line under the switch and the key. */
+    public void setTornado(TornadoPathsOverlay overlay) {
+        tornado = overlay;
+        if (tornado == null)
+            return;
+        tornado.setListener(new TornadoPathsOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                tornadoStatus.setText(status);
+                tornadoStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        tornadoLegend.removeAllViews();
+        for (String[] row : TornadoPathsOverlay.LEGEND)
+            tornadoLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        buildDayRow(tornadoDayRow, tornado);
+        reportsPage.setPathsOverlay(tornado);
+        tornado.setDataListener(new Runnable() {
+            @Override
+            public void run() {
+                buildDayRow(tornadoDayRow, tornado);
+                reportsPage.onDataChanged();
+            }
+        });
+        updateLayerControls();
+    }
+
+    /** Debris flow: the status line under the switch and the key. */
+    public void setDebrisFlow(DebrisFlowOverlay overlay) {
+        debrisflow = overlay;
+        if (debrisflow == null)
+            return;
+        debrisflow.setListener(new DebrisFlowOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                debrisflowStatus.setText(status);
+                debrisflowStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        debrisflowLegend.removeAllViews();
+        for (String[] row : DebrisFlowOverlay.LEGEND)
+            debrisflowLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        updateLayerControls();
+    }
+
+    /** Earthquakes: the status line under the switch and the key. */
+    public void setQuakes(QuakesOverlay overlay) {
+        quakes = overlay;
+        if (quakes == null)
+            return;
+        quakes.setListener(new QuakesOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                quakesStatus.setText(status);
+                quakesStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        quakesLegend.removeAllViews();
+        for (String[] row : QuakesOverlay.LEGEND)
+            quakesLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        buildDayRow(quakesDayRow, quakes);
+        buildChoiceRow(quakesChoiceRow, quakes);
+        updateLayerControls();
+    }
+
+    /** Fuel Moisture: the status line under the switch and the key. */
+    public void setFuel(FuelMoistureOverlay overlay) {
+        fuel = overlay;
+        if (fuel == null)
+            return;
+        fuel.setListener(new FuelMoistureOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                fuelStatus.setText(status);
+                fuelStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        fuelLegend.removeAllViews();
+        for (String[] row : FuelMoistureOverlay.LEGEND)
+            fuelLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        buildDayRow(fuelDayRow, fuel);
+        buildChoiceRow(fuelChoiceRow, fuel);
+        updateLayerControls();
+    }
+
+    /** USGS rain gauges: the status line, the key, and the page behind the list button. */
+    public void setRainGauges(RainGaugesOverlay overlay) {
+        raingauges = overlay;
+        if (raingauges == null)
+            return;
+        raingauges.setListener(new RainGaugesOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                raingaugesStatus.setText(status);
+                raingaugesStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        rainPage.setGauges(raingauges);
+        buildRainGaugesKey();
+        raingauges.setDataListener(new Runnable() {
+            @Override
+            public void run() {
+                rainPage.onGaugesChanged();
+                buildRainGaugesKey();
+            }
+        });
+        raingaugesWindow.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                rainPage.chooseWindow();
+            }
+        });
+        final View openList = find(R.id.raingauges_open_list);
+        if (openList != null)
+            openList.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    openPage(rainPage.view());
+                }
+            });
+        updateLayerControls();
+    }
+
+    /** The run of days the gauges add up, on its button, and the key for it. */
+    private void buildRainGaugesKey() {
+        if (raingauges == null)
+            return;
+        raingaugesWindow.setText(pluginContext.getString(R.string.rain_window_button, raingauges.windowLabel()));
+        raingaugesLegend.removeAllViews();
+        for (String[] row : raingauges.legend())
+            raingaugesLegend.addView(legendLine(row[0], Color.parseColor(row[1])));
+    }
+
+    /**
+     * The radar estimate before a moment: the day, the time, then 1, 24, 48 or 72 hours
+     * before. The relay keeps 45 days, so the calendar starts there.
+     */
+    private void pickRainTotalsMoment(android.content.Context ctx) {
+        MomentPicker.pick(ctx, raintotals.moment(), RainTotalsOverlay.earliestMoment(),
+                com.atakmap.android.atmosphere.data.IemRadar.HOURS,
+                raintotals.beforeHours(), pluginContext.getString(R.string.rain_window_title), new MomentPicker.Words() {
+                    @Override
+                    public String of(int hours, long millis) {
+                        return RainGaugesOverlay.hoursWords(hours) + " before " + RainGaugesOverlay.momentName(
+                                com.atakmap.android.atmosphere.data.IemRadar.hourOf(millis));
+                    }
+                }, new MomentPicker.Picked() {
+                    @Override
+                    public void picked(long millis, int hours) {
+                        raintotals.setMoment(millis, hours);
+                        buildRainTotalsRow();
+                    }
+                });
+    }
+
+    /** Rain that fell: the window chips, the status line and the key in the NWS colors. */
+    public void setRainTotals(RainTotalsOverlay overlay) {
+        raintotals = overlay;
+        if (raintotals == null)
+            return;
+        raintotals.setListener(new RainTotalsOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                raintotalsStatus.setText(status);
+                raintotalsStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        buildRainTotalsRow();
+        updateLayerControls();
+    }
+
+    /** The chips and the key, which follows the window: MRMS's or the RFC analysis's. */
+    private void buildRainTotalsRow() {
+        if (raintotals == null)
+            return;
+        raintotalsLegend.removeAllViews();
+        for (String[] row : raintotals.legend())
+            raintotalsLegend.addView(legendLine(row[0], Color.parseColor(row[1])));
+        // One "Totals:" button, as on Rain Gauges: eight windows do not fit a chip row.
+        raintotalsWindowRow.removeAllViews();
+        final Button pick = (Button) LayoutInflater.from(pluginContext)
+                .inflate(R.layout.trend_chip, raintotalsWindowRow, false);
+        pick.setText(pluginContext.getString(R.string.rain_window_button, raintotals.windowLabel()));
+        pick.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        pick.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final android.content.Context ctx = com.atakmap.android.atmosphere.compat.MapCompat.atakContext();
+                if (ctx == null)
+                    return;
+                final String[] names = RainTotalsOverlay.WINDOWS.clone();
+                names[RainTotalsOverlay.WINDOW_BEFORE] = raintotals.window() == RainTotalsOverlay.WINDOW_BEFORE
+                        ? raintotals.windowLabel() + "…" : "Before a date and time…";
+                new android.app.AlertDialog.Builder(ctx)
+                        .setTitle(pluginContext.getString(R.string.rain_window_title))
+                        .setSingleChoiceItems(names, raintotals.window(),
+                                new android.content.DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(android.content.DialogInterface d, int which) {
+                                        d.dismiss();
+                                        if (which == RainTotalsOverlay.WINDOW_BEFORE) {
+                                            pickRainTotalsMoment(ctx);
+                                            return;
+                                        }
+                                        raintotals.setWindow(which);
+                                        buildRainTotalsRow();
+                                    }
+                                })
+                        .setNegativeButton(pluginContext.getString(R.string.close), null)
+                        .show();
+            }
+        });
+        raintotalsWindowRow.addView(pick);
+        raintotalsTransparency.setMax(RainTotalsOverlay.MAX_TRANSPARENCY);
+        raintotalsTransparency.setProgress(raintotals.transparency());
+        raintotalsTransparencyLabel.setText(pluginContext.getString(R.string.raintotals_opacity_heading)
+                + " " + raintotals.transparency() + "%");
+        // The bar owns the touch from down to up: the pager would otherwise take a
+        // sideways drag as a page turn. Applied on release, not on every tick, since
+        // each change asks the server for the picture again.
+        raintotalsTransparency.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, android.view.MotionEvent e) {
+                final int a = e.getActionMasked();
+                if (a == android.view.MotionEvent.ACTION_DOWN)
+                    v.getParent().requestDisallowInterceptTouchEvent(true);
+                else if (a == android.view.MotionEvent.ACTION_UP
+                        || a == android.view.MotionEvent.ACTION_CANCEL)
+                    v.getParent().requestDisallowInterceptTouchEvent(false);
+                return false;
+            }
+        });
+        raintotalsTransparency.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(android.widget.SeekBar bar, int progress, boolean fromUser) {
+                raintotalsTransparencyLabel.setText(pluginContext.getString(
+                        R.string.raintotals_opacity_heading) + " " + progress + "%");
+            }
+
+            @Override
+            public void onStartTrackingTouch(android.widget.SeekBar bar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(android.widget.SeekBar bar) {
+                if (raintotals != null)
+                    raintotals.setTransparency(bar.getProgress());
+            }
+        });
+    }
+
+    private interface Picked {
+        void picked(int which);
+    }
+
+    /** A row of equal chips, the current one green. */
+    private void chips(LinearLayout row, String[] labels, int current, final Picked picked) {
+        row.removeAllViews();
+        for (int i = 0; i < labels.length; i++) {
+            final int value = i;
+            final Button b = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, row, false);
+            b.setText(labels[i]);
+            b.setTextSize(12);
+            b.setTextColor(current == i
+                    ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    picked.picked(value);
+                }
+            });
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = dp(4);
+            b.setLayoutParams(lp);
+            row.addView(b);
+        }
+    }
+
+    /** Lightning strike density; the newest frame, its time and age on the status line. */
+    public void setLightning(LightningOverlay overlay) {
+        lightning = overlay;
+        if (lightning == null)
+            return;
+        lightning.setListener(new LightningOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                lightningStatus.setText(status);
+                lightningStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        lightningLegend.removeAllViews();
+        lightningLegend.addView(legendLine(pluginContext.getString(R.string.lightning_legend_heading), 0));
+        for (int i = 0; i < com.atakmap.android.atmosphere.data.Lightning.BANDS.length; i++)
+            lightningLegend.addView(legendLine(com.atakmap.android.atmosphere.data.Lightning.BANDS[i],
+                    com.atakmap.android.atmosphere.data.Lightning.BAND_COLORS[i]));
+        updateLayerControls();
+    }
+
+    /**
+     * Which day of an outlook is on the map: one at a time by default, because
+     * three days of bands stacked on one map hide each other and a tap on the
+     * overlap lists all three (operator, 2026-09-26).
+     */
+    private void buildDayRow(final LinearLayout row, final com.atakmap.android.atmosphere.overlay.OutlookOverlay layer) {
+        row.removeAllViews();
+        if (layer == null)
+            return;
+        final int n = layer.days();
+        final int count = layer.allDays() ? n + 1 : n;
+        for (int i = 0; i < count; i++) {
+            // Days 1..n, then "All days" where the layer offers it (value 0).
+            final int value = i < n ? i + 1 : 0;
+            final boolean chosen = layer.day() == value;
+            final Button b = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, row, false);
+            b.setText(value == 0 ? "All days" : layer.dayLabel(value));
+            b.setTextSize(12);
+            b.setTextColor(chosen ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    layer.setDay(value);
+                    buildDayRow(row, layer);
+                }
+            });
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = dp(4);
+            b.setLayoutParams(lp);
+            row.addView(b);
+        }
+    }
+
+
+    /** The second chip row of a layer that offers one: its {@code choices()}, the pick in green. */
+    private void buildChoiceRow(final LinearLayout row, final com.atakmap.android.atmosphere.overlay.OutlookOverlay layer) {
+        row.removeAllViews();
+        if (layer == null || layer.choices() == null)
+            return;
+        final String[] cs = layer.choices();
+        for (int i = 0; i < cs.length; i++) {
+            final int value = i;
+            final boolean chosen = layer.choice() == value;
+            final Button b = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, row, false);
+            b.setText(cs[i]);
+            b.setTextSize(12);
+            b.setTextColor(chosen ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    layer.setChoice(value);
+                    buildChoiceRow(row, layer);
+                }
+            });
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = dp(4);
+            b.setLayoutParams(lp);
+            row.addView(b);
+        }
+    }
+
+    /** Avalanche zones, owned by the plugin. Not time-enabled. */
+    public void setAvalanche(AvalancheOverlay overlay) {
+        avalanche = overlay;
+        if (avalanche == null)
+            return;
+        avalanche.setListener(new AvalancheOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                avalancheStatus.setText(status);
+                avalancheStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        avalancheLegend.removeAllViews();
+        for (String[] row : AvalancheOverlay.LEGEND)
+            avalancheLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        updateLayerControls();
+    }
+
+    /**
+     * Air quality, owned by the plugin. The latest hour only, so no strip: its line
+     * says which hour is on the map, and its reading follows the pane's point.
+     */
+    public void setAirQuality(AirQualityOverlay overlay) {
+        air = overlay;
+        if (air == null)
+            return;
+        air.setListener(new AirQualityOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                airStatus.setText(status);
+                airStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+
+            @Override
+            public void onContours() {
+                updateAirReading();
+            }
+        });
+        updateLayerControls();
+    }
+
+    /**
+     * When the wind on screen is for, led by how far that is from now, which is what
+     * somebody scrubbing the bar is actually asking. "+0 h" is a modeler's way of
+     * counting and the model's name is not something a crew can act on.
+     */
+    private String windLabel(int hour, long validTime) {
+        if (validTime <= 0)
+            return "No forecast yet";
+        // Counted in steps off the bar rather than off the clock. Step 0 is the hour
+        // that contains now, so at 5:46 it is the 5 pm forecast: measuring that
+        // against the clock reads "44 min ago", which is stale weather to anyone
+        // looking at it, and it is the wind blowing right now.
+        final String when = hour <= 0 ? "Now"
+                : "In " + hour + " h";
+        return when + ", " + clock(validTime);
+    }
+
+    /** "now", "in 6 h", "2 h ago" \u2014 a forecast hour in the operator's terms. */
+    private static String relativeTime(long when) {
+        final long minutes = Math.round((when - System.currentTimeMillis()) / 60000.0);
+        if (Math.abs(minutes) <= 30)
+            return "now";
+        final long size = Math.abs(minutes);
+        final String gap = size < 60 ? size + " min" : Math.round(size / 60.0) + " h";
+        return minutes > 0 ? "in " + gap : gap + " ago";
+    }
+
+    /** "Tue 6 pm": the day and hour, with a lower-case meridiem. */
+    private static String clock(long when) {
+        return com.atakmap.android.atmosphere.units.Clock.format("EEE h a").format(new Date(when))
+                .replace("AM", "am").replace("PM", "pm");
+    }
+
+    private static String capitalize(String s) {
+        return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
+    }
+
+    // ---- layers ------------------------------------------------------------------
+
+    private void wireLayers() {
+        tropicalToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (tropical == null)
+                    return;
+                if (tropical.isOn()) {
+                    tropical.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(TropicalOverlay.LAYER_ID)) {
+                    turnTropicalOn();
+                } else {
+                    askToAllowTropical();
+                }
+            }
+        });
+        snotelToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (snotel == null)
+                    return;
+                if (snotel.isOn()) {
+                    snotel.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(SnotelOverlay.LAYER_ID)) {
+                    snotel.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowSnotel();
+                }
+            }
+        });
+        highflowToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (highflow == null)
+                    return;
+                if (highflow.isOn()) {
+                    highflow.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(HighFlowOverlay.LAYER_ID)) {
+                    highflow.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowHighFlow();
+                }
+            }
+        });
+        floodgroundToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (floodground == null)
+                    return;
+                if (floodground.isOn()) {
+                    floodground.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(FloodedGroundOverlay.LAYER_ID)) {
+                    floodground.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowFloodedGround();
+                }
+            }
+        });
+        floodzonesToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (floodzones == null)
+                    return;
+                if (floodzones.isOn()) {
+                    floodzones.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(FloodZoneOverlay.LAYER_ID)) {
+                    floodzones.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowFloodZones();
+                }
+            }
+        });
+        damareasToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (damareas == null)
+                    return;
+                if (damareas.isOn()) {
+                    damareas.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(DamAreaOverlay.LAYER_ID)) {
+                    damareas.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowDamAreas();
+                }
+            }
+        });
+        satelliteToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (satellite == null)
+                    return;
+                if (satellite.isOn()) {
+                    satellite.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(SatelliteOverlay.LAYER_ID)) {
+                    satellite.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowSatellite();
+                }
+            }
+        });
+        snowToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (snow == null)
+                    return;
+                if (snow.isOn()) {
+                    snow.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(SnowOverlay.LAYER_ID)) {
+                    snow.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowSnow();
+                }
+            }
+        });
+        sstToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (sst == null)
+                    return;
+                if (sst.isOn()) {
+                    sst.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(SstOverlay.LAYER_ID)) {
+                    sst.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowSst();
+                }
+            }
+        });
+        beachToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (beach == null)
+                    return;
+                if (beach.isOn()) {
+                    beach.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(BeachOverlay.LAYER_ID)) {
+                    beach.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowBeach();
+                }
+            }
+        });
+        floodToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (flood == null)
+                    return;
+                if (flood.isOn()) {
+                    flood.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(FloodOutlookOverlay.LAYER_ID)) {
+                    flood.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowFlood();
+                }
+            }
+        });
+        firewxToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (firewx == null)
+                    return;
+                if (firewx.isOn()) {
+                    firewx.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(FireWxOutlookOverlay.LAYER_ID)) {
+                    firewx.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowFireWx();
+                }
+            }
+        });
+        ercToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (erc == null)
+                    return;
+                if (erc.isOn()) {
+                    erc.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(ErcOverlay.LAYER_ID)) {
+                    erc.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowErc();
+                }
+            }
+        });
+        sawtiToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (sawti == null)
+                    return;
+                if (sawti.isOn()) {
+                    sawti.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(SawtiOverlay.LAYER_ID)) {
+                    sawti.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowSawti();
+                }
+            }
+        });
+        pspsToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (psps == null)
+                    return;
+                if (psps.isOn()) {
+                    psps.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(PspsOverlay.LAYER_ID)) {
+                    psps.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowPsps();
+                }
+            }
+        });
+        reportsToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (reports == null)
+                    return;
+                if (reports.isOn()) {
+                    reports.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(StormReportsOverlay.LAYER_ID)) {
+                    reports.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowReports();
+                }
+            }
+        });
+        tornadoToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (tornado == null)
+                    return;
+                if (tornado.isOn()) {
+                    tornado.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(TornadoPathsOverlay.LAYER_ID)) {
+                    tornado.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowTornado();
+                }
+            }
+        });
+        debrisflowToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (debrisflow == null)
+                    return;
+                if (debrisflow.isOn()) {
+                    debrisflow.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(DebrisFlowOverlay.LAYER_ID)) {
+                    debrisflow.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowDebrisflow();
+                }
+            }
+        });
+        quakesToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (quakes == null)
+                    return;
+                if (quakes.isOn()) {
+                    quakes.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(QuakesOverlay.LAYER_ID)) {
+                    quakes.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowQuakes();
+                }
+            }
+        });
+        fuelToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (fuel == null)
+                    return;
+                if (fuel.isOn()) {
+                    fuel.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(FuelMoistureOverlay.LAYER_ID)) {
+                    fuel.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowFuel();
+                }
+            }
+        });
+        raingaugesToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (raingauges == null)
+                    return;
+                if (raingauges.isOn()) {
+                    raingauges.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(RainGaugesOverlay.LAYER_ID)) {
+                    raingauges.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowRaingauges();
+                }
+            }
+        });
+        raintotalsToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (raintotals == null)
+                    return;
+                if (raintotals.isOn()) {
+                    raintotals.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(RainTotalsOverlay.LAYER_ID)) {
+                    raintotals.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowRaintotals();
+                }
+            }
+        });
+        lightningToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (lightning == null)
+                    return;
+                if (lightning.isOn()) {
+                    lightning.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(LightningOverlay.LAYER_ID)) {
+                    lightning.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowLightning();
+                }
+            }
+        });
+        firezonesToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (fireZones == null)
+                    return;
+                if (fireZones.isOn()) {
+                    fireZones.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(FireZoneOverlay.LAYER_ID)) {
+                    fireZones.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowFireZones();
+                }
+            }
+        });
+        avalancheToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (avalanche == null)
+                    return;
+                if (avalanche.isOn()) {
+                    avalanche.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(AvalancheOverlay.LAYER_ID)) {
+                    avalanche.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowAvalanche();
+                }
+            }
+        });
+        windToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (wind == null)
+                    return;
+                if (wind.isOn()) {
+                    wind.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(WindOverlay.LAYER_ID)) {
+                    turnWindOn();
+                } else {
+                    askToAllowWind();
+                }
+            }
+        });
+        windHeatToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (wind == null)
+                    return;
+                final boolean heat = !wind.heatOn();
+                // The heat map paints over the radar: the two never share the map.
+                if (heat && radar != null && radar.isOn())
+                    radar.setOn(false);
+                wind.setHeatOn(heat);
+                updateLayerControls();
+            }
+        });
+        spotToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (spotLayer == null)
+                    return;
+                if (spotLayer.isOn()) {
+                    spotLayer.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(SpotOverlay.LAYER_ID)) {
+                    turnSpotLayerOn();
+                } else {
+                    askToAllowSpotLayer();
+                }
+            }
+        });
+        airToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (air == null)
+                    return;
+                if (air.isOn()) {
+                    air.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(AirQualityOverlay.LAYER_ID)) {
+                    air.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowAir();
+                }
+            }
+        });
+        wavesToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (waves == null)
+                    return;
+                if (waves.isOn()) {
+                    waves.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(WaveOverlay.LAYER_ID)) {
+                    turnWavesOn();
+                } else {
+                    askToAllowWaves();
+                }
+            }
+        });
+        rainToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (rain == null)
+                    return;
+                if (rain.isOn()) {
+                    rain.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(RainOverlay.LAYER_ID)) {
+                    turnRainOn();
+                } else {
+                    askToAllowRain();
+                }
+            }
+        });
+        smokeToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (smoke == null)
+                    return;
+                if (smoke.isOn()) {
+                    smoke.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(SmokeOverlay.LAYER_ID)) {
+                    turnSmokeOn();
+                } else {
+                    askToAllowSmoke();
+                }
+            }
+        });
+        radarToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (radar == null)
+                    return;
+                if (radar.isOn()) {
+                    radar.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(RadarOverlay.LAYER_ID)) {
+                    turnRadarOn();
+                } else {
+                    askToAllowRadar();
+                }
+            }
+        });
+    }
+
+    // ---- when: live, then a day, then an hour ----------------------------------------
+
+    /**
+     * The wave overlay, owned by the plugin. A forecast on the same kind of hourly
+     * run as the wind, so it shares the strip and the wind's way of naming an hour.
+     */
+    public void setWaves(WaveOverlay overlay) {
+        waves = overlay;
+        if (waves == null)
+            return;
+        waves.setListener(new WaveOverlay.Listener() {
+            @Override
+            public void onFrames(List<String> labels, int shown) {
+                wavesHours = Math.max(0, labels.size() - 1);
+                if (stripLayer() == TimeLayer.WAVES) {
+                    setWhenTimes(wavesTimes(), shown, 0);
+                    stripShowing = TimeLayer.WAVES;
+                }
+                updateLayerControls();
+            }
+
+            @Override
+            public void onFrameShown(int index, long validTime) {
+                if (!waves.isOn())
+                    return;
+                if (stripLayer() == TimeLayer.WAVES) {
+                    showWhen(index);
+                    scrubberLabel.setText(windLabel(index, validTime));
+                }
+                updateWavesReading();
+            }
+
+            @Override
+            public void onStatus(String status) {
+                if (!waves.isOn())
+                    return;
+                if (stripLayer() == TimeLayer.WAVES) {
+                    if (!status.isEmpty())
+                        scrubberLabel.setText(status);
+                    else
+                        scrubberLabel.setText(
+                                windLabel(waves.hourIndex(), waves.validTime(waves.hourIndex())));
+                }
+                updateWavesReading();
+            }
+        });
+        updateLayerControls();
+    }
+
+    /** The waves' forecast hours as wall-clock times, index for index. */
+    private List<Long> wavesTimes() {
+        final List<Long> out = new ArrayList<>();
+        if (waves != null)
+            for (int i = 0; i <= wavesHours; i++)
+                out.add(waves.validTime(i));
+        return out;
+    }
+
+    /**
+     * The rain overlay, owned by the plugin. A forecast on the same kind of hourly
+     * run as the wind, so it shares the strip and the wind's way of naming an hour.
+     */
+    public void setRain(RainOverlay overlay) {
+        rain = overlay;
+        if (rain == null)
+            return;
+        rain.setListener(new RainOverlay.Listener() {
+            @Override
+            public void onFrames(List<String> labels, int shown) {
+                rainHours = Math.max(0, labels.size() - 1);
+                if (stripLayer() == TimeLayer.RAIN) {
+                    setWhenTimes(rainTimes(), shown, 0);
+                    stripShowing = TimeLayer.RAIN;
+                }
+                updateLayerControls();
+            }
+
+            @Override
+            public void onFrameShown(int index, long validTime) {
+                if (!rain.isOn())
+                    return;
+                if (stripLayer() == TimeLayer.RAIN) {
+                    showWhen(index);
+                    scrubberLabel.setText(windLabel(index, validTime));
+                }
+                updateRainReading();
+            }
+
+            @Override
+            public void onStatus(String status) {
+                if (!rain.isOn())
+                    return;
+                if (stripLayer() == TimeLayer.RAIN) {
+                    if (!status.isEmpty())
+                        scrubberLabel.setText(status);
+                    else
+                        scrubberLabel.setText(
+                                windLabel(rain.hourIndex(), rain.validTime(rain.hourIndex())));
+                }
+                updateRainReading();
+            }
+        });
+        updateLayerControls();
+    }
+
+    /** The rain's forecast hours as wall-clock times, index for index. */
+    private List<Long> rainTimes() {
+        final List<Long> out = new ArrayList<>();
+        if (rain != null)
+            for (int i = 0; i <= rainHours; i++)
+                out.add(rain.validTime(i));
+        return out;
+    }
+
+    /** The wind's forecast hours as wall-clock times, index for index. */
+    private List<Long> windTimes() {
+        final List<Long> out = new ArrayList<>();
+        if (wind != null)
+            for (int i = 0; i <= windHours; i++)
+                out.add(wind.validTime(i));
+        return out;
+    }
+
+    /** The smoke's forecast hours as wall-clock times, index for index. */
+    private List<Long> smokeTimes() {
+        final List<Long> out = new ArrayList<>();
+        if (smoke != null)
+            for (int i = 0; i <= smokeHours; i++)
+                out.add(smoke.validTime(i));
+        return out;
+    }
+
+    /** The radar's frame stamps as wall-clock times, index for index. */
+    private List<Long> radarTimes() {
+        final List<Long> out = new ArrayList<>();
+        for (String t : radarFrames)
+            out.add(com.atakmap.android.atmosphere.data.IsoTime.parse(t));
+        return out;
+    }
+
+    /**
+     * Hand the picker a fresh set of times.
+     *
+     * @param live the index that means now: hour 0 for a forecast that runs forward,
+     *             the last frame for a radar loop that runs up to the present.
+     */
+    private void setWhenTimes(List<Long> times, int shown, int live) {
+        whenTimes.clear();
+        whenTimes.addAll(times);
+        whenLive = live;
+        whenIndex = shown >= 0 && shown < whenTimes.size() ? shown : live;
+        // A rebuilt list is following now again whenever it lands on now: the run
+        // rolled forward, or the layer was just switched on.
+        liveMode = whenIndex == whenLive;
+        whenDay = Long.MIN_VALUE;
+        buildWhenPicker();
+    }
+
+    /** The map moved to another time; follow it without rebuilding unless the day changed. */
+    private void showWhen(int index) {
+        if (index < 0 || index >= whenTimes.size())
+            return;
+        whenIndex = index;
+        if (liveMode == (scrubberHours.getVisibility() == View.VISIBLE)
+                || startOfDay(whenTimes.get(index)) != whenDay)
+            buildWhenPicker();
+        else
+            paintWhenPicker();
+    }
+
+    /**
+     * Live, the days, and the hours of the day being shown, as buttons.
+     *
+     * <p>This was a SeekBar and a SeekBar was wrong here twice over: on a pager page
+     * it will not drag sideways, and once it is made to, a finger meaning to scroll
+     * the page drags the value instead. Buttons also say what the choices are without
+     * being touched, which is the whole of "pick a day and an hour".
+     */
+    private void buildWhenPicker() {
+        scrubberDays.removeAllViews();
+        scrubberHours.removeAllViews();
+        if (whenTimes.isEmpty())
+            return;
+        if (whenIndex < 0 || whenIndex >= whenTimes.size())
+            whenIndex = Math.max(0, Math.min(whenLive, whenTimes.size() - 1));
+        whenDay = startOfDay(whenTimes.get(whenIndex));
+
+        // Live, then one button per day the times cover. A single day is not worth
+        // a button of its own: the hours below it are already that day.
+        final List<Button> dayButtons = new ArrayList<>();
+        final boolean playing = radarPlaying();
+        dayButtons.add(whenButton("Live", null, new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                liveMode = true;
+                pickWhen(whenLive);
+            }
+        }, liveMode && !playing));
+        // The radar plays its last two hours as a loop, to show which way the cells
+        // move (takwerx/atmosphere#7). Any other pick on the strip stops it.
+        if (stripLayer() == TimeLayer.RADAR && radar != null && whenTimes.size() > 1)
+            dayButtons.add(whenButton(playing ? "Stop" : "Play", PLAY_TAG, new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (radar != null)
+                        radar.setPlaying(!radar.isPlaying());
+                }
+            }, playing));
+        final List<Long> days = new ArrayList<>();
+        for (Long t : whenTimes) {
+            final long d = startOfDay(t);
+            if (!days.contains(d))
+                days.add(d);
+        }
+        // Every day the forecast reaches gets a button, even when that is one. It used
+        // to take two before any appeared, on the grounds that a lone "Today" says
+        // nothing -- but Live hides the hours, so a forecast that fits inside one day
+        // left Live as the only control on the page with no way to reach an hour at
+        // all (operator, 2026-09-23: "all i see is live"). Last night's window
+        // straddled midnight and showed two, which is why this held until morning.
+        for (final Long day : days)
+            dayButtons.add(whenButton(dayLabel(day), day, new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    // A day is picked by going to its first hour, so green always
+                    // means "this is what is on the map" and never "this is open".
+                    liveMode = false;
+                    for (int i = 0; i < whenTimes.size(); i++)
+                        if (startOfDay(whenTimes.get(i)) == day) {
+                            pickWhen(i);
+                            return;
+                        }
+                }
+            }, !liveMode && day == whenDay));
+        layOutDayRows(dayButtons);
+
+        // Live is not a day, so it has no hours to choose from.
+        scrubberHours.setVisibility(liveMode ? View.GONE : View.VISIBLE);
+        if (liveMode)
+            return;
+        LinearLayout row = null;
+        int inRow = 0;
+        for (int i = 0; i < whenTimes.size(); i++) {
+            if (startOfDay(whenTimes.get(i)) != whenDay)
+                continue;
+            if (inRow % 4 == 0) {
+                row = new LinearLayout(pluginContext);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                scrubberHours.addView(row, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT));
+            }
+            final int index = i;
+            final Button b = whenButton(hourLabel(whenTimes.get(i)), index,
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            liveMode = false;
+                            pickWhen(index);
+                        }
+                    }, i == whenIndex);
+            row.addView(b);
+            inRow++;
+        }
+        // Pad the last row so four across stay four across.
+        if (row != null)
+            for (int i = inRow % 4; i > 0 && i < 4; i++) {
+                final View filler = new View(pluginContext);
+                final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                        0, 1, 1f);
+                lp.rightMargin = dp(4);
+                row.addView(filler, lp);
+            }
+    }
+
+    /** Repaint which button is green without rebuilding the rows. */
+    private void paintWhenPicker() {
+        paintGreen(scrubberDays);
+        for (int i = 0; i < scrubberHours.getChildCount(); i++) {
+            final View row = scrubberHours.getChildAt(i);
+            if (row instanceof LinearLayout)
+                paintGreen((LinearLayout) row);
+        }
+    }
+
+    /**
+     * The day buttons, at most four to a row. Seven across -- Live and six days of
+     * a model run -- cut "Today" and "Tomorrow" to "To..." at half width (the rain
+     * and wave strips on the S22, 2026-09-27); four leave room for "Tomorrow" whole.
+     * A short last row is padded so its buttons line up with the ones above.
+     */
+    private void layOutDayRows(List<Button> buttons) {
+        scrubberDays.setOrientation(LinearLayout.VERTICAL);
+        final int perRow = 4;
+        LinearLayout row = null;
+        for (int i = 0; i < buttons.size(); i++) {
+            if (i % perRow == 0) {
+                row = new LinearLayout(pluginContext);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                scrubberDays.addView(row, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            }
+            row.addView(buttons.get(i));
+        }
+        if (row != null && buttons.size() > perRow)
+            for (int k = buttons.size() % perRow; k != 0 && k < perRow; k++) {
+                final View pad = new View(pluginContext);
+                final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, 1, 1f);
+                lp.rightMargin = dp(4);
+                row.addView(pad, lp);
+            }
+    }
+
+    private void paintGreen(LinearLayout host) {
+        final long day = whenIndex >= 0 && whenIndex < whenTimes.size()
+                ? startOfDay(whenTimes.get(whenIndex)) : Long.MIN_VALUE;
+        for (int i = 0; i < host.getChildCount(); i++) {
+            final View v = host.getChildAt(i);
+            // The day buttons sit in rows now; paint inside them too.
+            if (v instanceof LinearLayout && !(v instanceof Button)) {
+                paintGreen((LinearLayout) v);
+                continue;
+            }
+            if (!(v instanceof Button))
+                continue;
+            final Object tag = v.getTag(R.id.scrubber);
+            final boolean on;
+            if (tag instanceof Integer)
+                on = !liveMode && (Integer) tag == whenIndex;
+            else if (tag instanceof Long)
+                on = !liveMode && ((Long) tag).longValue() == day;
+            else if (PLAY_TAG.equals(tag))
+                on = radarPlaying();
+            else
+                on = liveMode && !radarPlaying();
+            ((Button) v).setTextColor(on
+                    ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+        }
+    }
+
+    /** One cell of the picker: a quarter-width TakwerxButton, green when it is on. */
+    private Button whenButton(String text, Object tag, View.OnClickListener onClick,
+            boolean on) {
+        final Button b = (Button) LayoutInflater.from(pluginContext)
+                .inflate(R.layout.trend_chip, scrubberHours, false);
+        b.setText(text);
+        // Keyed so a repaint can tell an hour (Integer) from a day (Long) from Live.
+        b.setTag(R.id.scrubber, tag);
+        b.setTextSize(13);
+        b.setOnClickListener(onClick);
+        b.setTextColor(on
+                ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        lp.rightMargin = dp(4);
+        lp.topMargin = dp(4);
+        b.setLayoutParams(lp);
+        return b;
+    }
+
+    /** The radar's loop is playing on the strip it owns. */
+    private boolean radarPlaying() {
+        return radar != null && radar.isPlaying() && stripLayer() == TimeLayer.RADAR;
+    }
+
+    /** The layers that share the one time strip. */
+    private enum TimeLayer { RADAR, WIND, SMOKE, WAVES, RAIN }
+
+    /** The time layer switched on last: the strip is its, while it is on. */
+    private TimeLayer stripOwner;
+    /** The layer whose times the strip holds now, to load another's when it changes. */
+    private TimeLayer stripShowing;
+
+    private boolean timeLayerOn(TimeLayer t) {
+        switch (t) {
+            case RADAR:
+                return radar != null && radar.isOn();
+            case WIND:
+                return wind != null && wind.isOn();
+            case SMOKE:
+                return smoke != null && smoke.isOn();
+            case WAVES:
+                return waves != null && waves.isOn();
+            default:
+                return rain != null && rain.isOn();
+        }
+    }
+
+    /**
+     * Which layer the strip drives: the one switched on last while it is on; else,
+     * after it went off or after All on, the first of the time layers still on, in
+     * the order the strip always took them. Null when none is on.
+     */
+    private TimeLayer stripLayer() {
+        if (stripOwner != null && timeLayerOn(stripOwner))
+            return stripOwner;
+        for (TimeLayer t : new TimeLayer[] { TimeLayer.WIND, TimeLayer.SMOKE, TimeLayer.WAVES,
+                TimeLayer.RAIN, TimeLayer.RADAR })
+            if (timeLayerOn(t))
+                return t;
+        return null;
+    }
+
+    /** The strip's times, reloaded when the layer that owns it changes. */
+    private void followStripOwner() {
+        final TimeLayer owner = stripLayer();
+        if (owner == stripShowing)
+            return;
+        stripShowing = owner;
+        if (owner == TimeLayer.RADAR)
+            setWhenTimes(radarTimes(), radar.frameIndex(), Math.max(0, radarFrames.size() - 1));
+        else if (owner == TimeLayer.WIND)
+            setWhenTimes(windTimes(), wind.hourIndex(), 0);
+        else if (owner == TimeLayer.SMOKE)
+            setWhenTimes(smokeTimes(), smoke.hourIndex(), 0);
+        else if (owner == TimeLayer.WAVES)
+            setWhenTimes(wavesTimes(), waves.hourIndex(), 0);
+        else if (owner == TimeLayer.RAIN)
+            setWhenTimes(rainTimes(), rain.hourIndex(), 0);
+    }
+
+    /** Send a pick to whichever layer owns the strip. */
+    private void pickWhen(int index) {
+        if (index < 0 || index >= whenTimes.size())
+            return;
+        // The line answers the tap, not the fetch. A grid takes a moment to arrive and
+        // the label is only written when it does, so the heading sat on the old time
+        // while the buttons had already moved, which reads as a control that did not
+        // take (XCover, 2026-09-22).
+        // Only the strip's layer moves: with Radar and Wind both on, the other stays
+        // at its own time (takwerx/atmosphere#6).
+        final TimeLayer owner = stripLayer();
+        if (owner == TimeLayer.WIND) {
+            wind.setHourIndex(index);
+            scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
+        } else if (owner == TimeLayer.SMOKE) {
+            smoke.setHourIndex(index);
+            scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
+        } else if (owner == TimeLayer.WAVES) {
+            waves.setHourIndex(index);
+            scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
+        } else if (owner == TimeLayer.RAIN) {
+            rain.setHourIndex(index);
+            scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
+        } else if (owner == TimeLayer.RADAR) {
+            radar.setFrameIndex(index);
+            scrubberLabel.setText(frameLabel(index,
+                    index < radarFrames.size() ? radarFrames.get(index) : null));
+        }
+        showWhen(index);
+    }
+
+    /** "Today", "Tomorrow", else the weekday. */
+    private static String dayLabel(long day) {
+        final long from = Math.round(
+                (day - startOfDay(System.currentTimeMillis())) / 86_400_000.0);
+        if (from == 0)
+            return "Today";
+        if (from == 1)
+            return "Tomorrow";
+        return new SimpleDateFormat("EEE", Locale.US).format(new Date(day));
+    }
+
+    /** "6 pm" on the hour, "5:12 pm" off it, because radar frames are not hourly. */
+    private static String hourLabel(long when) {
+        final Calendar c = Calendar.getInstance();
+        c.setTimeInMillis(when);
+        final String pattern = c.get(Calendar.MINUTE) == 0 ? "h a" : "h:mm a";
+        return new SimpleDateFormat(pattern, Locale.US).format(new Date(when))
+                .replace("AM", "am").replace("PM", "pm");
+    }
+
+    private static long startOfDay(long when) {
+        final Calendar c = Calendar.getInstance();
+        c.setTimeInMillis(when);
+        c.set(Calendar.HOUR_OF_DAY, 0);
+        c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        return c.getTimeInMillis();
+    }
+
+    /**
+     * Hurricanes: NHC's live storms, their forecast cone and their track. Unlike radar
+     * and wind this is not a time-enabled layer -- an advisory is a single picture
+     * issued every six hours, so it does not share the strip.
+     */
+    public void setTropical(TropicalOverlay overlay) {
+        tropical = overlay;
+        if (tropical == null)
+            return;
+        tropical.setListener(new TropicalOverlay.Listener() {
+            @Override
+            public void onStorms(List<Nhc.Storm> storms) {
+                buildStormRows(storms);
+                updateLayerControls();
+            }
+
+            @Override
+            public void onStatus(String status) {
+                if (!status.isEmpty()) {
+                    tropicalStatus.setText(status);
+                    tropicalStatus.setVisibility(View.VISIBLE);
+                }
+            }
+        });
+        updateLayerControls();
+    }
+
+    /**
+     * One row per storm: what it is, how hard, and Go to. The shape is Comms'
+     * site_row and Cam Depot's camera_row, so a crew moving between takwerx plugins
+     * finds the same control (operator, 2026-09-23).
+     */
+    private void buildStormRows(List<Nhc.Storm> storms) {
+        tropicalRows.removeAllViews();
+        if (storms.isEmpty()) {
+            tropicalStatus.setText(R.string.tropical_none);
+            tropicalStatus.setVisibility(View.VISIBLE);
+            return;
+        }
+        // The list is the answer, so the status line gets out of its way.
+        tropicalStatus.setVisibility(View.GONE);
+        for (final Nhc.Storm storm : storms) {
+            final View row = LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.storm_row, tropicalRows, false);
+            ((TextView) row.findViewById(R.id.name)).setText(storm.display());
+            ((TextView) row.findViewById(R.id.detail)).setText(strength(storm));
+            row.findViewById(R.id.goto_btn).setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (tropical != null)
+                        tropical.goTo(storm);
+                }
+            });
+            tropicalRows.addView(row);
+
+            // Each storm's own maps, folded under it. Same chevron as a layer's
+            // settings, because it means the same thing (operator, 2026-09-23:
+            // "sub menus for the different maps it has for each one ... to turn on
+            // and off like we have in the feature layer plugin").
+            final LinearLayout products = new LinearLayout(pluginContext);
+            products.setOrientation(LinearLayout.VERTICAL);
+            products.setVisibility(stormOpen.contains(storm.id)
+                    ? View.VISIBLE : View.GONE);
+            for (final Nhc.Product product : Nhc.Product.values())
+                products.addView(productButton(storm, product));
+            tropicalRows.addView(products);
+
+            final ImageButton chevron = (ImageButton) row.findViewById(R.id.storm_expand);
+            chevron.setRotation(stormOpen.contains(storm.id) ? 180f : 0f);
+            chevron.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (stormOpen.contains(storm.id))
+                        stormOpen.remove(storm.id);
+                    else
+                        stormOpen.add(storm.id);
+                    final boolean open = stormOpen.contains(storm.id);
+                    products.setVisibility(open ? View.VISIBLE : View.GONE);
+                    chevron.setRotation(open ? 180f : 0f);
+                }
+            });
+        }
+    }
+
+    /**
+     * What the track colors mean (operator, 2026-09-23: "on the hurricane when you
+     * expand the section a color code for the categories"). Swatches come from the
+     * same table the map draws with, so the legend cannot drift from the map.
+     */
+    /**
+     * EPA's six categories in EPA's colors, from the table the map is drawn with. Two
+     * lines allowed, because "Sensitive groups" and "Very unhealthy" are the words and
+     * six cells across half a pane is not wide.
+     */
+    private void buildAirScale() {
+        airScale.removeAllViews();
+        for (AirNow.Category c : AirNow.Category.values()) {
+            final TextView cell = new TextView(pluginContext);
+            cell.setText(c.shortLabel);
+            cell.setTextSize(10);
+            cell.setMaxLines(2);
+            cell.setGravity(Gravity.CENTER);
+            cell.setPadding(dp(1), dp(3), dp(1), dp(3));
+            cell.setBackgroundColor(c.color);
+            // Green, yellow and orange carry dark text; red and darker carry light.
+            cell.setTextColor(c.ordinal() <= AirNow.Category.SENSITIVE.ordinal()
+                    ? 0xFF101010 : 0xFFFFFFFF);
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.MATCH_PARENT, 1f);
+            cell.setLayoutParams(lp);
+            airScale.addView(cell);
+        }
+    }
+
+    /** The category at the pane's point, from the contours already on the map. */
+    private void updateAirReading() {
+        if (air == null || !air.isOn()) {
+            airReading.setText(R.string.empty);
+            return;
+        }
+        final GeoPoint p = point();
+        if (p == null) {
+            airReading.setText(R.string.empty);
+            return;
+        }
+        final AirNow.Category c = air.at(p.getLatitude(), p.getLongitude());
+        airReading.setText(c == null
+                ? pluginContext.getString(R.string.air_here_none)
+                : pluginContext.getString(R.string.air_here, c.label, c.range));
+    }
+
+    private void buildStormScale() {
+        tropicalScale.removeAllViews();
+        for (int i = 0; i < TropicalOverlay.SAFFIR_SIMPSON_LABELS.length; i++) {
+            final TextView cell = new TextView(pluginContext);
+            cell.setText(TropicalOverlay.SAFFIR_SIMPSON_LABELS[i]);
+            cell.setTextSize(11);
+            cell.setGravity(Gravity.CENTER);
+            cell.setPadding(0, dp(3), 0, dp(3));
+            cell.setBackgroundColor(TropicalOverlay.rungColor(i));
+            // The pale rungs need dark text and the saturated ones light; the scale
+            // runs light-to-dark, so the split is where it stops being readable.
+            cell.setTextColor(i <= 3 ? 0xFF101010 : 0xFFFFFFFF);
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            cell.setLayoutParams(lp);
+            tropicalScale.addView(cell);
+        }
+    }
+
+    /** One of a storm's maps: ON green, OFF plain, the way every toggle here reads. */
+    private Button productButton(final Nhc.Storm storm, final Nhc.Product product) {
+        final Button b = (Button) LayoutInflater.from(pluginContext)
+                .inflate(R.layout.storm_product, tropicalRows, false);
+        paintProduct(b, storm, product);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (tropical == null)
+                    return;
+                final boolean next = !tropical.isEnabled(storm, product);
+                tropical.setEnabled(storm, product, next);
+                paintProduct((Button) v, storm, product);
+            }
+        });
+        return b;
+    }
+
+    private void paintProduct(Button b, Nhc.Storm storm, Nhc.Product product) {
+        final boolean on = tropical != null && tropical.isEnabled(storm, product);
+        b.setText(product.label + (on ? "  ON" : "  OFF"));
+        b.setTextColor(pluginContext.getResources().getColor(
+                on ? R.color.state_on : R.color.state_off));
+    }
+
+    /** "150 mph, cat 4, 922 mb" -- the numbers a crew would hear on the news. */
+    private String strength(Nhc.Storm storm) {
+        final StringBuilder b = new StringBuilder();
+        if (storm.intensityKt > 0) {
+            // Knots are how the advisory is written and how nobody outside aviation
+            // reads it. This line is not a unit the pane's own switch reaches.
+            b.append(Math.round(storm.intensityKt * 1.15078)).append(" mph");
+            if (storm.category() > 0)
+                b.append(", cat ").append(storm.category());
+        }
+        if (storm.pressureMb > 0) {
+            if (b.length() > 0)
+                b.append(", ");
+            b.append(storm.pressureMb).append(" mb");
+        }
+        return b.toString();
+    }
+
+    private void turnTropicalOn() {
+        if (tropical != null)
+            tropical.setOn(true);
+        updateLayerControls();
+    }
+
+    private void askToAllowTropical() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.tropical_allow_title))
+                .setMessage(pluginContext.getString(R.string.tropical_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(TropicalOverlay.LAYER_ID, true);
+                                turnTropicalOn();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    /**
+     * What the layer draws, hooked to the pane. Not time-enabled: a spot request is
+     * a standing thing, not a frame, so it never touches the time strip.
+     */
+    /**
+     * The station layer. Its controls on this page are not built yet; it is held so
+     * the plugin can hand it over once, and turned on from the layer's own toggle.
+     */
+    /** Each layer's last count, said again with the zoom hint when the map settles. */
+    private String stationsCount = "", gaugesCount = "", buoysCount = "";
+
+    /** A layer's count, and what its zoom setting hides right now; see {@link ScaleBar#zoomInHint}. */
+    private String withZoomHint(String count, double gate) {
+        if (count.isEmpty())
+            return count;
+        final String hint = ScaleBar.zoomInHint(mapView(), gate);
+        return hint.isEmpty() ? count : count + "\n" + hint;
+    }
+
+    public void setStations(StationOverlay overlay) {
+        stationLayer = overlay;
+        if (overlay != null)
+            overlay.setOrigin(paneOrigin);
+        if (stationLayer == null)
+            return;
+        stationLayer.setListener(new StationOverlay.Listener() {
+            @Override
+            public void onStationsStatus(String s) {
+                if (!s.isEmpty() && stationsStatus != null)
+                    stationsStatus.setText(s);
+            }
+
+            @Override
+            public void onStationsDrawn(int drawn, int total, int critical, int utility,
+                    int utilityCritical) {
+                // The utility stations are counted apart, and said to be hidden when
+                // the zoom hides them: a count the map does not show reads as a fault.
+                stationsCount = total == 0 ? "" : drawn + " stations, " + critical
+                        + " at criteria" + (utility == 0 ? "" : "\n" + utility
+                                + " utility stations, " + utilityCritical + " at criteria"
+                                + (stationLayer.drawingNow(stationLayer.utilityGate())
+                                        ? "" : ", shown when zoomed in"));
+                if (stationsStatus != null)
+                    stationsStatus.setText(total == 0 ? noStationsText()
+                            : withZoomHint(stationsCount, stationLayer.stationGate()));
+                if (stationPage != null)
+                    stationPage.refresh();
+                updateLayerControls();
+            }
+
+            /**
+             * Nothing within the radius, said with the point it was measured from: a
+             * phone with no fix keeps a stale self position, and "0 stations" alone
+             * read as a broken layer (operator, 2026-10-12: "why aren't weather
+             * stations turning on").
+             */
+            private String noStationsText() {
+                final GeoPoint o = stationLayer.originPoint();
+                final String where = o == null ? "" : String.format(Locale.US, " (%.2f, %.2f)",
+                        o.getLatitude(), o.getLongitude());
+                final Origin from = stationLayer.originSource();
+                return "No stations within " + stationLayer.miles() + " mi of " + from.words()
+                        + where + (from.self() ? ". No GPS fix here? Pick Map center at the top."
+                                : ".");
+            }
+
+            @Override
+            public void onOriginMoved() {
+                // The map moved: the list is ordered by distance from it, so it is
+                // now in the wrong order even though nothing was refetched.
+                if (stationPage != null)
+                    stationPage.refresh();
+                if (stationsStatus != null && !stationsCount.isEmpty())
+                    stationsStatus.setText(withZoomHint(stationsCount, stationLayer.stationGate()));
+                updateLayerControls();      // the gate readouts quote the scale bar
+            }
+        });
+        if (stationPage != null)
+            stationPage.setLayer(stationLayer);
+    }
+
+    public void setBuoys(BuoyOverlay overlay) {
+        buoyLayer = overlay;
+        if (overlay != null)
+            overlay.setOrigin(paneOrigin);
+        if (buoyLayer == null)
+            return;
+        buoyLayer.setListener(new BuoyOverlay.Listener() {
+            @Override
+            public void onBuoysStatus(String s) {
+                if (!s.isEmpty() && buoysStatus != null)
+                    buoysStatus.setText(s);
+            }
+
+            @Override
+            public void onBuoysDrawn(int drawn, int total, int windy) {
+                buoysCount = total == 0 ? "" : drawn + " buoys, " + windy + " reporting wind";
+                if (buoysStatus != null)
+                    buoysStatus.setText(withZoomHint(buoysCount, buoyLayer.gate()));
+                if (buoyPage != null)
+                    buoyPage.refresh();
+                updateLayerControls();
+            }
+
+            @Override
+            public void onOriginMoved() {
+                if (buoyPage != null)
+                    buoyPage.refresh();
+                if (buoysStatus != null && !buoysCount.isEmpty())
+                    buoysStatus.setText(withZoomHint(buoysCount, buoyLayer.gate()));
+            }
+        });
+        if (buoyPage != null)
+            buoyPage.setLayer(buoyLayer);
+    }
+
+    public void setGauges(GaugeOverlay overlay) {
+        gaugeLayer = overlay;
+        if (overlay != null)
+            overlay.setOrigin(paneOrigin);
+        if (gaugeLayer == null)
+            return;
+        gaugeLayer.setListener(new GaugeOverlay.Listener() {
+            @Override
+            public void onGaugesStatus(String s) {
+                if (!s.isEmpty() && gaugesStatus != null)
+                    gaugesStatus.setText(s);
+            }
+
+            @Override
+            public void onGaugesDrawn(int drawn, int total, int flooding) {
+                gaugesCount = total == 0 ? "" : drawn + " gauges, "
+                        + (flooding == 0 ? "none at action stage or above"
+                                : flooding + " at action stage or above");
+                if (gaugesStatus != null)
+                    gaugesStatus.setText(withZoomHint(gaugesCount, gaugeLayer.gate()));
+                if (gaugePage != null)
+                    gaugePage.refresh();
+                updateLayerControls();
+            }
+
+            @Override
+            public void onOriginMoved() {
+                if (gaugePage != null)
+                    gaugePage.refresh();
+                if (gaugesStatus != null && !gaugesCount.isEmpty())
+                    gaugesStatus.setText(withZoomHint(gaugesCount, gaugeLayer.gate()));
+            }
+        });
+        if (gaugePage != null)
+            gaugePage.setLayer(gaugeLayer);
+    }
+
+    public void setSpotLayer(SpotOverlay overlay) {
+        spotLayer = overlay;
+        if (spotLayer == null)
+            return;
+        spotLayer.setListener(new SpotOverlay.Listener() {
+            @Override
+            public void onStatus(String s) {
+                if (!s.isEmpty())
+                    spotLayerStatus.setText(s);
+            }
+
+            @Override
+            public void onDrawn(int drawn, int total) {
+                spotLayerStatus.setText(total == 0 ? ""
+                        : drawn + " on the map, of " + total + " in the country");
+                updateLayerControls();
+            }
+        });
+        updateLayerControls();
+    }
+
+    private void turnSpotLayerOn() {
+        if (spotLayer != null)
+            spotLayer.setOn(true);
+        updateLayerControls();
+    }
+
+    private void askToAllowBuoys() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.buoys_allow_title))
+                .setMessage(pluginContext.getString(R.string.buoys_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(BuoyOverlay.LAYER_ID, true);
+                                if (buoyLayer != null)
+                                    buoyLayer.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void buildBuoysDistanceRow() {
+        buoysDistanceRow.removeAllViews();
+        final int current = buoyLayer.miles();
+        for (final int m : BuoyOverlay.RADII)
+            buoysDistanceRow.addView(choiceTile(m + " mi", m == current, new Runnable() {
+                @Override
+                public void run() {
+                    buoyLayer.setMiles(m);
+                    updateLayerControls();
+                }
+            }));
+    }
+
+    private void buildBuoysShowRow() {
+        buoysShowRow.removeAllViews();
+        // Two rows, as on the buoy list: what a buoy reports, then what its reading
+        // means. Five tiles overflow one row of the half-width pane.
+        buoysShowRow.setOrientation(LinearLayout.VERTICAL);
+        final LinearLayout reports = new LinearLayout(pluginContext);
+        reports.setOrientation(LinearLayout.HORIZONTAL);
+        buoyShowTile(reports, "All", BuoyOverlay.SHOW_ALL, 0);
+        buoyShowTile(reports, "Wind", BuoyOverlay.SHOW_WIND, 0);
+        buoyShowTile(reports, "Seas", BuoyOverlay.SHOW_WAVES, 0);
+        final LinearLayout means = new LinearLayout(pluginContext);
+        means.setOrientation(LinearLayout.HORIZONTAL);
+        buoyShowTile(means, "Rough", BuoyOverlay.SHOW_ROUGH,
+                com.atakmap.android.atmosphere.data.MarineBand.GALE.color);
+        buoyShowTile(means, "\u2605 Favorites", BuoyOverlay.SHOW_FAVORITES, StationPage.STAR_ON);
+        buoysShowRow.addView(reports, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        final LinearLayout.LayoutParams under = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        under.topMargin = dp(4);
+        buoysShowRow.addView(means, under);
+    }
+
+    private void buoyShowTile(LinearLayout row, String label, final int value, int color) {
+        final boolean chosen = buoyLayer.show() == value;
+        final Button b = (Button) LayoutInflater.from(pluginContext)
+                .inflate(R.layout.trend_chip, buoysShowRow, false);
+        b.setText(label);
+        b.setTextSize(12);
+        b.setTextColor(chosen
+                ? (color != 0 ? color : pluginContext.getResources().getColor(R.color.state_on))
+                : Color.WHITE);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                buoyLayer.setShow(value);
+                if (buoyPage != null)
+                    buoyPage.refresh();
+                updateLayerControls();
+            }
+        });
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        lp.rightMargin = dp(4);
+        b.setLayoutParams(lp);
+        row.addView(b);
+    }
+
+    private void buildBuoysGateRows() {
+        gateRow(buoysGateRow, buoysGateText, "Buoys", buoyLayer.gate(), new Gate() {
+            @Override
+            public void set(double gsd) {
+                buoyLayer.setGate(gsd);
+            }
+        });
+        gateRow(buoysLabelGateRow, buoysLabelGateText, "Readings", buoyLayer.labelGate(),
+                new Gate() {
+                    @Override
+                    public void set(double gsd) {
+                        buoyLayer.setLabelGate(gsd);
+                    }
+                });
+    }
+
+    private void buildBuoysLegend() {
+        if (buoysLegend.getChildCount() > 0)
+            return;
+        for (String[] row : BuoyOverlay.LEGEND)
+            buoysLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+    }
+
+    /** A buoy tapped on the map: its page, its record. */
+    public void openBuoy(final String id) {
+        if (id == null || id.isEmpty() || buoyPage == null)
+            return;
+        for (int i = 0; i < pages.length; i++)
+            if (pages[i] == buoyPage.view()) {
+                pager.setCurrentItem(i, false);
+                break;
+            }
+        if (host != null)
+            host.show();
+        buoyPage.showById(id);
+    }
+
+    private void askToAllowGauges() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.gauges_allow_title))
+                .setMessage(pluginContext.getString(R.string.gauges_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(GaugeOverlay.LAYER_ID, true);
+                                if (gaugeLayer != null)
+                                    gaugeLayer.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void buildGaugesDistanceRow() {
+        gaugesDistanceRow.removeAllViews();
+        final int current = gaugeLayer.miles();
+        for (final int m : GaugeOverlay.RADII)
+            gaugesDistanceRow.addView(choiceTile(m + " mi", m == current,
+                    new Runnable() {
+                        @Override
+                        public void run() {
+                            gaugeLayer.setMiles(m);
+                            updateLayerControls();
+                        }
+                    }));
+    }
+
+    /** Which gauges reach the map: the same three the list filters by. */
+    private void buildGaugesShowRow() {
+        gaugesShowRow.removeAllViews();
+        gaugeShowTile("All", GaugeOverlay.SHOW_ALL, 0);
+        gaugeShowTile("High water only", GaugeOverlay.SHOW_HIGH,
+                GaugeOverlay.legendColor(com.atakmap.android.atmosphere.data.Nwps.ACTION));
+        gaugeShowTile("\u2605 Favorites only", GaugeOverlay.SHOW_FAVORITES, StationPage.STAR_ON);
+    }
+
+    private void gaugeShowTile(String label, final int value, int color) {
+        final boolean chosen = gaugeLayer.show() == value;
+        final Button b = (Button) LayoutInflater.from(pluginContext)
+                .inflate(R.layout.trend_chip, gaugesShowRow, false);
+        b.setText(label);
+        b.setTextSize(12);
+        b.setTextColor(chosen
+                ? (color != 0 ? color : pluginContext.getResources().getColor(R.color.state_on))
+                : Color.WHITE);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                gaugeLayer.setShow(value);
+                if (gaugePage != null)
+                    gaugePage.refresh();
+                updateLayerControls();
+            }
+        });
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        lp.rightMargin = dp(4);
+        b.setLayoutParams(lp);
+        gaugesShowRow.addView(b);
+    }
+
+    /** water.noaa.gov's legend, in its own colors and its own order. */
+    private void buildGaugesLegend() {
+        if (gaugesLegend.getChildCount() > 0)
+            return;
+        for (String category : GaugeOverlay.LEGEND)
+            gaugesLegend.addView(legendLine(
+                    com.atakmap.android.atmosphere.data.Nwps.label(category),
+                    GaugeOverlay.legendColor(category)));
+    }
+
+    /** Cal OES is another server than NIFC, so it is allowed on its own, by name. */
+    private void askToAllowUtilityStations() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.stations_utility_allow_title))
+                .setMessage(pluginContext.getString(R.string.stations_utility_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(StationOverlay.UTILITY_ID, true);
+                                if (stationLayer != null)
+                                    stationLayer.setUtilityOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowStations() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.stations_allow_title))
+                .setMessage(pluginContext.getString(R.string.stations_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(StationOverlay.LAYER_ID, true);
+                                if (stationLayer != null)
+                                    stationLayer.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void buildStationsDistanceRow() {
+        stationsDistanceRow.removeAllViews();
+        final int current = stationLayer.miles();
+        for (final int m : StationOverlay.RADII)
+            stationsDistanceRow.addView(choiceTile(m + " mi", m == current,
+                    new Runnable() {
+                        @Override
+                        public void run() {
+                            stationLayer.setMiles(m);
+                            updateLayerControls();
+                        }
+                    }));
+    }
+
+    /**
+     * Every layer at once.
+     *
+     * <p>Off is unconditional. <b>On only turns on the layers whose server the
+     * operator has already allowed</b>: each of these asks once, by name, before it
+     * talks to anything, and a button that quietly said yes on behalf of all of them
+     * would be a way around that rather than a convenience. The ones still waiting
+     * on an answer stay off and are counted, so nothing happens silently.
+     */
+    private void allLayers(boolean on) {
+        int blocked = 0;
+        if (radar != null && (!on || allowed(RadarOverlay.LAYER_ID)))
+            radar.setOn(on);
+        else if (radar != null && on)
+            blocked++;
+        if (wind != null && (!on || allowed(WindOverlay.LAYER_ID)))
+            wind.setOn(on);
+        else if (wind != null && on)
+            blocked++;
+        if (waves != null && (!on || allowed(WaveOverlay.LAYER_ID)))
+            waves.setOn(on);
+        else if (waves != null && on)
+            blocked++;
+        if (rain != null && (!on || allowed(RainOverlay.LAYER_ID)))
+            rain.setOn(on);
+        else if (rain != null && on)
+            blocked++;
+        if (smoke != null && (!on || allowed(SmokeOverlay.LAYER_ID)))
+            smoke.setOn(on);
+        else if (smoke != null && on)
+            blocked++;
+        if (air != null && (!on || allowed(AirQualityOverlay.LAYER_ID)))
+            air.setOn(on);
+        else if (air != null && on)
+            blocked++;
+        if (spotLayer != null && (!on || allowed(SpotOverlay.LAYER_ID)))
+            spotLayer.setOn(on);
+        else if (spotLayer != null && on)
+            blocked++;
+        if (tropical != null && (!on || allowed(TropicalOverlay.LAYER_ID)))
+            tropical.setOn(on);
+        else if (tropical != null && on)
+            blocked++;
+        if (snotel != null && (!on || allowed(SnotelOverlay.LAYER_ID)))
+            snotel.setOn(on);
+        else if (snotel != null && on)
+            blocked++;
+        if (highflow != null && (!on || allowed(HighFlowOverlay.LAYER_ID)))
+            highflow.setOn(on);
+        else if (highflow != null && on)
+            blocked++;
+        if (floodground != null && (!on || allowed(FloodedGroundOverlay.LAYER_ID)))
+            floodground.setOn(on);
+        else if (floodground != null && on)
+            blocked++;
+        if (floodzones != null && (!on || allowed(FloodZoneOverlay.LAYER_ID)))
+            floodzones.setOn(on);
+        else if (floodzones != null && on)
+            blocked++;
+        if (damareas != null && (!on || allowed(DamAreaOverlay.LAYER_ID)))
+            damareas.setOn(on);
+        else if (damareas != null && on)
+            blocked++;
+        if (satellite != null && (!on || allowed(SatelliteOverlay.LAYER_ID)))
+            satellite.setOn(on);
+        else if (satellite != null && on)
+            blocked++;
+        if (snow != null && (!on || allowed(SnowOverlay.LAYER_ID)))
+            snow.setOn(on);
+        else if (snow != null && on)
+            blocked++;
+        if (sst != null && (!on || allowed(SstOverlay.LAYER_ID)))
+            sst.setOn(on);
+        else if (sst != null && on)
+            blocked++;
+        if (beach != null && (!on || allowed(BeachOverlay.LAYER_ID)))
+            beach.setOn(on);
+        else if (beach != null && on)
+            blocked++;
+        if (flood != null && (!on || allowed(FloodOutlookOverlay.LAYER_ID)))
+            flood.setOn(on);
+        else if (flood != null && on)
+            blocked++;
+        if (firewx != null && (!on || allowed(FireWxOutlookOverlay.LAYER_ID)))
+            firewx.setOn(on);
+        else if (firewx != null && on)
+            blocked++;
+        if (sawti != null && (!on || allowed(SawtiOverlay.LAYER_ID)))
+            sawti.setOn(on);
+        else if (sawti != null && on)
+            blocked++;
+        if (erc != null && (!on || allowed(ErcOverlay.LAYER_ID)))
+            erc.setOn(on);
+        else if (erc != null && on)
+            blocked++;
+        if (lightning != null && (!on || allowed(LightningOverlay.LAYER_ID)))
+            lightning.setOn(on);
+        else if (lightning != null && on)
+            blocked++;
+        if (psps != null && (!on || allowed(PspsOverlay.LAYER_ID)))
+            psps.setOn(on);
+        else if (psps != null && on)
+            blocked++;
+        if (reports != null && (!on || allowed(StormReportsOverlay.LAYER_ID)))
+            reports.setOn(on);
+        else if (reports != null && on)
+            blocked++;
+        if (tornado != null && (!on || allowed(TornadoPathsOverlay.LAYER_ID)))
+            tornado.setOn(on);
+        else if (tornado != null && on)
+            blocked++;
+        if (debrisflow != null && (!on || allowed(DebrisFlowOverlay.LAYER_ID)))
+            debrisflow.setOn(on);
+        else if (debrisflow != null && on)
+            blocked++;
+        if (quakes != null && (!on || allowed(QuakesOverlay.LAYER_ID)))
+            quakes.setOn(on);
+        else if (quakes != null && on)
+            blocked++;
+        if (fuel != null && (!on || allowed(FuelMoistureOverlay.LAYER_ID)))
+            fuel.setOn(on);
+        else if (fuel != null && on)
+            blocked++;
+        if (raintotals != null && (!on || allowed(RainTotalsOverlay.LAYER_ID)))
+            raintotals.setOn(on);
+        else if (raintotals != null && on)
+            blocked++;
+        if (raingauges != null && (!on || allowed(RainGaugesOverlay.LAYER_ID)))
+            raingauges.setOn(on);
+        else if (raingauges != null && on)
+            blocked++;
+        if (fireZones != null && (!on || allowed(FireZoneOverlay.LAYER_ID)))
+            fireZones.setOn(on);
+        else if (fireZones != null && on)
+            blocked++;
+        if (avalanche != null && (!on || allowed(AvalancheOverlay.LAYER_ID)))
+            avalanche.setOn(on);
+        else if (avalanche != null && on)
+            blocked++;
+        if (stationLayer != null && (!on || allowed(StationOverlay.LAYER_ID)))
+            stationLayer.setOn(on);
+        else if (stationLayer != null && on)
+            blocked++;
+        if (gaugeLayer != null && (!on || allowed(GaugeOverlay.LAYER_ID)))
+            gaugeLayer.setOn(on);
+        else if (gaugeLayer != null && on)
+            blocked++;
+        if (buoyLayer != null && (!on || allowed(BuoyOverlay.LAYER_ID)))
+            buoyLayer.setOn(on);
+        else if (buoyLayer != null && on)
+            blocked++;
+        // The wind's heat map paints over the radar, here as from the switches (#6).
+        if (on && radar != null && radar.isOn() && wind != null && wind.isOn() && wind.heatOn())
+            wind.setHeatOn(false);
+        final Context ctx = MapCompat.atakContext();
+        if (blocked > 0 && ctx != null)
+            Toast.makeText(ctx, blocked + (blocked == 1 ? " layer is" : " layers are")
+                    + " still waiting to be allowed \u2014 turn those on one at a time",
+                    Toast.LENGTH_LONG).show();
+        updateLayerControls();
+    }
+
+    /** True when the operator has already allowed that layer's server, or off is asked. */
+    private boolean allowed(String layerId) {
+        return egress.isLayerEnabled(layerId);
+    }
+
+    /**
+     * When the stations draw, and when their readings do -- each as how wide the map
+     * is on screen, which is the number already on the scale bar.
+     */
+    /**
+     * The zoom gate and the label zoom, in Feature Layer's shape.
+     *
+     * <p>Two controls each: <b>Use this zoom</b>, which takes whatever is on screen
+     * right now, and a button carrying the current setting that opens the scale-bar
+     * ladder. Set it by example when you are already looking at the right view, pick
+     * a reading when you are not. Both quote ATAK's own scale bar, which is the
+     * reference already on screen.
+     */
+    /**
+     * Which stations reach the map at all. The same three the list filters by, so a
+     * map showing only Red Flag and a list showing everything cannot happen.
+     */
+    private void buildStationsShowRow() {
+        stationsShowRow.removeAllViews();
+        showTile("All", StationOverlay.SHOW_ALL, 0);
+        showTile("Flirting and Red Flag", StationOverlay.SHOW_WATCH,
+                StationOverlay.NEAR);
+        showTile("Red Flag only", StationOverlay.SHOW_RED, StationOverlay.CRITICAL);
+        showTile("\u2605 Favorites only", StationOverlay.SHOW_FAVORITES, StationPage.STAR_ON);
+        inRowsOf(stationsShowRow, 2);
+    }
+
+    /**
+     * Move a row's buttons into rows of {@code perRow}. Four across cut "Flirting and
+     * Red Flag" and "Red Flag only" to "Flirting an..." and "Red Flag o..." at half
+     * width (S22, 2026-09-27); two across leaves every label whole.
+     */
+    private void inRowsOf(LinearLayout host, int perRow) {
+        final List<View> buttons = new ArrayList<>();
+        for (int i = 0; i < host.getChildCount(); i++)
+            buttons.add(host.getChildAt(i));
+        host.removeAllViews();
+        host.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout row = null;
+        for (int i = 0; i < buttons.size(); i++) {
+            if (i % perRow == 0) {
+                row = new LinearLayout(pluginContext);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                host.addView(row, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            }
+            final View b = buttons.get(i);
+            final ViewGroup.LayoutParams old = b.getLayoutParams();
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = dp(4);
+            lp.topMargin = old instanceof ViewGroup.MarginLayoutParams
+                    ? ((ViewGroup.MarginLayoutParams) old).topMargin : dp(4);
+            row.addView(b, lp);
+        }
+    }
+
+    private void showTile(String label, final int value, int color) {
+        final boolean chosen = stationLayer.show() == value;
+        final Button b = (Button) LayoutInflater.from(pluginContext)
+                .inflate(R.layout.trend_chip, stationsShowRow, false);
+        b.setText(label);
+        b.setTextSize(12);
+        b.setTextColor(chosen
+                ? (color != 0 ? color
+                        : pluginContext.getResources().getColor(R.color.state_on))
+                : Color.WHITE);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                stationLayer.setShow(value);
+                updateLayerControls();
+            }
+        });
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        lp.rightMargin = dp(4);
+        b.setLayoutParams(lp);
+        stationsShowRow.addView(b);
+    }
+
+    private void buildStationsGateRows() {
+        gateRow(stationsGateRow, stationsGateText, "Stations",
+                stationLayer.stationGate(), new Gate() {
+                    @Override
+                    public void set(double gsd) {
+                        stationLayer.setStationGate(gsd);
+                    }
+                });
+        gateRow(stationsLabelGateRow, stationsLabelGateText, "Readings",
+                stationLayer.labelGate(), new Gate() {
+                    @Override
+                    public void set(double gsd) {
+                        stationLayer.setLabelGate(gsd);
+                    }
+                });
+        if (stationLayer.isUtilityOn())
+            gateRow(stationsUtilityGateRow, stationsUtilityGateText, "Utility stations",
+                    stationLayer.utilityGate(), new Gate() {
+                        @Override
+                        public void set(double gsd) {
+                            stationLayer.setUtilityGate(gsd);
+                        }
+                    });
+    }
+
+    private interface Gate {
+        void set(double metersPerPixel);
+    }
+
+    /** Which layer's scale-bar arithmetic a gate row quotes; they are all the same. */
+    private void buildGaugesGateRows() {
+        gateRow(gaugesGateRow, gaugesGateText, "Gauges", gaugeLayer.gate(), new Gate() {
+            @Override
+            public void set(double gsd) {
+                gaugeLayer.setGate(gsd);
+            }
+        });
+        gateRow(gaugesLabelGateRow, gaugesLabelGateText, "Readings",
+                gaugeLayer.labelGate(), new Gate() {
+                    @Override
+                    public void set(double gsd) {
+                        gaugeLayer.setLabelGate(gsd);
+                    }
+                });
+    }
+
+    private void buildFireZonesGateRows() {
+        gateRow(firezonesGateRow, firezonesGateText, "Zones", fireZones.gate(), new Gate() {
+            @Override
+            public void set(double gsd) {
+                fireZones.setGate(gsd);
+            }
+        });
+        // The layer has a limit of its own past any gate; say so here, where the
+        // gate would otherwise read as drawing.
+        if (fireZones.tooWide())
+            firezonesGateText.setText(firezonesGateText.getText()
+                    + "  \u2014 hidden, the view is too wide; zones draw at "
+                    + fireZones.widestBar() + " or closer");
+        gateRow(firezonesLabelGateRow, firezonesLabelGateText, "Zone numbers",
+                fireZones.labelGate(), new Gate() {
+                    @Override
+                    public void set(double gsd) {
+                        fireZones.setLabelGate(gsd);
+                    }
+                });
+    }
+
+    private void buildFloodZonesGateRow() {
+        gateRow(floodzonesGateRow, floodzonesGateText, "Flood zones", floodzones.gate(),
+                new Gate() {
+                    @Override
+                    public void set(double gsd) {
+                        floodzones.setGate(gsd);
+                    }
+                });
+        if (floodzones.tooWide())
+            floodzonesGateText.setText(floodzonesGateText.getText()
+                    + "  \u2014 hidden, the view is too wide; zones draw at "
+                    + floodzones.widestBar() + " or closer");
+    }
+
+    private void buildDamAreasGateRow() {
+        gateRow(damareasGateRow, damareasGateText, "Dam failure areas", damareas.gate(),
+                new Gate() {
+                    @Override
+                    public void set(double gsd) {
+                        damareas.setGate(gsd);
+                    }
+                });
+        if (damareas.tooWide())
+            damareasGateText.setText(damareasGateText.getText()
+                    + "  \u2014 hidden, the view is too wide; areas draw at "
+                    + damareas.widestBar() + " or closer");
+    }
+
+    /** Feature Layer's ladder, as scale-bar readings in the operator's big unit. */
+    private static final double[] GATE_BIG = { 0.25, 1, 5, 15, 50 };
+
+    private void gateRow(LinearLayout row, final TextView readout, final String what,
+            final double current, final Gate gate) {
+        row.removeAllViews();
+        row.addView(choiceTile("Use this zoom", false, new Runnable() {
+            @Override
+            public void run() {
+                gate.set(stationLayer.resolution());
+                updateLayerControls();
+            }
+        }));
+        row.addView(choiceTile(gateSetting(current), true, new Runnable() {
+            @Override
+            public void run() {
+                pickGate(what, gate);
+            }
+        }));
+        readout.setText(gateText(current, what));
+    }
+
+    /** The ladder, as scale-bar readings, plus Always. */
+    private void pickGate(final String what, final Gate gate) {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        final String[] labels = new String[GATE_BIG.length + 1];
+        for (int i = 0; i < GATE_BIG.length; i++)
+            labels[i] = gateName(i);
+        labels[GATE_BIG.length] = "Always";
+        new AlertDialog.Builder(ctx)
+                .setTitle(what + " drawn when the scale bar reads")
+                .setItems(labels, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        gate.set(which == GATE_BIG.length ? StationOverlay.ALWAYS_GATE
+                                : stationLayer.gsdForBig(GATE_BIG[which]));
+                        updateLayerControls();
+                    }
+                })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private static String gateName(int i) {
+        final double n = GATE_BIG[i];
+        final String num = n == Math.floor(n) ? String.format(Locale.US, "%.0f", n)
+                : String.format(Locale.US, "%.2f", n);
+        return num + " " + ScaleBar.bigLabel() + " or closer";
+    }
+
+    /** What the button itself carries: the current setting, short. */
+    private String gateSetting(double gate) {
+        if (StationOverlay.isAlways(gate))
+            return "Always";
+        return ScaleBar.describe(gate * stationLayer.barPixels()) + " or closer";
+    }
+
+    private String gateText(double gate, String what) {
+        final String bar = ScaleBar.text(mapView());
+        if (StationOverlay.isAlways(gate))
+            return what + " always drawn  \u00b7  scale bar now " + bar;
+        return what + " drawn at " + ScaleBar.describe(gate * stationLayer.barPixels())
+                + " or closer  \u00b7  scale bar now " + bar
+                + (stationLayer.drawingNow(gate) ? "" : "  \u2014 hidden");
+    }
+
+    private static MapView mapView() {
+        return MapView.getMapView();
+    }
+
+    /** One tile of a row of choices: the chosen one green, the Traffic convention. */
+    private View choiceTile(String label, boolean chosen, final Runnable onPick) {
+        final Button b = (Button) LayoutInflater.from(pluginContext)
+                .inflate(R.layout.trend_chip, stationsDistanceRow, false);
+        b.setText(label);
+        b.setTextSize(13);
+        // Green text on a plain face for the chosen one, never a colored button.
+        b.setTextColor(chosen
+                ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                onPick.run();
+            }
+        });
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        lp.rightMargin = dp(4);
+        b.setLayoutParams(lp);
+        return b;
+    }
+
+    /**
+     * How to read a station: the barb's own feathers at real speeds, then what the
+     * three colors mean.
+     *
+     * <p>The examples are composed by the same code that draws the map, so the guide
+     * cannot drift from what is on it. A legend redrawn by hand is a legend that is
+     * eventually wrong.
+     */
+    private void buildStationsGuide() {
+        if (stationsGuide.getChildCount() > 0 || stationLayer == null)
+            return;
+        stationsGuide.addView(guideNote(
+                "The staff points at where the wind is coming from. Short feather 5, "
+                        + "long feather 10, triangle 50 \u2014 added up."));
+        stationsGuide.addView(guideRow(example(StationOverlay.NORMAL),
+                "Calm", "no staff at all"));
+        // The whole ladder, not a handful of examples: this is the chart a crew would
+        // otherwise go and look up, and it is generated from the same arithmetic the
+        // map draws with, so it cannot disagree with what is on screen.
+        for (int kt = 5; kt <= 100; kt += 5)
+            stationsGuide.addView(guideRow(barbExample(kt),
+                    stationLayer.exampleSpeed(kt), feathers(kt)));
+        stationsGuide.addView(guideNote(
+                "Feathers are counted in knots, the way every station plot does it. "
+                        + "The numbers beside a station are in your own unit."));
+
+        stationsGuide.addView(guideHeading("What the color means"));
+        stationsGuide.addView(guideRow(example(StationOverlay.NORMAL),
+                "Below criteria", "neither humidity nor wind is there"));
+        stationsGuide.addView(guideRow(example(StationOverlay.NEAR),
+                "Flirting", "one of the two criteria is met"));
+        stationsGuide.addView(guideRow(example(StationOverlay.CRITICAL),
+                "Red Flag", "both are met at once"));
+
+        // The source lives here rather than on the list page: there it was three
+        // lines of credit above the fold, and in landscape that is most of the rows
+        // the operator can see (2026-09-25).
+        stationsGuide.addView(guideHeading("Where this comes from"));
+        stationsGuide.addView(guideNote(pluginContext.getString(R.string.credit_stations)));
+    }
+
+    private Example example(final int stateColor) {
+        return new Example() {
+            @Override
+            public String compose() {
+                return stationLayer == null ? null
+                        : stationLayer.exampleSymbol(stateColor);
+            }
+        };
+    }
+
+    private Example barbExample(final int knots) {
+        return new Example() {
+            @Override
+            public String compose() {
+                return stationLayer == null ? null : stationLayer.exampleBarb(knots);
+            }
+        };
+    }
+
+    /** "1 triangle, 1 long, 1 short" -- what is actually drawn at that speed. */
+    private static String feathers(int knots) {
+        final com.atakmap.android.atmosphere.data.WindBarb.Feathers f =
+                com.atakmap.android.atmosphere.data.WindBarb.of(knots);
+        final StringBuilder b = new StringBuilder();
+        append(b, f.flags, "triangle", "triangles");
+        append(b, f.fulls, "long", "long");
+        append(b, f.halves, "short", "short");
+        return b.toString();
+    }
+
+    private static void append(StringBuilder b, int n, String one, String many) {
+        if (n <= 0)
+            return;
+        if (b.length() > 0)
+            b.append(", ");
+        b.append(n).append(' ').append(n == 1 ? one : many);
+    }
+
+    /**
+     * Compose the legend's artwork off the main thread and fill it in as it lands.
+     *
+     * <p>Twenty-one barbs is twenty-one PNG encodes, twenty-one file writes and
+     * twenty-one full-bitmap scans to trim them. Done where the row is built -- which
+     * is the thread that draws the map -- that is seconds of nothing happening, and
+     * the same mistake as the spot layer's inserts and the storm layer's icons
+     * earlier today. The rows go up immediately with their text; the pictures arrive.
+     */
+    private final java.util.concurrent.ExecutorService guideWorker =
+            java.util.concurrent.Executors.newSingleThreadExecutor();
+
+    private void art(final ImageView into, final Example example) {
+        guideWorker.execute(new Runnable() {
+            @Override
+            public void run() {
+                final String uri = example.compose();
+                if (uri == null)
+                    return;
+                final android.graphics.Bitmap raw = android.graphics.BitmapFactory
+                        .decodeFile(uri.replace("file://", ""));
+                if (raw == null)
+                    return;
+                final android.graphics.Bitmap shown = trimmed(raw);
+                // The file has no density of its own; without this Android rescales
+                // it by the screen's, and the legend stops matching the map.
+                shown.setDensity(android.graphics.Bitmap.DENSITY_NONE);
+                // The view itself is the handler: no MapView reference is held here,
+                // and a row that has gone away simply never gets its picture.
+                into.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        into.setImageBitmap(shown);
+                    }
+                });
+            }
+        });
+    }
+
+    /** Something the legend needs drawn, composed only when the worker gets to it. */
+    private interface Example {
+        String compose();
+    }
+
+    /** One guide row: the real symbol on the left, what it means on the right. */
+    private View guideRow(final Example example, String title, String detail) {
+        final LinearLayout row = new LinearLayout(pluginContext);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(2), 0, dp(2));
+        final ImageView art = new ImageView(pluginContext);
+        art.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        // Drawn at the size the map draws it, pixel for pixel. Squeezed into a fixed
+        // box it was a smudge, which is no use in a guide whose whole job is to let
+        // you count feathers (operator, 2026-09-25).
+        art.setScaleType(ImageView.ScaleType.CENTER);
+        art.setMinimumWidth(dp(56));
+        art.setMinimumHeight(dp(26));
+        art(art, example);
+        row.addView(art);
+        final TextView t = new TextView(pluginContext);
+        t.setTextColor(Color.WHITE);
+        t.setTextSize(13);
+        t.setPadding(dp(8), 0, 0, 0);
+        t.setText(detail == null || detail.isEmpty() ? title : title + " \u2014 " + detail);
+        row.addView(t);
+        return row;
+    }
+
+    /** A small caps heading inside the guide, the pane's own convention. */
+    private View guideHeading(String text) {
+        final TextView t = new TextView(pluginContext);
+        t.setTextColor(0xFF00E5FF);
+        t.setTextSize(12f);
+        t.setAllCaps(true);
+        t.setTypeface(Typeface.DEFAULT_BOLD);
+        t.setPadding(0, dp(10), 0, dp(2));
+        t.setText(text);
+        return t;
+    }
+
+    /**
+     * The same bitmap with its empty margin cut off.
+     *
+     * <p>A station icon is composed on a canvas big enough for a barb pointing any
+     * direction and symmetric about the disc, so that the disc lands on the station.
+     * On the map that is invisible. In a list it is most of the row: the examples all
+     * point west, so the entire east half is blank and the rows sat a long way apart
+     * (operator, 2026-09-25: "why so much buffer between the lines"). The pixels are
+     * not resized, only the empty ones dropped, so the legend still matches the map.
+     */
+    private static android.graphics.Bitmap trimmed(android.graphics.Bitmap src) {
+        final int w = src.getWidth(), h = src.getHeight();
+        final int[] row = new int[w];
+        int top = -1, bottom = -1, left = w, right = -1;
+        for (int y = 0; y < h; y++) {
+            src.getPixels(row, 0, w, 0, y, w, 1);
+            for (int x = 0; x < w; x++) {
+                if ((row[x] >>> 24) == 0)
+                    continue;
+                if (top < 0)
+                    top = y;
+                bottom = y;
+                if (x < left)
+                    left = x;
+                if (x > right)
+                    right = x;
+            }
+        }
+        if (top < 0 || right < left)
+            return src;                 // nothing drawn; hand it back untouched
+        final int pad = 2;
+        left = Math.max(0, left - pad);
+        top = Math.max(0, top - pad);
+        right = Math.min(w - 1, right + pad);
+        bottom = Math.min(h - 1, bottom + pad);
+        return android.graphics.Bitmap.createBitmap(src, left, top,
+                right - left + 1, bottom - top + 1);
+    }
+
+    private View guideNote(String text) {
+        final TextView t = new TextView(pluginContext);
+        t.setTextColor(Color.WHITE);
+        t.setTextSize(12);
+        t.setAlpha(0.75f);
+        t.setPadding(0, dp(4), 0, dp(2));
+        t.setText(text);
+        return t;
+    }
+
+    /** What the symbol's color means, from the map's own palette. */
+    private void buildStationsLegend() {
+        if (stationsLegend.getChildCount() > 0)
+            return;
+        // The Fire Weather Snooper's own legend, word for word.
+        stationsLegend.addView(legendLine("Hitting Red Flag criteria",
+                StationOverlay.CRITICAL));
+        stationsLegend.addView(legendLine("Flirting with Red Flag criteria",
+                StationOverlay.NEAR));
+        stationsLegend.addView(legendLine("Below criteria", StationOverlay.NORMAL));
+    }
+
+    private void askToAllowSpotLayer() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.spot_layer_allow_title))
+                .setMessage(pluginContext.getString(R.string.spot_layer_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(SpotOverlay.LAYER_ID, true);
+                                turnSpotLayerOn();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    /**
+     * NWS's own legend, drawn from the same art the map is using so the two can
+     * never disagree: a letter for what the request is, a color for how far along.
+     */
+    private void buildSpotLegend() {
+        if (spotLegend.getChildCount() > 0)
+            return;
+        // The discs themselves, as the map draws them (operator, 2026-09-29: "bring
+        // the icon for the type not just W Wildfire but the actual icon"), in two
+        // columns: the kinds on the left in the color of a forecast issued, what the
+        // three colors mean on the right ("two columns with the types on left and
+        // the status on right").
+        final LinearLayout cols = new LinearLayout(pluginContext);
+        cols.setOrientation(LinearLayout.HORIZONTAL);
+        cols.setBaselineAligned(false);
+        final LinearLayout kinds = new LinearLayout(pluginContext);
+        kinds.setOrientation(LinearLayout.VERTICAL);
+        final LinearLayout states = new LinearLayout(pluginContext);
+        states.setOrientation(LinearLayout.VERTICAL);
+        for (String[] k : SpotOverlay.KINDS)
+            kinds.addView(iconLine(SpotOverlay.keyIcon(k[0].charAt(0), SpotOverlay.DONE),
+                    k[1]));
+        states.addView(iconLine(SpotOverlay.keyIcon('W', SpotOverlay.DONE),
+                "Forecast issued"));
+        states.addView(iconLine(SpotOverlay.keyIcon('W', SpotOverlay.WAITING),
+                "Update requested"));
+        states.addView(iconLine(SpotOverlay.keyIcon('W', SpotOverlay.PENDING),
+                "Waiting for the forecast"));
+        cols.addView(kinds, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        cols.addView(states, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        spotLegend.addView(cols);
+    }
+
+    /** One legend row led by an icon, at the size a key row reads at. */
+    private View iconLine(android.graphics.Bitmap icon, String text) {
+        final LinearLayout row = new LinearLayout(pluginContext);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(3), 0, dp(3));
+        final ImageView iv = new ImageView(pluginContext);
+        if (icon != null)
+            iv.setImageBitmap(icon);
+        final LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(dp(20), dp(20));
+        ip.rightMargin = dp(8);
+        row.addView(iv, ip);
+        final TextView t = new TextView(pluginContext);
+        t.setText(text);
+        t.setTextSize(12);
+        t.setTextColor(Color.WHITE);
+        row.addView(t);
+        return row;
+    }
+
+    /** One legend row: a swatch in the status color, or none for the letter key. */
+    private View legendLine(String text, int color) {
+        final LinearLayout row = new LinearLayout(pluginContext);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(0, dp(3), 0, dp(3));
+        if (color != 0) {
+            final View swatch = new View(pluginContext);
+            swatch.setBackgroundColor(color);
+            final LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(dp(14), dp(14));
+            sp.rightMargin = dp(8);
+            sp.topMargin = dp(2);
+            row.addView(swatch, sp);
+        }
+        final TextView t = new TextView(pluginContext);
+        t.setText(text);
+        t.setTextSize(12);
+        t.setTextColor(Color.WHITE);
+        row.addView(t);
+        return row;
+    }
+
+    /**
+     * A spot request tapped on the map: bring its page forward and open the forecast.
+     * The details receiver routes here rather than showing the request's own fields,
+     * which the row already carries (operator, 2026-09-25: "when i click on it from
+     * the map it should bring up the forecast").
+     */
+    /**
+     * Jump to the page that lists what a layer is drawing.
+     *
+     * <p>A layer's settings and its list are two ends of the same thing, and the only
+     * way between them was to know which page it was on and swipe there (operator,
+     * 2026-09-25: "can we have a hot link from the layer to the list").
+     */
+    private void openPage(View page) {
+        if (page == null)
+            return;
+        for (int i = 0; i < pages.length; i++)
+            if (pages[i] == page) {
+                pager.setCurrentItem(i, true);
+                return;
+            }
+    }
+
+    public void openSpot(final String spotId) {
+        if (spotId == null || spotId.isEmpty())
+            return;
+        for (int i = 0; i < pages.length; i++)
+            if (pages[i] == spotPage.view()) {
+                pager.setCurrentItem(i, false);
+                break;
+            }
+        if (host != null)
+            host.show();
+        spotPage.showById(spotId);
+    }
+
+    /** A fire weather zone tapped on the map: its planning forecast. */
+    public void openZone(String id, String name, String cwa) {
+        if (id == null || id.isEmpty())
+            return;
+        for (int i = 0; i < pages.length; i++)
+            if (pages[i] == zonePage.view()) {
+                pager.setCurrentItem(i, false);
+                break;
+            }
+        if (host != null)
+            host.show();
+        zonePage.showZone(id, name, cwa);
+    }
+
+    /** A Predictive Service Area tapped on the map ("SC08"): its fire danger and its GACC's chart. */
+    public void openErc(String code) {
+        if (erc == null || code == null)
+            return;
+        showErc(erc.find(code));
+    }
+
+    /** The Fire Danger page on one area, the pane opened wide so the chart is large. */
+    public void showErc(com.atakmap.android.atmosphere.data.Erc.Psa psa) {
+        if (psa == null)
+            return;
+        for (int i = 0; i < pages.length; i++)
+            if (pages[i] == ercPage.view()) {
+                pager.setCurrentItem(i, false);
+                break;
+            }
+        if (host != null)
+            host.showWide();
+        ercPage.show(psa, false);
+    }
+
+    /** A SAWTI zone tapped on the map ("3|2026-09-30"): the SAWTI page on that zone and day. */
+    public void openSawti(String ref) {
+        if (ref == null)
+            return;
+        final int bar = ref.indexOf('|');
+        final int zone;
+        try {
+            zone = Integer.parseInt(bar < 0 ? ref : ref.substring(0, bar));
+        } catch (NumberFormatException e) {
+            return;
+        }
+        for (int i = 0; i < pages.length; i++)
+            if (pages[i] == sawtiPage.view()) {
+                pager.setCurrentItem(i, false);
+                break;
+            }
+        if (host != null)
+            host.show();
+        sawtiPage.show(zone, bar < 0 ? null : ref.substring(bar + 1));
+    }
+
+    /** A gauge tapped on the map: its page, its record, its hydrograph. */
+    public void openGauge(final String lid) {
+        if (lid == null || lid.isEmpty() || gaugePage == null)
+            return;
+        for (int i = 0; i < pages.length; i++)
+            if (pages[i] == gaugePage.view()) {
+                pager.setCurrentItem(i, false);
+                break;
+            }
+        if (host != null)
+            host.show();
+        gaugePage.showById(lid);
+    }
+
+    /** The egress gate: the host, by name, once. */
+    private void askToAllowRadar() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.radar_allow_title))
+                .setMessage(pluginContext.getString(R.string.radar_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(RadarOverlay.LAYER_ID, true);
+                                turnRadarOn();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    /**
+     * Radar and Wind run together; Smoke, Waves and Rain stay one at a time with
+     * every time layer (takwerx/atmosphere#6: "When I turn on either the Radar or the
+     * Wind overlays, the other one will turn off"). Wind's speed heat map paints over
+     * the radar, so the two never share the map: Radar coming on takes the heat map
+     * off, and the heat map coming on takes Radar off. The one time strip follows the
+     * layer switched on last ({@link #stripLayer}).
+     */
+    private void turnRadarOn() {
+        if (smoke != null && smoke.isOn())
+            smoke.setOn(false);
+        if (waves != null && waves.isOn())
+            waves.setOn(false);
+        if (rain != null && rain.isOn())
+            rain.setOn(false);
+        if (wind != null && wind.isOn() && wind.heatOn())
+            wind.setHeatOn(false);
+        if (radar != null) {
+            radar.setOn(true);
+            stripOwner = TimeLayer.RADAR;
+        }
+        updateLayerControls();
+    }
+
+    /** See {@link #turnRadarOn}: Wind runs with Radar, its heat map does not. */
+    private void turnWindOn() {
+        if (smoke != null && smoke.isOn())
+            smoke.setOn(false);
+        if (waves != null && waves.isOn())
+            waves.setOn(false);
+        if (rain != null && rain.isOn())
+            rain.setOn(false);
+        if (wind != null) {
+            if (radar != null && radar.isOn() && wind.heatOn())
+                wind.setHeatOn(false);
+            wind.setOn(true);
+            stripOwner = TimeLayer.WIND;
+        }
+        updateLayerControls();
+    }
+
+    /** One at a time with every time layer, Radar and Wind included (see {@link #turnRadarOn}). */
+    private void turnSmokeOn() {
+        if (radar != null && radar.isOn())
+            radar.setOn(false);
+        if (wind != null && wind.isOn())
+            wind.setOn(false);
+        if (waves != null && waves.isOn())
+            waves.setOn(false);
+        if (rain != null && rain.isOn())
+            rain.setOn(false);
+        if (smoke != null) {
+            smoke.setOn(true);
+            stripOwner = TimeLayer.SMOKE;
+        }
+        updateLayerControls();
+    }
+
+    /** One at a time with every time layer, Radar and Wind included (see {@link #turnRadarOn}). */
+    private void turnWavesOn() {
+        if (radar != null && radar.isOn())
+            radar.setOn(false);
+        if (wind != null && wind.isOn())
+            wind.setOn(false);
+        if (smoke != null && smoke.isOn())
+            smoke.setOn(false);
+        if (rain != null && rain.isOn())
+            rain.setOn(false);
+        if (waves != null) {
+            waves.setOn(true);
+            stripOwner = TimeLayer.WAVES;
+        }
+        updateLayerControls();
+    }
+
+    /** One at a time with every time layer, Radar and Wind included (see {@link #turnRadarOn}). */
+    private void turnRainOn() {
+        if (radar != null && radar.isOn())
+            radar.setOn(false);
+        if (wind != null && wind.isOn())
+            wind.setOn(false);
+        if (smoke != null && smoke.isOn())
+            smoke.setOn(false);
+        if (waves != null && waves.isOn())
+            waves.setOn(false);
+        if (rain != null) {
+            rain.setOn(true);
+            stripOwner = TimeLayer.RAIN;
+        }
+        updateLayerControls();
+    }
+
+    private void askToAllowSnotel() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.snotel_allow_title))
+                .setMessage(pluginContext.getString(R.string.snotel_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(SnotelOverlay.LAYER_ID, true);
+                                if (snotel != null)
+                                    snotel.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowHighFlow() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.highflow_allow_title))
+                .setMessage(pluginContext.getString(R.string.highflow_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(HighFlowOverlay.LAYER_ID, true);
+                                if (highflow != null)
+                                    highflow.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowFloodedGround() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.floodground_allow_title))
+                .setMessage(pluginContext.getString(R.string.floodground_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(FloodedGroundOverlay.LAYER_ID, true);
+                                if (floodground != null)
+                                    floodground.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowFloodZones() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.floodzones_allow_title))
+                .setMessage(pluginContext.getString(R.string.floodzones_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(FloodZoneOverlay.LAYER_ID, true);
+                                if (floodzones != null)
+                                    floodzones.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowDamAreas() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.damareas_allow_title))
+                .setMessage(pluginContext.getString(R.string.damareas_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(DamAreaOverlay.LAYER_ID, true);
+                                if (damareas != null)
+                                    damareas.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowSatellite() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.satellite_allow_title))
+                .setMessage(pluginContext.getString(R.string.satellite_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(SatelliteOverlay.LAYER_ID, true);
+                                if (satellite != null)
+                                    satellite.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowSnow() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.snow_allow_title))
+                .setMessage(pluginContext.getString(R.string.snow_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(SnowOverlay.LAYER_ID, true);
+                                if (snow != null)
+                                    snow.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowSst() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.sst_allow_title))
+                .setMessage(pluginContext.getString(R.string.sst_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(SstOverlay.LAYER_ID, true);
+                                if (sst != null)
+                                    sst.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowBeach() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.beach_allow_title))
+                .setMessage(pluginContext.getString(R.string.beach_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(BeachOverlay.LAYER_ID, true);
+                                if (beach != null)
+                                    beach.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowFlood() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.flood_allow_title))
+                .setMessage(pluginContext.getString(R.string.flood_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(FloodOutlookOverlay.LAYER_ID, true);
+                                if (flood != null)
+                                    flood.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowFireWx() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.firewx_allow_title))
+                .setMessage(pluginContext.getString(R.string.firewx_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(FireWxOutlookOverlay.LAYER_ID, true);
+                                if (firewx != null)
+                                    firewx.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowErc() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.erc_allow_title))
+                .setMessage(pluginContext.getString(R.string.erc_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(ErcOverlay.LAYER_ID, true);
+                                if (erc != null)
+                                    erc.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowSawti() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.sawti_allow_title))
+                .setMessage(pluginContext.getString(R.string.sawti_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(SawtiOverlay.LAYER_ID, true);
+                                if (sawti != null)
+                                    sawti.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowPsps() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.psps_allow_title))
+                .setMessage(pluginContext.getString(R.string.psps_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(PspsOverlay.LAYER_ID, true);
+                                if (psps != null)
+                                    psps.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowReports() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.reports_allow_title))
+                .setMessage(pluginContext.getString(R.string.reports_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(StormReportsOverlay.LAYER_ID, true);
+                                if (reports != null)
+                                    reports.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowTornado() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.tornado_allow_title))
+                .setMessage(pluginContext.getString(R.string.tornado_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(TornadoPathsOverlay.LAYER_ID, true);
+                                if (tornado != null)
+                                    tornado.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowDebrisflow() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.debrisflow_allow_title))
+                .setMessage(pluginContext.getString(R.string.debrisflow_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(DebrisFlowOverlay.LAYER_ID, true);
+                                if (debrisflow != null)
+                                    debrisflow.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowQuakes() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.quakes_allow_title))
+                .setMessage(pluginContext.getString(R.string.quakes_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(QuakesOverlay.LAYER_ID, true);
+                                if (quakes != null)
+                                    quakes.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowFuel() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.fuel_allow_title))
+                .setMessage(pluginContext.getString(R.string.fuel_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(FuelMoistureOverlay.LAYER_ID, true);
+                                if (fuel != null)
+                                    fuel.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowRaingauges() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.raingauges_allow_title))
+                .setMessage(pluginContext.getString(R.string.raingauges_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(RainGaugesOverlay.LAYER_ID, true);
+                                if (raingauges != null)
+                                    raingauges.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowRaintotals() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.raintotals_allow_title))
+                .setMessage(pluginContext.getString(R.string.raintotals_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(RainTotalsOverlay.LAYER_ID, true);
+                                if (raintotals != null)
+                                    raintotals.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowLightning() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.lightning_allow_title))
+                .setMessage(pluginContext.getString(R.string.lightning_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(LightningOverlay.LAYER_ID, true);
+                                if (lightning != null)
+                                    lightning.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowFireZones() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.firezones_allow_title))
+                .setMessage(pluginContext.getString(R.string.firezones_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(FireZoneOverlay.LAYER_ID, true);
+                                if (fireZones != null)
+                                    fireZones.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowAvalanche() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.avalanche_allow_title))
+                .setMessage(pluginContext.getString(R.string.avalanche_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(AvalancheOverlay.LAYER_ID, true);
+                                if (avalanche != null)
+                                    avalanche.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowAir() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.air_allow_title))
+                .setMessage(pluginContext.getString(R.string.air_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(AirQualityOverlay.LAYER_ID, true);
+                                if (air != null)
+                                    air.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowWaves() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.waves_allow_title))
+                .setMessage(pluginContext.getString(R.string.waves_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(WaveOverlay.LAYER_ID, true);
+                                turnWavesOn();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowRain() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.rain_allow_title))
+                .setMessage(pluginContext.getString(R.string.rain_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(RainOverlay.LAYER_ID, true);
+                                turnRainOn();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowSmoke() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.smoke_allow_title))
+                .setMessage(pluginContext.getString(R.string.smoke_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(SmokeOverlay.LAYER_ID, true);
+                                turnSmokeOn();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowWind() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.wind_allow_title))
+                .setMessage(pluginContext.getString(R.string.wind_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(WindOverlay.LAYER_ID, true);
+                                turnWindOn();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    /**
+     * The Layers page's groups fold: a tap on a group heading hides or shows every
+     * block under it, remembered per group (operator, 2026-10-12: "it's getting to
+     * be a very long side pane window"). The page is flat, a heading then its
+     * blocks, so the members of a group are the siblings up to the next heading.
+     */
+    private static final int[] GROUP_NAMES = { R.string.group_points, R.string.group_wind, R.string.group_storms,
+            R.string.group_fire, R.string.group_rain, R.string.group_ocean, R.string.group_snow,
+            R.string.group_ground };
+    /** Each group's icon, the one its first layer wears, so the heading reads like its rows. */
+    private static final int[] GROUP_ICONS = { R.drawable.ic_layer_spot, R.drawable.ic_layer_wind,
+            R.drawable.ic_layer_reports, R.drawable.ic_layer_firewx, R.drawable.ic_layer_rain,
+            R.drawable.ic_layer_waves, R.drawable.ic_layer_snow, R.drawable.ic_layer_quakes };
+    private final java.util.Map<Integer, TextView> groupHeads = new java.util.LinkedHashMap<>();
+    private final java.util.Map<Integer, java.util.List<View>> groupMembers = new java.util.LinkedHashMap<>();
+
+    private static TextView findHeading(View v, String text) {
+        if (v instanceof TextView && text.contentEquals(((TextView) v).getText()))
+            return (TextView) v;
+        if (v instanceof android.view.ViewGroup) {
+            final android.view.ViewGroup g = (android.view.ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) {
+                final TextView t = findHeading(g.getChildAt(i), text);
+                if (t != null)
+                    return t;
+            }
+        }
+        return null;
+    }
+
+    private void wireGroupFolds(View layersPage) {
+        final TextView first = findHeading(layersPage, pluginContext.getString(GROUP_NAMES[0]));
+        if (first == null || !(first.getParent() instanceof android.view.ViewGroup))
+            return;
+        final android.view.ViewGroup parent = (android.view.ViewGroup) first.getParent();
+        final java.util.Map<String, Integer> byText = new java.util.HashMap<>();
+        for (int id : GROUP_NAMES)
+            byText.put(pluginContext.getString(id), id);
+        Integer current = null;
+        for (int i = 0; i < parent.getChildCount(); i++) {
+            final View child = parent.getChildAt(i);
+            final Integer key = child instanceof TextView
+                    ? byText.get(((TextView) child).getText().toString()) : null;
+            if (key != null) {
+                current = key;
+                groupHeads.put(key, (TextView) child);
+                groupMembers.put(key, new java.util.ArrayList<View>());
+                for (int g = 0; g < GROUP_NAMES.length; g++)
+                    if (GROUP_NAMES[g] == key) {
+                        final android.graphics.drawable.Drawable icon =
+                                pluginContext.getResources().getDrawable(GROUP_ICONS[g]);
+                        if (icon != null) {
+                            icon.setBounds(0, 0, dp(26), dp(26));
+                            ((TextView) child).setCompoundDrawables(icon, null, null, null);
+                            ((TextView) child).setCompoundDrawablePadding(dp(10));
+                            ((TextView) child).setGravity(android.view.Gravity.CENTER_VERTICAL);
+                        }
+                    }
+                final int k = key;
+                child.setClickable(true);
+                child.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        final SharedPreferences p = MapCompat.prefs();
+                        final boolean open = p == null || p.getBoolean(groupPref(k), true);
+                        if (p != null)
+                            p.edit().putBoolean(groupPref(k), !open).apply();
+                        // Put back what the fold hid, then let the switch code decide
+                        // each settings block afresh.
+                        applyGroupFolds();
+                        updateLayerControls();
+                    }
+                });
+            } else if (current != null)
+                groupMembers.get(current).add(child);
+        }
+        applyGroupFolds();
+    }
+
+    private String groupPref(int nameId) {
+        return "weather.group." + pluginContext.getResources().getResourceEntryName(nameId) + ".open";
+    }
+
+    /** Layer switches under a view that read ON: every layer toggle says "<Name> ON" or "OFF". */
+    /**
+     * How many layers under a view are on: main layer switches only, never a setting
+     * inside a layer's block (operator, 2026-10-15: "the number of layers on should
+     * just track the main layer not sub settings etc."). Counting every button that
+     * read " ON" made a group say "2 ON" with every layer off, from a hidden "Readings
+     * and names ON" and "Utility Stations ON" (signed 0.16, S22).
+     */
+    private int countOn(View v) {
+        if (v instanceof Button) {
+            final CharSequence t = ((Button) v).getText();
+            return isLayerSwitch(v) && t != null && t.toString().endsWith(" ON") ? 1 : 0;
+        }
+        int n = 0;
+        if (v instanceof android.view.ViewGroup) {
+            final android.view.ViewGroup g = (android.view.ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++)
+                n += countOn(g.getChildAt(i));
+        }
+        return n;
+    }
+
+    /** The switches named "_toggle" that are a setting inside a layer, not a layer. */
+    private static final java.util.Set<String> SETTING_TOGGLES = new java.util.HashSet<>(
+            java.util.Arrays.asList("stations_guide_toggle", "wind_heat_toggle"));
+
+    /** A layer's own switch: "<layer>_toggle" on the Layers page, so a new layer counts. */
+    private boolean isLayerSwitch(View v) {
+        if (v.getId() == View.NO_ID)
+            return false;
+        try {
+            final String name = pluginContext.getResources().getResourceEntryName(v.getId());
+            return name.endsWith("_toggle") && !SETTING_TOGGLES.contains(name);
+        } catch (android.content.res.Resources.NotFoundException e) {
+            return false;
+        }
+    }
+
+    /**
+     * A heading reads bigger than a section heading, folds its group, and turns
+     * green with a count when any layer under it is on, so the state of a folded
+     * group is known at a glance (operator, 2026-10-12: "you sort of know right off
+     * the bat if something is on").
+     */
+    /** What a fold hid and how it stood, so opening puts back exactly that and no more. */
+    private final java.util.Map<View, Integer> hiddenByFold = new java.util.HashMap<>();
+
+    private void applyGroupFolds() {
+        final SharedPreferences p = MapCompat.prefs();
+        for (java.util.Map.Entry<Integer, TextView> e : groupHeads.entrySet()) {
+            final boolean open = p == null || p.getBoolean(groupPref(e.getKey()), true);
+            int on = 0;
+            // A layer's settings block is a sibling of its switch row, and the switch
+            // code decides whether it shows: a fold only hides, and an open only puts
+            // back what the fold hid (2026-10-12: every settings block showed with its
+            // layer off, because the open forced every member visible).
+            for (View v : groupMembers.get(e.getKey())) {
+                if (open) {
+                    final Integer was = hiddenByFold.remove(v);
+                    if (was != null)
+                        v.setVisibility(was);
+                } else if (!hiddenByFold.containsKey(v)) {
+                    hiddenByFold.put(v, v.getVisibility());
+                    v.setVisibility(View.GONE);
+                }
+                on += countOn(v);
+            }
+            final TextView h = e.getValue();
+            h.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16);
+            h.setText(pluginContext.getString(e.getKey()) + (open ? "  \u25BE" : "  \u25B8")
+                    + (on > 0 ? "   " + on + " ON" : ""));
+            h.setTextColor(on > 0 ? pluginContext.getResources().getColor(R.color.state_on)
+                    : 0xFF00E5FF);
+        }
+    }
+
+    /** The zone the SAWTI page reads, held for a layer that arrives after the page. */
+    private int sawtiZone;
+    /** The pane is on screen. */
+    private boolean paneShowing;
+
+    /**
+     * The SAWTI page's zone is outlined on the map only while that page is on
+     * screen: leaving it is how the outline goes, with nothing to switch off
+     * (operator, 2026-10-14: "there is now no way to turn off that white outline").
+     */
+    private void updateSawtiOutline() {
+        if (sawti == null)
+            return;
+        final boolean onPage = paneShowing && pager != null && pages[pager.getCurrentItem()] == sawtiPage.view();
+        sawti.setPickedZone(onPage ? sawtiZone : 0);
+    }
+
+    /** The pane is covered or slid away without closing. */
+    public void onHidden() {
+        paneShowing = false;
+        updateSawtiOutline();
+    }
+
+    /** A day picked on the SAWTI page before the layer's own forecast was in. */
+    private String sawtiPendingDate;
+
+    private void applySawtiPendingDate() {
+        final com.atakmap.android.atmosphere.data.Sawti.Forecast f = sawti == null ? null : sawti.forecast();
+        if (f == null || sawtiPendingDate == null)
+            return;
+        final int n = f.dayNumber(sawtiPendingDate);
+        sawtiPendingDate = null;
+        if (n < 1 || n > sawti.days())
+            return;
+        sawti.setDay(n);
+        buildDayRow(sawtiDayRow, sawti);
+    }
+
+    /** Each page's own layer switch, beside the Layers page switch it mirrors. */
+    private final List<Button[]> pageSwitches = new ArrayList<>();
+
+    /**
+     * Puts a page's map layer switch at its top: a mirror of that layer's switch on the
+     * Layers page, which it clicks, so allowing, turning on and off go one way wherever
+     * they start (operator, 2026-10-14: "some way from a page to turn that layer on for
+     * all the pages we host"). It sits small at the end of the page's heading line, as
+     * "Map ON", the heading naming the layer; a row of its own took the space of a list
+     * item on every page (operator, 2026-10-16: "it needs to be small and in line with
+     * something else that is already on the page to allow space for list items").
+     */
+    private void addPageSwitch(View page, int toggleId) {
+        addPageSwitch(page, toggleId, null);
+    }
+
+    /**
+     * The page's switch on its heading's line; {@code middle}, when given, between
+     * the two -- a page's folded filter, so the filter costs the list no row of its own.
+     */
+    private void addPageSwitch(View page, int toggleId, View middle) {
+        final View t = pages[LAYERS_PAGE].findViewById(toggleId);
+        if (!(t instanceof Button))
+            return;
+        final Button toggle = (Button) t;
+        ViewGroup column = null;
+        if (page instanceof ScrollView && ((ScrollView) page).getChildCount() > 0
+                && ((ScrollView) page).getChildAt(0) instanceof ViewGroup)
+            column = (ViewGroup) ((ScrollView) page).getChildAt(0);
+        else if (page instanceof LinearLayout)
+            column = (ViewGroup) page;
+        if (column == null)
+            return;
+        final Button sw = (Button) LayoutInflater.from(pluginContext).inflate(R.layout.page_layer_switch, column,
+                false);
+        sw.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                toggle.performClick();
+                syncPageSwitches();
+            }
+        });
+        final TextView heading = firstHeading(column);
+        if (heading != null && heading.getParent() instanceof LinearLayout) {
+            // The heading and the switch on one line: the heading takes what is left,
+            // the switch its own width, and the line keeps the heading's place and its
+            // space above.
+            final LinearLayout parent = (LinearLayout) heading.getParent();
+            final int at = parent.indexOfChild(heading);
+            final LinearLayout line = new LinearLayout(pluginContext);
+            line.setOrientation(LinearLayout.HORIZONTAL);
+            line.setGravity(Gravity.CENTER_VERTICAL);
+            line.setPadding(0, heading.getPaddingTop(), 0, 0);
+            final ViewGroup.LayoutParams lp = heading.getLayoutParams();
+            parent.removeViewAt(at);
+            heading.setPadding(heading.getPaddingLeft(), 0, heading.getPaddingRight(),
+                    heading.getPaddingBottom());
+            if (middle == null)
+                line.addView(heading, new LinearLayout.LayoutParams(0,
+                        ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            else {
+                // The heading keeps its words; the filter takes what is left between it
+                // and the switch.
+                line.addView(heading, new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                final LinearLayout.LayoutParams midLp = new LinearLayout.LayoutParams(0,
+                        ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+                midLp.leftMargin = (int) (8 * pluginContext.getResources().getDisplayMetrics().density);
+                line.addView(middle, midLp);
+            }
+            final LinearLayout.LayoutParams swLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            swLp.leftMargin = (int) (8 * pluginContext.getResources().getDisplayMetrics().density);
+            sw.setGravity(Gravity.CENTER);
+            sw.setTag(COMPACT);
+            // As wide as "Map OFF" both ways, so the switch does not jump as it flips.
+            sw.setMinWidth(sw.getPaddingLeft() + sw.getPaddingRight() + (int) Math.ceil(
+                    sw.getPaint().measureText(pluginContext.getString(R.string.page_map_off))));
+            line.addView(sw, swLp);
+            parent.addView(line, at, lp != null ? lp : new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        } else
+            column.addView(sw, 0);
+        pageSwitches.add(new Button[] { sw, toggle });
+        syncPageSwitches();
+    }
+
+    /** Marks a page switch that sits on its heading's line and says only "Map ON". */
+    private static final String COMPACT = "compact";
+
+    /**
+     * A page's heading: its first text, down through first children. Null when a page
+     * starts with something else, and the switch then takes a row of its own.
+     */
+    private static TextView firstHeading(ViewGroup column) {
+        View v = column.getChildCount() > 0 ? column.getChildAt(0) : null;
+        while (v instanceof LinearLayout && ((LinearLayout) v).getChildCount() > 0)
+            v = ((LinearLayout) v).getChildAt(0);
+        return v instanceof TextView && !(v instanceof Button) ? (TextView) v : null;
+    }
+
+    /** The page switches say what their Layers page switches say. */
+    private void syncPageSwitches() {
+        for (Button[] pair : pageSwitches) {
+            final String full = pair[1].getText().toString();
+            String shown = full;
+            if (COMPACT.equals(pair[0].getTag())) {
+                if (full.endsWith(" ON"))
+                    shown = pluginContext.getString(R.string.page_map_on);
+                else if (full.endsWith(" OFF"))
+                    shown = pluginContext.getString(R.string.page_map_off);
+            }
+            pair[0].setText(shown);
+            pair[0].setTextColor(pair[1].getCurrentTextColor());
+        }
+    }
+
+    private void updateLayerControls() {
+        final boolean radarOn = radar != null && radar.isOn();
+        final boolean windOn = wind != null && wind.isOn();
+        radarToggle.setText(radarOn ? R.string.radar_on : R.string.radar_off);
+        radarToggle.setTextColor(pluginContext.getResources().getColor(
+                radarOn ? R.color.state_on : R.color.state_off));
+        windToggle.setText(windOn ? R.string.wind_on : R.string.wind_off);
+        windToggle.setTextColor(pluginContext.getResources().getColor(
+                windOn ? R.color.state_on : R.color.state_off));
+        final boolean heatOn = windOn && wind.heatOn();
+        windHeatToggle.setVisibility(windOn ? View.VISIBLE : View.GONE);
+        windHeatToggle.setText(heatOn ? R.string.wind_heat_on : R.string.wind_heat_off);
+        windHeatToggle.setTextColor(pluginContext.getResources().getColor(
+                heatOn ? R.color.state_on : R.color.state_off));
+        final boolean smokeOn = smoke != null && smoke.isOn();
+        smokeToggle.setText(smokeOn ? R.string.smoke_on : R.string.smoke_off);
+        smokeToggle.setTextColor(pluginContext.getResources().getColor(
+                smokeOn ? R.color.state_on : R.color.state_off));
+        smokeExpand.setVisibility(smokeOn ? View.VISIBLE : View.GONE);
+        smokeExpand.setRotation(smokeOpen ? 180f : 0f);
+        smokeSettings.setVisibility(smokeOn && smokeOpen ? View.VISIBLE : View.GONE);
+        if (smokeOn) {
+            updateSmokeScale();
+            updateSmokeHeightRow();
+            updateSmokeReading();
+        }
+        final boolean wavesOn = waves != null && waves.isOn();
+        wavesToggle.setText(wavesOn ? R.string.waves_on : R.string.waves_off);
+        wavesToggle.setTextColor(pluginContext.getResources().getColor(
+                wavesOn ? R.color.state_on : R.color.state_off));
+        wavesExpand.setVisibility(wavesOn ? View.VISIBLE : View.GONE);
+        wavesExpand.setRotation(wavesOpen ? 180f : 0f);
+        wavesSettings.setVisibility(wavesOn && wavesOpen ? View.VISIBLE : View.GONE);
+        if (wavesOn) {
+            updateWavesScale();
+            updateWavesReading();
+        }
+        final boolean rainOn = rain != null && rain.isOn();
+        rainToggle.setText(rainOn ? R.string.rain_on : R.string.rain_off);
+        rainToggle.setTextColor(pluginContext.getResources().getColor(
+                rainOn ? R.color.state_on : R.color.state_off));
+        rainExpand.setVisibility(rainOn ? View.VISIBLE : View.GONE);
+        rainExpand.setRotation(rainOpen ? 180f : 0f);
+        rainSettings.setVisibility(rainOn && rainOpen ? View.VISIBLE : View.GONE);
+        if (rainOn) {
+            updateRainScale();
+            updateRainReading();
+        }
+        final boolean stationsOn = stationLayer != null && stationLayer.isOn();
+        stationsToggle.setText(stationsOn ? R.string.stations_on : R.string.stations_off);
+        stationsToggle.setTextColor(pluginContext.getResources().getColor(
+                stationsOn ? R.color.state_on : R.color.state_off));
+        stationsExpand.setVisibility(stationsOn ? View.VISIBLE : View.GONE);
+        stationsExpand.setRotation(stationsOpen ? 180f : 0f);
+        stationsSettings.setVisibility(stationsOn && stationsOpen ? View.VISIBLE : View.GONE);
+        if (stationsOn) {
+            final boolean withLabels = stationLayer.hasLabels();
+            stationsLabels.setText(withLabels ? "Readings and names  ON" : "Readings and names  OFF");
+            stationsLabels.setTextColor(pluginContext.getResources().getColor(
+                    withLabels ? R.color.state_on : R.color.state_off));
+            final boolean utilityOn = stationLayer.isUtilityOn()
+                    && egress.isLayerEnabled(StationOverlay.UTILITY_ID);
+            stationsUtility.setText(utilityOn ? R.string.stations_utility_on
+                    : R.string.stations_utility_off);
+            stationsUtility.setTextColor(pluginContext.getResources().getColor(
+                    utilityOn ? R.color.state_on : R.color.state_off));
+            stationsUtilitySettings.setVisibility(utilityOn ? View.VISIBLE : View.GONE);
+            buildStationsDistanceRow();
+            buildStationsShowRow();
+            buildStationsGateRows();
+            buildStationsLegend();
+            stationsGuideExpand.setRotation(stationsGuideOpen ? 180f : 0f);
+            stationsGuide.setVisibility(stationsGuideOpen ? View.VISIBLE : View.GONE);
+            if (stationsGuideOpen)
+                buildStationsGuide();
+            stationsBasis.setText(RedFlag.basis());
+        }
+
+        final boolean gaugesOn = gaugeLayer != null && gaugeLayer.isOn();
+        gaugesToggle.setText(gaugesOn ? R.string.gauges_on : R.string.gauges_off);
+        gaugesToggle.setTextColor(pluginContext.getResources().getColor(
+                gaugesOn ? R.color.state_on : R.color.state_off));
+        gaugesExpand.setVisibility(gaugesOn ? View.VISIBLE : View.GONE);
+        gaugesExpand.setRotation(gaugesOpen ? 180f : 0f);
+        gaugesSettings.setVisibility(gaugesOn && gaugesOpen ? View.VISIBLE : View.GONE);
+        if (gaugesOn) {
+            buildGaugesDistanceRow();
+            buildGaugesShowRow();
+            buildGaugesGateRows();
+            final boolean gl = gaugeLayer.hasLabels();
+            gaugesLabels.setText(gl ? "Readings and names  ON" : "Readings and names  OFF");
+            gaugesLabels.setTextColor(pluginContext.getResources().getColor(
+                    gl ? R.color.state_on : R.color.state_off));
+            buildGaugesLegend();
+        }
+        final boolean buoysOn = buoyLayer != null && buoyLayer.isOn();
+        buoysToggle.setText(buoysOn ? R.string.buoys_on : R.string.buoys_off);
+        buoysToggle.setTextColor(pluginContext.getResources().getColor(
+                buoysOn ? R.color.state_on : R.color.state_off));
+        buoysExpand.setVisibility(buoysOn ? View.VISIBLE : View.GONE);
+        buoysExpand.setRotation(buoysOpen ? 180f : 0f);
+        buoysSettings.setVisibility(buoysOn && buoysOpen ? View.VISIBLE : View.GONE);
+        if (buoysOn) {
+            buildBuoysDistanceRow();
+            buildBuoysShowRow();
+            buildBuoysGateRows();
+            final boolean bl = buoyLayer.hasLabels();
+            buoysLabels.setText(bl ? "Readings and names  ON" : "Readings and names  OFF");
+            buoysLabels.setTextColor(pluginContext.getResources().getColor(
+                    bl ? R.color.state_on : R.color.state_off));
+            buildBuoysLegend();
+        }
+        final boolean spotOn = spotLayer != null && spotLayer.isOn();
+        spotToggle.setText(spotOn ? R.string.spot_layer_on : R.string.spot_layer_off);
+        spotToggle.setTextColor(pluginContext.getResources().getColor(
+                spotOn ? R.color.state_on : R.color.state_off));
+        spotExpand.setVisibility(spotOn ? View.VISIBLE : View.GONE);
+        spotExpand.setRotation(spotOpen ? 180f : 0f);
+        spotSettings.setVisibility(spotOn && spotOpen ? View.VISIBLE : View.GONE);
+        if (spotOn) {
+            final boolean recentOnly = spotLayer.isRecentOnly();
+            // Age, not status. Nearly every request is filled within the hour, so
+            // hiding filled ones hid today's forecast for an active fire -- which is
+            // the one a crew is looking for (operator, 2026-09-25).
+            spotOpenOnly.setText(recentOnly
+                    ? "Last 3 days only  ON" : "Last 3 days only  OFF");
+            spotOpenOnly.setTextColor(pluginContext.getResources().getColor(
+                    recentOnly ? R.color.state_on : R.color.state_off));
+            buildSpotLegend();
+        }
+        final boolean airOn = air != null && air.isOn();
+        airToggle.setText(airOn ? R.string.air_on : R.string.air_off);
+        airToggle.setTextColor(pluginContext.getResources().getColor(
+                airOn ? R.color.state_on : R.color.state_off));
+        airExpand.setVisibility(airOn ? View.VISIBLE : View.GONE);
+        airExpand.setRotation(airOpen ? 180f : 0f);
+        airSettings.setVisibility(airOn && airOpen ? View.VISIBLE : View.GONE);
+        if (airOn)
+            updateAirReading();
+        // A layer with nothing on the map has no settings worth a chevron.
+        final boolean tropicalOn = tropical != null && tropical.isOn();
+        tropicalToggle.setText(tropicalOn ? R.string.tropical_on : R.string.tropical_off);
+        tropicalToggle.setTextColor(pluginContext.getResources().getColor(
+                tropicalOn ? R.color.state_on : R.color.state_off));
+        tropicalExpand.setVisibility(tropicalOn ? View.VISIBLE : View.GONE);
+        tropicalExpand.setRotation(tropicalOpen ? 180f : 0f);
+        tropicalSettings.setVisibility(tropicalOn && tropicalOpen ? View.VISIBLE : View.GONE);
+        final boolean snotelOn = snotel != null && snotel.isOn();
+        snotelToggle.setText(snotelOn ? R.string.snotel_on : R.string.snotel_off);
+        snotelToggle.setTextColor(pluginContext.getResources().getColor(
+                snotelOn ? R.color.state_on : R.color.state_off));
+        snotelExpand.setVisibility(snotelOn ? View.VISIBLE : View.GONE);
+        snotelExpand.setRotation(snotelOpen ? 180f : 0f);
+        snotelSettings.setVisibility(snotelOn && snotelOpen ? View.VISIBLE : View.GONE);
+        final boolean highflowOn = highflow != null && highflow.isOn();
+        highflowToggle.setText(highflowOn ? R.string.highflow_on : R.string.highflow_off);
+        highflowToggle.setTextColor(pluginContext.getResources().getColor(
+                highflowOn ? R.color.state_on : R.color.state_off));
+        highflowExpand.setVisibility(highflowOn ? View.VISIBLE : View.GONE);
+        highflowExpand.setRotation(highflowOpen ? 180f : 0f);
+        highflowSettings.setVisibility(highflowOn && highflowOpen ? View.VISIBLE : View.GONE);
+        final boolean floodgroundOn = floodground != null && floodground.isOn();
+        floodgroundToggle.setText(floodgroundOn ? R.string.floodground_on : R.string.floodground_off);
+        floodgroundToggle.setTextColor(pluginContext.getResources().getColor(
+                floodgroundOn ? R.color.state_on : R.color.state_off));
+        floodgroundExpand.setVisibility(floodgroundOn ? View.VISIBLE : View.GONE);
+        floodgroundExpand.setRotation(floodgroundOpen ? 180f : 0f);
+        floodgroundSettings.setVisibility(floodgroundOn && floodgroundOpen ? View.VISIBLE : View.GONE);
+        final boolean floodzonesOn = floodzones != null && floodzones.isOn();
+        floodzonesToggle.setText(floodzonesOn ? R.string.floodzones_on : R.string.floodzones_off);
+        floodzonesToggle.setTextColor(pluginContext.getResources().getColor(
+                floodzonesOn ? R.color.state_on : R.color.state_off));
+        floodzonesExpand.setVisibility(floodzonesOn ? View.VISIBLE : View.GONE);
+        floodzonesExpand.setRotation(floodzonesOpen ? 180f : 0f);
+        floodzonesSettings.setVisibility(floodzonesOn && floodzonesOpen ? View.VISIBLE : View.GONE);
+        if (floodzonesOn && stationLayer != null)
+            buildFloodZonesGateRow();
+        final boolean damareasOn = damareas != null && damareas.isOn();
+        damareasToggle.setText(damareasOn ? R.string.damareas_on : R.string.damareas_off);
+        damareasToggle.setTextColor(pluginContext.getResources().getColor(
+                damareasOn ? R.color.state_on : R.color.state_off));
+        damareasExpand.setVisibility(damareasOn ? View.VISIBLE : View.GONE);
+        damareasExpand.setRotation(damareasOpen ? 180f : 0f);
+        damareasSettings.setVisibility(damareasOn && damareasOpen ? View.VISIBLE : View.GONE);
+        if (damareasOn && stationLayer != null)
+            buildDamAreasGateRow();
+        final boolean satelliteOn = satellite != null && satellite.isOn();
+        satelliteToggle.setText(satelliteOn ? R.string.satellite_on : R.string.satellite_off);
+        satelliteToggle.setTextColor(pluginContext.getResources().getColor(
+                satelliteOn ? R.color.state_on : R.color.state_off));
+        satelliteExpand.setVisibility(satelliteOn ? View.VISIBLE : View.GONE);
+        satelliteExpand.setRotation(satelliteOpen ? 180f : 0f);
+        satelliteSettings.setVisibility(satelliteOn && satelliteOpen ? View.VISIBLE : View.GONE);
+        final boolean snowOn = snow != null && snow.isOn();
+        snowToggle.setText(snowOn ? R.string.snow_on : R.string.snow_off);
+        snowToggle.setTextColor(pluginContext.getResources().getColor(
+                snowOn ? R.color.state_on : R.color.state_off));
+        snowExpand.setVisibility(snowOn ? View.VISIBLE : View.GONE);
+        snowExpand.setRotation(snowOpen ? 180f : 0f);
+        snowSettings.setVisibility(snowOn && snowOpen ? View.VISIBLE : View.GONE);
+        final boolean sstOn = sst != null && sst.isOn();
+        sstToggle.setText(sstOn ? R.string.sst_on : R.string.sst_off);
+        sstToggle.setTextColor(pluginContext.getResources().getColor(
+                sstOn ? R.color.state_on : R.color.state_off));
+        sstExpand.setVisibility(sstOn ? View.VISIBLE : View.GONE);
+        sstExpand.setRotation(sstOpen ? 180f : 0f);
+        sstSettings.setVisibility(sstOn && sstOpen ? View.VISIBLE : View.GONE);
+        if (sstOn)
+            ensureSstLegend();
+        final boolean beachOn = beach != null && beach.isOn();
+        beachToggle.setText(beachOn ? R.string.beach_on : R.string.beach_off);
+        beachToggle.setTextColor(pluginContext.getResources().getColor(
+                beachOn ? R.color.state_on : R.color.state_off));
+        beachExpand.setVisibility(beachOn ? View.VISIBLE : View.GONE);
+        beachExpand.setRotation(beachOpen ? 180f : 0f);
+        beachSettings.setVisibility(beachOn && beachOpen ? View.VISIBLE : View.GONE);
+        final boolean floodOn = flood != null && flood.isOn();
+        floodToggle.setText(floodOn ? R.string.flood_on : R.string.flood_off);
+        floodToggle.setTextColor(pluginContext.getResources().getColor(
+                floodOn ? R.color.state_on : R.color.state_off));
+        floodExpand.setVisibility(floodOn ? View.VISIBLE : View.GONE);
+        floodExpand.setRotation(floodOpen ? 180f : 0f);
+        floodSettings.setVisibility(floodOn && floodOpen ? View.VISIBLE : View.GONE);
+        final boolean firewxOn = firewx != null && firewx.isOn();
+        firewxToggle.setText(firewxOn ? R.string.firewx_on : R.string.firewx_off);
+        firewxToggle.setTextColor(pluginContext.getResources().getColor(
+                firewxOn ? R.color.state_on : R.color.state_off));
+        firewxExpand.setVisibility(firewxOn ? View.VISIBLE : View.GONE);
+        firewxExpand.setRotation(firewxOpen ? 180f : 0f);
+        firewxSettings.setVisibility(firewxOn && firewxOpen ? View.VISIBLE : View.GONE);
+        final boolean ercOn = erc != null && erc.isOn();
+        ercToggle.setText(ercOn ? R.string.erc_on : R.string.erc_off);
+        ercToggle.setTextColor(pluginContext.getResources().getColor(
+                ercOn ? R.color.state_on : R.color.state_off));
+        ercExpand.setVisibility(ercOn ? View.VISIBLE : View.GONE);
+        ercExpand.setRotation(ercOpen ? 180f : 0f);
+        ercSettings.setVisibility(ercOn && ercOpen ? View.VISIBLE : View.GONE);
+        final boolean sawtiOn = sawti != null && sawti.isOn();
+        sawtiToggle.setText(sawtiOn ? R.string.sawti_on : R.string.sawti_off);
+        sawtiToggle.setTextColor(pluginContext.getResources().getColor(
+                sawtiOn ? R.color.state_on : R.color.state_off));
+        sawtiExpand.setVisibility(sawtiOn ? View.VISIBLE : View.GONE);
+        sawtiExpand.setRotation(sawtiOpen ? 180f : 0f);
+        sawtiSettings.setVisibility(sawtiOn && sawtiOpen ? View.VISIBLE : View.GONE);
+        final boolean lightningOn = lightning != null && lightning.isOn();
+        lightningToggle.setText(lightningOn ? R.string.lightning_on : R.string.lightning_off);
+        lightningToggle.setTextColor(pluginContext.getResources().getColor(
+                lightningOn ? R.color.state_on : R.color.state_off));
+        lightningExpand.setVisibility(lightningOn ? View.VISIBLE : View.GONE);
+        lightningExpand.setRotation(lightningOpen ? 180f : 0f);
+        lightningSettings.setVisibility(lightningOn && lightningOpen ? View.VISIBLE : View.GONE);
+        final boolean pspsOn = psps != null && psps.isOn();
+        pspsToggle.setText(pspsOn ? R.string.psps_on : R.string.psps_off);
+        pspsToggle.setTextColor(pluginContext.getResources().getColor(
+                pspsOn ? R.color.state_on : R.color.state_off));
+        pspsExpand.setVisibility(pspsOn ? View.VISIBLE : View.GONE);
+        pspsExpand.setRotation(pspsOpen ? 180f : 0f);
+        pspsSettings.setVisibility(pspsOn && pspsOpen ? View.VISIBLE : View.GONE);
+        final boolean reportsOn = reports != null && reports.isOn();
+        reportsToggle.setText(reportsOn ? R.string.reports_on : R.string.reports_off);
+        reportsToggle.setTextColor(pluginContext.getResources().getColor(
+                reportsOn ? R.color.state_on : R.color.state_off));
+        reportsExpand.setVisibility(reportsOn ? View.VISIBLE : View.GONE);
+        reportsExpand.setRotation(reportsOpen ? 180f : 0f);
+        reportsSettings.setVisibility(reportsOn && reportsOpen ? View.VISIBLE : View.GONE);
+        final boolean tornadoOn = tornado != null && tornado.isOn();
+        tornadoToggle.setText(tornadoOn ? R.string.tornado_on : R.string.tornado_off);
+        tornadoToggle.setTextColor(pluginContext.getResources().getColor(
+                tornadoOn ? R.color.state_on : R.color.state_off));
+        tornadoExpand.setVisibility(tornadoOn ? View.VISIBLE : View.GONE);
+        tornadoExpand.setRotation(tornadoOpen ? 180f : 0f);
+        tornadoSettings.setVisibility(tornadoOn && tornadoOpen ? View.VISIBLE : View.GONE);
+        final boolean debrisflowOn = debrisflow != null && debrisflow.isOn();
+        debrisflowToggle.setText(debrisflowOn ? R.string.debrisflow_on : R.string.debrisflow_off);
+        debrisflowToggle.setTextColor(pluginContext.getResources().getColor(
+                debrisflowOn ? R.color.state_on : R.color.state_off));
+        debrisflowExpand.setVisibility(debrisflowOn ? View.VISIBLE : View.GONE);
+        debrisflowExpand.setRotation(debrisflowOpen ? 180f : 0f);
+        debrisflowSettings.setVisibility(debrisflowOn && debrisflowOpen ? View.VISIBLE : View.GONE);
+        final boolean quakesOn = quakes != null && quakes.isOn();
+        quakesToggle.setText(quakesOn ? R.string.quakes_on : R.string.quakes_off);
+        quakesToggle.setTextColor(pluginContext.getResources().getColor(
+                quakesOn ? R.color.state_on : R.color.state_off));
+        quakesExpand.setVisibility(quakesOn ? View.VISIBLE : View.GONE);
+        quakesExpand.setRotation(quakesOpen ? 180f : 0f);
+        quakesSettings.setVisibility(quakesOn && quakesOpen ? View.VISIBLE : View.GONE);
+        final boolean fuelOn = fuel != null && fuel.isOn();
+        fuelToggle.setText(fuelOn ? R.string.fuel_on : R.string.fuel_off);
+        fuelToggle.setTextColor(pluginContext.getResources().getColor(
+                fuelOn ? R.color.state_on : R.color.state_off));
+        fuelExpand.setVisibility(fuelOn ? View.VISIBLE : View.GONE);
+        fuelExpand.setRotation(fuelOpen ? 180f : 0f);
+        fuelSettings.setVisibility(fuelOn && fuelOpen ? View.VISIBLE : View.GONE);
+        final boolean raintotalsOn = raintotals != null && raintotals.isOn();
+        raintotalsToggle.setText(raintotalsOn ? R.string.raintotals_on : R.string.raintotals_off);
+        raintotalsToggle.setTextColor(pluginContext.getResources().getColor(
+                raintotalsOn ? R.color.state_on : R.color.state_off));
+        raintotalsExpand.setVisibility(raintotalsOn ? View.VISIBLE : View.GONE);
+        raintotalsExpand.setRotation(raintotalsOpen ? 180f : 0f);
+        raintotalsSettings.setVisibility(raintotalsOn && raintotalsOpen ? View.VISIBLE : View.GONE);
+        final boolean raingaugesOn = raingauges != null && raingauges.isOn();
+        raingaugesToggle.setText(raingaugesOn ? R.string.raingauges_on : R.string.raingauges_off);
+        raingaugesToggle.setTextColor(pluginContext.getResources().getColor(
+                raingaugesOn ? R.color.state_on : R.color.state_off));
+        raingaugesExpand.setVisibility(raingaugesOn ? View.VISIBLE : View.GONE);
+        raingaugesExpand.setRotation(raingaugesOpen ? 180f : 0f);
+        raingaugesSettings.setVisibility(raingaugesOn && raingaugesOpen ? View.VISIBLE : View.GONE);
+        final boolean firezonesOn = fireZones != null && fireZones.isOn();
+        firezonesToggle.setText(firezonesOn ? R.string.firezones_on : R.string.firezones_off);
+        firezonesToggle.setTextColor(pluginContext.getResources().getColor(
+                firezonesOn ? R.color.state_on : R.color.state_off));
+        firezonesExpand.setVisibility(firezonesOn ? View.VISIBLE : View.GONE);
+        firezonesExpand.setRotation(firezonesOpen ? 180f : 0f);
+        firezonesSettings.setVisibility(firezonesOn && firezonesOpen ? View.VISIBLE : View.GONE);
+        if (firezonesOn && stationLayer != null)
+            buildFireZonesGateRows();
+        final boolean avalancheOn = avalanche != null && avalanche.isOn();
+        avalancheToggle.setText(avalancheOn ? R.string.avalanche_on : R.string.avalanche_off);
+        avalancheToggle.setTextColor(pluginContext.getResources().getColor(
+                avalancheOn ? R.color.state_on : R.color.state_off));
+        avalancheExpand.setVisibility(avalancheOn ? View.VISIBLE : View.GONE);
+        avalancheExpand.setRotation(avalancheOpen ? 180f : 0f);
+        avalancheSettings.setVisibility(avalancheOn && avalancheOpen ? View.VISIBLE : View.GONE);
+        radarExpand.setVisibility(radarOn ? View.VISIBLE : View.GONE);
+        windExpand.setVisibility(windOn ? View.VISIBLE : View.GONE);
+        radarExpand.setRotation(radarOpen ? 180f : 0f);
+        windExpand.setRotation(windOpen ? 180f : 0f);
+        radarSettings.setVisibility(radarOn && radarOpen ? View.VISIBLE : View.GONE);
+        windSettings.setVisibility(windOn && windOpen ? View.VISIBLE : View.GONE);
+        // The legend explains what is on the map, so it appears with the layer.
+        windScaleHost.setVisibility(windOn ? View.VISIBLE : View.GONE);
+        windLevelBlock.setVisibility(windOn ? View.VISIBLE : View.GONE);
+        if (windOn) {
+            updateWindReading();
+            updateWindScale();
+            // The row is built in the constructor, before the stored unit has been
+            // read, so the first paint of it happens here.
+            updateWindUnitRow();
+            updateWindLevel();
+        }
+        followStripOwner();
+        final TimeLayer owner = stripLayer();
+        // The loop's Stop is on the strip: a radar that loses the strip stops playing.
+        if (radar != null && radar.isPlaying() && owner != TimeLayer.RADAR)
+            radar.setPlaying(false);
+        if (owner == TimeLayer.WIND)
+            hostScrubberIn(windSettings);
+        else if (owner == TimeLayer.SMOKE)
+            hostScrubberIn(smokeSettings);
+        else if (owner == TimeLayer.WAVES)
+            hostScrubberIn(wavesSettings);
+        else if (owner == TimeLayer.RAIN)
+            hostScrubberIn(rainSettings);
+        else if (owner == TimeLayer.RADAR)
+            hostScrubberIn(radarSettings);
+        scrubber.setVisibility(radarOn || windOn || smokeOn || wavesOn || rainOn ? View.VISIBLE : View.GONE);
+        creditTheLayers(radarOn, windOn);
+        applyGroupFolds();
+        syncPageSwitches();
+    }
+
+    /**
+     * Put the time strip under the layer that owns it. One strip, not one per layer:
+     * Radar and Wind can be on together (takwerx/atmosphere#6), but the strip drives
+     * one of them, the one switched on last ({@link #stripLayer}), so moving the one
+     * view beats keeping two in step. It goes first in the block, above that layer's
+     * own controls.
+     */
+    private void hostScrubberIn(LinearLayout container) {
+        final ViewParent parent = scrubber.getParent();
+        if (parent == container)
+            return;
+        if (parent instanceof ViewGroup)
+            ((ViewGroup) parent).removeView(scrubber);
+        container.addView(scrubber, 0);
+    }
+
+    private void rememberFold(String key, boolean open) {
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putBoolean(key, open).apply();
+    }
+
+    /**
+     * Credit what this page actually draws. It used to show the forecast source's
+     * line, because the one attribution view in the pane sat on this page while the
+     * forecast wrote into it -- so a page of NOAA model wind and an NWS radar service
+     * was crediting the forecast API, which serves neither (operator, 2026-09-22:
+     * "yeah i guess make it accurate"). The host comes from the constant the fetch
+     * uses, so the credit cannot drift from where the data came from.
+     */
+    private void creditTheLayers(boolean radarOn, boolean windOn) {
+        final StringBuilder out = new StringBuilder();
+        if (windOn)
+            out.append(pluginContext.getString(R.string.credit_wind, NomadsWind.HOST));
+        if (smoke != null && smoke.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_smoke, SmokeOverlay.HOST));
+        }
+        if (waves != null && waves.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_waves, WaveOverlay.HOST));
+        }
+        if (rain != null && rain.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_rain, RainOverlay.HOST));
+        }
+        if (radarOn) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(radar != null && radar.worldSource()
+                    ? pluginContext.getString(R.string.credit_radar_world)
+                    : pluginContext.getString(R.string.credit_radar, RadarOverlay.HOST));
+        }
+        if (air != null && air.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_air, AirQualityOverlay.HOST));
+        }
+        if (tropical != null && tropical.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_tropical, TropicalOverlay.HOST));
+        }
+        if (firewx != null && firewx.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_firewx, FireWxOutlookOverlay.HOST));
+        }
+        if (sawti != null && sawti.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_sawti, SawtiOverlay.HOST));
+        }
+        if (erc != null && erc.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_erc, ErcOverlay.HOST,
+                    ErcOverlay.CHART_HOST));
+        }
+        if (lightning != null && lightning.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_lightning, LightningOverlay.HOST));
+        }
+        if (psps != null && psps.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_psps, PspsOverlay.HOST));
+        }
+        if (reports != null && reports.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_reports, StormReportsOverlay.HOST));
+        }
+        if (tornado != null && tornado.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_tornado, TornadoPathsOverlay.HOST));
+        }
+        if (debrisflow != null && debrisflow.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_debrisflow, DebrisFlowOverlay.HOST));
+        }
+        if (quakes != null && quakes.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_quakes, QuakesOverlay.HOST));
+        }
+        if (fuel != null && fuel.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_fuel, FuelMoistureOverlay.HOST));
+        }
+        if (raintotals != null && raintotals.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_raintotals, RainTotalsOverlay.HOST));
+        }
+        if (raingauges != null && raingauges.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_raingauges, RainGaugesOverlay.HOST));
+        }
+        // Synoptic asks for its credit, Cal OES that its extract is not called verified.
+        if (stationLayer != null && stationLayer.isOn() && stationLayer.isUtilityOn()
+                && egress.isLayerEnabled(StationOverlay.UTILITY_ID)) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_utility_stations,
+                    StationOverlay.UTILITY_HOST));
+        }
+        if (flood != null && flood.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_flood, FloodOutlookOverlay.HOST));
+        }
+        if (beach != null && beach.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_beach, BeachOverlay.HOST));
+        }
+        if (highflow != null && highflow.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_highflow, HighFlowOverlay.HOST));
+        }
+        if (floodground != null && floodground.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_floodground, FloodedGroundOverlay.HOST));
+        }
+        if (floodzones != null && floodzones.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_floodzones, FloodZoneOverlay.HOST));
+        }
+        if (damareas != null && damareas.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_damareas, DamAreaOverlay.HOST));
+        }
+        if (satellite != null && satellite.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_satellite, SatelliteOverlay.HOST));
+        }
+        if (snow != null && snow.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_snow, SnowOverlay.HOST));
+        }
+        if (snotel != null && snotel.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_snotel, SnotelOverlay.HOST));
+        }
+        if (sst != null && sst.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_sst, SstOverlay.HOST));
+        }
+        if (avalanche != null && avalanche.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_avalanche, AvalancheOverlay.HOST));
+        }
+        setCredits(out.toString());
+    }
+
+    /**
+     * The credits, with RainViewer's words a link: its terms ask for a link back,
+     * and a stock URLSpan would start the browser from the plugin context, which
+     * throws without NEW_TASK. So the span is ours and starts it from ATAK's.
+     */
+    private void setCredits(String text) {
+        final int at = text.indexOf(WorldRadar.CREDIT_HOST);
+        if (at < 0) {
+            layersAttribution.setText(text);
+            layersAttribution.setMovementMethod(null);
+            return;
+        }
+        final SpannableString span = new SpannableString(text);
+        span.setSpan(new ClickableSpan() {
+            @Override
+            public void onClick(View widget) {
+                try {
+                    final Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(WorldRadar.CREDIT_URL));
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    MapCompat.atakContext().startActivity(i);
+                } catch (RuntimeException e) {
+                    com.atakmap.coremap.log.Log.w("AtmospherePane", "could not open the credit link", e);
+                }
+            }
+        }, at, at + WorldRadar.CREDIT_HOST.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        layersAttribution.setText(span);
+        layersAttribution.setMovementMethod(LinkMovementMethod.getInstance());
+    }
+
+    /**
+     * Wind speed by the unit a crew names it in, picked where they are looking at it
+     * (operator, 2026-09-22: "on wind can we have kt and mph as option on the scale
+     * on the layers"). Each button sets the whole unit system rather than a private
+     * wind unit, so there is one answer to "what units am I in" and the icon row's
+     * button never disagrees: knots is the aviation system, miles per hour imperial,
+     * kilometers per hour metric. The third is there because the system has three; a
+     * row where the live setting matched no button would be worse than a spare.
+     */
+    private void buildWindUnitRow() {
+        final UnitSystem[] order = { UnitSystem.IMPERIAL, UnitSystem.AVIATION, UnitSystem.METRIC };
+        for (final UnitSystem system : order) {
+            final Button b = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, windUnitRow, false);
+            b.setText(Units.displayUnit(Quantity.SPEED, system));
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    applyUnits(system);
+                }
+            });
+            b.setTag(system);
+            windUnitRow.addView(b);
+        }
+        updateWindUnitRow();
+    }
+
+    private void updateWindUnitRow() {
+        for (int i = 0; i < windUnitRow.getChildCount(); i++) {
+            final View child = windUnitRow.getChildAt(i);
+            if (!(child instanceof Button))
+                continue;
+            ((Button) child).setTextColor(child.getTag() == units
+                    ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+        }
+    }
+
+    /** Every route to a unit change goes through here, so nothing gets left behind. */
+    private void applyUnits(UnitSystem system) {
+        units = system;
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putString(PREF_UNITS, units.name()).apply();
+        updateUnitsButton();
+        updateWindScale();
+        updateWindUnitRow();
+        relabelWindLevelRows();
+        updateWindLevel();
+        // A unit change is a display change: re-render, never re-fetch.
+        render();
+        // The Here lines too: the wind said km/h beside a mph legend after the
+        // units were switched to imperial (XCover, 2026-09-27).
+        updateHereLines();
+    }
+
+    /**
+     * What the wind is doing at the pane's own point, in the operator's own units.
+     *
+     * <p>Read straight out of the grid the particles are flying on, so it costs a
+     * bilinear interpolation and never a request. It is the point mode's point, which
+     * means "Pick a point" is already the tap-the-map-and-read-it control; nothing new
+     * to learn and nothing new to get in the way of panning.
+     */
+    private void updateWindReading() {
+        final GeoPoint p = point();
+        final float[] uv = wind == null || p == null ? null
+                : wind.readingAt(p.getLatitude(), p.getLongitude());
+        if (uv == null) {
+            // Silence would read as calm. Say which it is.
+            windReading.setText(wind != null && wind.isOn() && p != null
+                    ? R.string.wind_here_unknown : R.string.empty);
+            return;
+        }
+        final double speed = Math.hypot(uv[0], uv[1]);
+        // Meteorological convention: the wind is named for where it comes FROM, which
+        // is the opposite of the vector it blows along.
+        double from = Math.toDegrees(Math.atan2(-uv[0], -uv[1]));
+        if (from < 0)
+            from += 360;
+        windReading.setText(pluginContext.getString(R.string.wind_here,
+                Units.format(Quantity.SPEED, speed, units),
+                Math.round(from), Units.degreesToCompass(from)));
+    }
+
+    /**
+     * Paint the height that is being drawn, and say how fine the wind is there.
+     * Ten meters up to the jet, a ladder rather than a scale because that is what
+     * the models carry: two heights above the ground and the standard pressure
+     * surfaces above them.
+     */
+    private void updateWindLevel() {
+        if (wind == null)
+            return;
+        final int picked = wind.levelIndex();
+        for (int i = 0; i < windLevelRows.getChildCount(); i++) {
+            final View row = windLevelRows.getChildAt(i);
+            if (!(row instanceof LinearLayout))
+                continue;
+            final LinearLayout cells = (LinearLayout) row;
+            for (int j = 0; j < cells.getChildCount(); j++) {
+                final View cell = cells.getChildAt(j);
+                if (!(cell instanceof Button) || !(cell.getTag() instanceof Integer))
+                    continue;
+                ((Button) cell).setTextColor((Integer) cell.getTag() == picked
+                        ? pluginContext.getResources().getColor(R.color.state_on)
+                        : Color.WHITE);
+            }
+        }
+    }
+
+    /**
+     * One button per height the models carry (operator, 2026-09-22: "lets just do
+     * some presets on the wind height"). It began as a slider and the slider was the
+     * wrong control here: it lives on a page of a ViewPager inside a scroller, so a
+     * finger meaning to scroll the page moved the wind to the jet stream instead, and
+     * eight discrete levels were never a scale to begin with. Buttons say what the
+     * choices are without being touched, which a slider cannot.
+     *
+     * <p>Four to a row, weighted so the two rows line up, and the labels are the
+     * heights themselves rather than the pressure surfaces they come from.
+     */
+    private void buildWindLevelRows() {
+        final NomadsWind.Level[] all = NomadsWind.Level.values();
+        final int perRow = 4;
+        LinearLayout row = null;
+        for (int i = 0; i < all.length; i++) {
+            if (i % perRow == 0) {
+                row = new LinearLayout(pluginContext);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                windLevelRows.addView(row, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT));
+            }
+            final int index = i;
+            final Button b = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, row, false);
+            b.setText(all[i].shortLabel(units == UnitSystem.METRIC));
+            // The button is a height on a small target; spoken, it is the whole name,
+            // with the pressure surface for anyone in aviation units.
+            b.setContentDescription(all[i].label(units == UnitSystem.METRIC,
+                    units == UnitSystem.AVIATION));
+            b.setTextSize(13);
+            b.setTag(index);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (wind == null)
+                        return;
+                    wind.setLevelIndex(index);
+                    updateWindLevel();
+                }
+            });
+            // Even columns: each cell takes a quarter of the row whatever its text.
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = dp(4);
+            lp.topMargin = dp(4);
+            b.setLayoutParams(lp);
+            row.addView(b);
+        }
+    }
+
+    /** The preset labels carry a unit, so a unit change relabels them. */
+    private void relabelWindLevelRows() {
+        final NomadsWind.Level[] all = NomadsWind.Level.values();
+        for (int i = 0; i < windLevelRows.getChildCount(); i++) {
+            final View r = windLevelRows.getChildAt(i);
+            if (!(r instanceof LinearLayout))
+                continue;
+            final LinearLayout cells = (LinearLayout) r;
+            for (int j = 0; j < cells.getChildCount(); j++) {
+                final View cell = cells.getChildAt(j);
+                if (!(cell instanceof Button) || !(cell.getTag() instanceof Integer))
+                    continue;
+                final int index = (Integer) cell.getTag();
+                if (index >= 0 && index < all.length) {
+                    ((Button) cell).setText(all[index].shortLabel(units == UnitSystem.METRIC));
+                    cell.setContentDescription(all[index].label(units == UnitSystem.METRIC,
+                            units == UnitSystem.AVIATION));
+                }
+            }
+        }
+    }
+
+    /** The legend for the seas on the map: the sea states, feet or meters under the joins. */
+    private void updateWavesScale() {
+        final boolean metric = units == UnitSystem.METRIC;
+        wavesScale.setBands(NomadsWaves.legendColors(), NomadsWaves.legendBreaks(metric),
+                metric ? "m" : "ft");
+        // Numbers only: the bar has seven joins and the last one sits where an end
+        // word would go ("46 ft" over "Phenomenal", XCover 2026-09-27). The words
+        // are in the reading line, where there is room for them.
+        wavesScale.setEnds(null, null);
+    }
+
+    /**
+     * The seas at the pane's own point, read out of the picture already on the map:
+     * the height and what a mariner calls it, where the swell comes from and how
+     * often, in words a deckhand uses.
+     */
+    private void updateWavesReading() {
+        if (waves == null || !waves.isOn()) {
+            wavesReading.setText(R.string.empty);
+            return;
+        }
+        final GeoPoint p = point();
+        final WaveOverlay.Reading r = p == null ? null
+                : waves.readingAt(p.getLatitude(), p.getLongitude());
+        String line;
+        if (p == null)
+            line = "";
+        else if (r == null)
+            line = pluginContext.getString(R.string.wind_here_unknown);
+        else if (Float.isNaN(r.heightM))
+            line = pluginContext.getString(R.string.waves_land);
+        else {
+            final boolean metric = units == UnitSystem.METRIC;
+            final StringBuilder b = new StringBuilder();
+            b.append(NomadsWaves.heightText(r.heightM, metric)).append(' ')
+                    .append(NomadsWaves.words(r.heightM));
+            if (!Float.isNaN(r.fromDeg))
+                b.append(", from the ").append(NomadsWaves.compass(r.fromDeg));
+            if (!Float.isNaN(r.periodS))
+                b.append(" every ").append(Math.round(r.periodS)).append(" s");
+            if (!Float.isNaN(r.swellHeightM) && r.swellHeightM > 0.1f) {
+                b.append("; swell ").append(NomadsWaves.heightText(r.swellHeightM, metric));
+                if (!Float.isNaN(r.swellFromDeg))
+                    b.append(" from the ").append(NomadsWaves.compass(r.swellFromDeg));
+                if (!Float.isNaN(r.swellPeriodS))
+                    b.append(" every ").append(Math.round(r.swellPeriodS)).append(" s");
+            }
+            line = pluginContext.getString(R.string.waves_here, b.toString());
+        }
+        if (waves.isCropped())
+            line = line.isEmpty() ? pluginContext.getString(R.string.waves_cropped)
+                    : line + "\n" + pluginContext.getString(R.string.waves_cropped);
+        wavesReading.setText(line);
+    }
+
+    /** The legend for the rain on the map: light to violent, inches or millimeters an hour under the joins. */
+    private void updateRainScale() {
+        final boolean metric = units == UnitSystem.METRIC;
+        rainScale.setBands(NomadsRain.legendColors(), NomadsRain.legendBreaks(metric),
+                metric ? "mm/hr" : "in/hr");
+        rainScale.setEnds(null, null);
+    }
+
+    /** The rain at the pane's own point, read out of the picture already on the map. */
+    private void updateRainReading() {
+        if (rain == null || !rain.isOn()) {
+            rainReading.setText(R.string.empty);
+            return;
+        }
+        final GeoPoint p = point();
+        final RainOverlay.Reading r = p == null ? null
+                : rain.readingAt(p.getLatitude(), p.getLongitude());
+        String line;
+        if (p == null)
+            line = "";
+        else if (r == null || Float.isNaN(r.mmPerHr))
+            line = pluginContext.getString(R.string.wind_here_unknown);
+        else if (NomadsRain.band(r.mmPerHr) < 0)
+            line = pluginContext.getString(R.string.rain_none);
+        else {
+            final boolean metric = units == UnitSystem.METRIC;
+            line = pluginContext.getString(R.string.rain_here,
+                    NomadsRain.rateText(r.mmPerHr, metric) + ", " + NomadsRain.words(r.mmPerHr));
+        }
+        if (rain.isCropped())
+            line = line.isEmpty() ? pluginContext.getString(R.string.rain_cropped)
+                    : line + "\n" + pluginContext.getString(R.string.rain_cropped);
+        rainReading.setText(line);
+    }
+
+    /**
+     * The two heights the model carries smoke at, as two presets side by side: the    /**
+     * The two heights the model carries smoke at, as two presets side by side: the
+     * ground, which is what a crew breathes, and the whole sky, which is what they see
+     * and what the sun and the aircraft come through.
+     */
+    private void buildSmokeHeightRow() {
+        for (final NomadsSmoke.Height h : NomadsSmoke.Height.values()) {
+            final Button b = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, smokeHeightRow, false);
+            b.setText(h == NomadsSmoke.Height.GROUND ? R.string.smoke_ground : R.string.smoke_sky);
+            b.setTextSize(13);
+            b.setTag(h);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (smoke == null)
+                        return;
+                    smoke.setHeight(h);
+                    updateSmokeHeightRow();
+                    updateSmokeScale();
+                    updateSmokeReading();
+                }
+            });
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = dp(4);
+            lp.topMargin = dp(4);
+            b.setLayoutParams(lp);
+            smokeHeightRow.addView(b);
+        }
+    }
+
+    private void updateSmokeHeightRow() {
+        final NomadsSmoke.Height picked = smoke == null ? null : smoke.height();
+        for (int i = 0; i < smokeHeightRow.getChildCount(); i++) {
+            final View cell = smokeHeightRow.getChildAt(i);
+            if (cell instanceof Button)
+                ((Button) cell).setTextColor(cell.getTag() == picked
+                        ? pluginContext.getResources().getColor(R.color.state_on)
+                        : Color.WHITE);
+        }
+    }
+
+    /**
+     * The legend for the height on the map: the air quality bands with their numbers
+     * near the ground, light to dense for the sky, which has no scale a crew reads
+     * in numbers.
+     */
+    private void updateSmokeScale() {
+        final NomadsSmoke.Height h = smoke == null ? NomadsSmoke.Height.GROUND : smoke.height();
+        smokeScale.setBands(h.legendColors(), h.legendBreaks(), h.unit);
+        if (h == NomadsSmoke.Height.GROUND)
+            smokeScale.setEnds(null, null);
+        else
+            smokeScale.setEnds(pluginContext.getString(R.string.smoke_light),
+                    pluginContext.getString(R.string.smoke_dense));
+    }
+
+    /**
+     * The smoke at the pane's own point, read out of the picture already on the map.
+     * Near the ground it is a number and what the number means for breathing; for
+     * the sky it is words only.
+     */
+    private void updateSmokeReading() {
+        if (smoke == null || !smoke.isOn()) {
+            smokeReading.setText(R.string.empty);
+            return;
+        }
+        final GeoPoint p = point();
+        final NomadsSmoke.Height h = smoke.height();
+        final float v = p == null ? Float.NaN
+                : smoke.readingAt(p.getLatitude(), p.getLongitude());
+        String line;
+        if (p == null)
+            line = "";
+        else if (Float.isNaN(v))
+            // Silence would read as clean air. Say which it is.
+            line = pluginContext.getString(R.string.wind_here_unknown);
+        else if (h == NomadsSmoke.Height.GROUND && h.band(v) >= 0)
+            line = pluginContext.getString(R.string.smoke_here_amount,
+                    v >= 10 ? String.valueOf(Math.round(v))
+                            : String.format(Locale.US, "%.1f", v),
+                    h.unit, h.words(v));
+        else
+            line = pluginContext.getString(R.string.smoke_here, h.words(v));
+        if (smoke.isCropped())
+            line = line.isEmpty() ? pluginContext.getString(R.string.smoke_cropped)
+                    : line + "\n" + pluginContext.getString(R.string.smoke_cropped);
+        smokeReading.setText(line);
+    }
+    /** The legend's numbers follow the operator's unit, like every other speed. */
+    private void updateWindScale() {
+        final float[] breaks = new float[WindScaleView.bandCount() - 1];
+        for (int i = 0; i < breaks.length; i++)
+            breaks[i] = (float) Units.toDisplay(Quantity.SPEED, WindScaleView.bandEdgeMs(i), units);
+        windScale.setScale(breaks, Units.displayUnit(Quantity.SPEED, units));
+    }
+
+    /** "Latest, 4:40 pm" or "18 min ago, 4:22 pm", in the phone's zone. */
+    private String frameLabel(int index, String time) {
+        if (time == null || index < 0)
+            return "No frame yet";
+        final long t = com.atakmap.android.atmosphere.data.IsoTime.parse(time);
+        if (t <= 0)
+            return time;
+        final String when = com.atakmap.android.atmosphere.units.Clock.format("h:mm a").format(new Date(t))
+                .replace("AM", "am").replace("PM", "pm");
+        final boolean latest = index == radarFrames.size() - 1;
+        return (latest ? "Latest" : capitalize(relativeTime(t))) + ", " + when;
+    }
+
+    /** The pane left the screen: an armed pick must not keep the map's tap listeners. */
+    public void onClosed() {
+        paneShowing = false;
+        updateSawtiOutline();
+        disarmPick();
+        updateModeIcons();
+        final MapView mv = MapView.getMapView();
+        if (mv != null && followingMap) {
+            mv.removeOnMapMovedListener(mapMoved);
+            mv.removeCallbacks(centerSettled);
+            mv.removeCallbacks(forecastSettled);
+            followingMap = false;
+        }
+    }
+
+    /** The plugin is going away: stop the spot page's worker and its fetches. */
+    public void dispose() {
+        onClosed();
+        spotPage.dispose();
+        reportsPage.dispose();
+        rainPage.dispose();
+        zonePage.dispose();
+        sawtiPage.dispose();
+    }
+
+    private void loadSelectedSource(SharedPreferences prefs) {
+        final String storedId = prefs == null ? null : prefs.getString(PREF_SOURCE, null);
+        // NWS on a new install, by name rather than by the order the files load in.
+        final String wanted = storedId != null ? storedId : "nws";
+        int index = 0;
+        for (int i = 0; i < sources.size(); i++) {
+            if (sources.get(i).id.equals(wanted)) {
+                index = i;
+                break;
+            }
+        }
+        if (!sources.isEmpty())
+            selected = sources.get(index);
+    }
+
+    private void chooseSource(WxSourceDef def) {
+        selected = def;
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putString(PREF_SOURCE, selected.id).apply();
+        snapshot = null;
+        refresh(true);
+    }
+
+    /** The gear: everything that is not the readout itself. */
+    private void showSettingsDialog() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        // One window: the services are the list, picked with one tap, and What
+        // to show is its button. Picking a service is the whole
+        // decision, no allow step (operator, 2026-09-28: "dont have allow just
+        // pick one ... your just picking a forecast service"; "you click on
+        // forecast settings why am i not just picking weather service all at
+        // once"). It only changes the Forecast page; every map layer has its own
+        // source and its own one-time question. No Position sent button: the point
+        // is always rounded to about 100 m ("just remove it its confusing").
+        final String[] names = new String[sources.size()];
+        for (int i = 0; i < sources.size(); i++)
+            names[i] = pluginContext.getString(R.string.forecast_from, sourceName(sources.get(i)));
+        final int checked = selected == null ? -1 : sources.indexOf(selected);
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.settings_title))
+                .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        if (which < 0 || which >= sources.size())
+                            return;
+                        final WxSourceDef def = sources.get(which);
+                        if (def.requiresApiKey) {
+                            Toast.makeText(ctx, egress.refuse(def), Toast.LENGTH_LONG).show();
+                            return;
+                        }
+                        if (def != selected)
+                            chooseSource(def);
+                    }
+                })
+                .setNeutralButton(pluginContext.getString(R.string.variables_title),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                showVariablesDialog();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    /** External (operator-dropped) definitions are marked, as the Sources dialog marks them. */
+    private static String sourceName(WxSourceDef def) {
+        return def.origin == WxSourceDef.Origin.EXTERNAL
+                ? def.displayName + " *" : def.displayName;
+    }
+
+    private void wireButtons() {
+        refreshButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                refresh(true);
+            }
+        });
+
+        modeSelf.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setMode(PointMode.SELF);
+            }
+        });
+
+        modeCenter.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setMode(PointMode.CENTER);
+            }
+        });
+
+        modePick.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                armPick();
+            }
+        });
+
+        favoritesButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showFavoritesDialog();
+            }
+        });
+
+        unitsButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final UnitSystem[] all = UnitSystem.values();
+                applyUnits(all[(units.ordinal() + 1) % all.length]);
+            }
+        });
+
+        wideButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (host != null)
+                    host.toggleWide();
+            }
+        });
+
+        settingsButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showSettingsDialog();
+            }
+        });
+    }
+
+    // ---- the point ---------------------------------------------------------------
+
+    /**
+     * The pane's point as the station, gauge and buoy layers measure from it: their
+     * own My position | Map center rows went (operator, 2026-10-16: "it should be
+     * driven by that top menu"), so a picked point or a favorite is theirs too.
+     */
+    private final Origin paneOrigin = new Origin() {
+        @Override
+        public GeoPoint point() {
+            return AtmospherePane.this.point();
+        }
+
+        @Override
+        public boolean followsMap() {
+            return mode == PointMode.CENTER;
+        }
+
+        @Override
+        public boolean self() {
+            return mode == PointMode.SELF;
+        }
+
+        @Override
+        public String words() {
+            switch (mode) {
+                case SELF:
+                    return "you";
+                case PICKED:
+                    return "the picked point";
+                case FAVORITE:
+                    return favorite == null ? "the favorite" : favorite.name;
+                default:
+                    return "the map center";
+            }
+        }
+    };
+
+    private void setMode(PointMode m) {
+        disarmPick();
+        mode = m;
+        if (m != PointMode.FAVORITE)
+            favorite = null;
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null) {
+            final SharedPreferences.Editor e = p.edit().putString(PREF_MODE, m.name());
+            if (favorite == null)
+                e.remove(PREF_FAVORITE);
+            else
+                e.putString(PREF_FAVORITE, favorite.name);
+            if (pickedPoint == null)
+                e.remove(PREF_PICKED);
+            else
+                e.putString(PREF_PICKED, pickedPoint.getLatitude() + "," + pickedPoint.getLongitude());
+            e.apply();
+        }
+        updateModeIcons();
+        snapshot = null;
+        refresh(false);
+        updateHereLines();
+        if (stationLayer != null)
+            stationLayer.originChanged();
+        if (gaugeLayer != null)
+            gaugeLayer.originChanged();
+        if (buoyLayer != null)
+            buoyLayer.originChanged();
+    }
+
+    /**
+     * Every layer's "Here:" line, read again at the pane's point. Called when the
+     * point changes: a new mode, or the map moving under Map center. Each line was
+     * refreshed only when its own layer redrew, so choosing Map center over a
+     * hurricane left the wind reading the Denver favorite chosen before it.
+     */
+    private void updateHereLines() {
+        if (wind != null && wind.isOn())
+            updateWindReading();
+        if (waves != null && waves.isOn())
+            updateWavesReading();
+        if (rain != null && rain.isOn())
+            updateRainReading();
+        if (smoke != null && smoke.isOn())
+            updateSmokeReading();
+        if (air != null && air.isOn())
+            updateAirReading();
+    }
+
+    /**
+     * Map center follows the map: the Here lines read again once a move settles, and
+     * so does the fire zone, which otherwise only heard of a new point when the
+     * forecast was refreshed (operator, 2026-09-28: "if i move the map the fire
+     * weather zone [does not update]"). A move within the same half-degree cell is
+     * answered from what the page already holds.
+     */
+    private final Runnable centerSettled = new Runnable() {
+        @Override
+        public void run() {
+            if (mode != PointMode.CENTER)
+                return;
+            updateHereLines();
+            if (zonePage != null && pager != null)
+                zonePage.pointChanged(pages[pager.getCurrentItem()] == zonePage.view());
+            if (sawtiPage != null && pager != null)
+                sawtiPage.pointChanged(pages[pager.getCurrentItem()] == sawtiPage.view());
+
+                reportsPage.pointChanged();
+            rainPage.pointChanged();
+            discussion.pointChanged();
+            if (spotPage != null)
+                spotPage.pointChanged();
+        }
+    };
+
+    /** How long the map has to stay still before the forecast follows it. */
+    private static final long FORECAST_SETTLE_MS = 1500L;
+    /**
+     * How far the center has to move for a new forecast. The NWS grid is 2.5 km, so
+     * a nudge closer than this reads the same forecast and is not asked for again.
+     */
+    private static final double FORECAST_FOLLOW_M = 1000d;
+    /** Where the forecast was last asked for. */
+    private GeoPoint forecastAt;
+
+    /**
+     * Map center follows the map for the forecast too, once the map has been still
+     * for a moment and the center has moved far enough to be another forecast
+     * (operator, 2026-09-28: the forecast stayed on the old place after a pan until
+     * Refresh was pressed).
+     */
+    private final Runnable forecastSettled = new Runnable() {
+        @Override
+        public void run() {
+            if (mode != PointMode.CENTER)
+                return;
+            final GeoPoint p = point();
+            if (p == null)
+                return;
+            if (forecastAt != null && forecastAt.distanceTo(p) < FORECAST_FOLLOW_M)
+                return;
+            refresh(false);
+        }
+    };
+
+    private final com.atakmap.map.AtakMapView.OnMapMovedListener mapMoved =
+            new com.atakmap.map.AtakMapView.OnMapMovedListener() {
+                @Override
+                public void onMapMoved(com.atakmap.map.AtakMapView view, boolean animate) {
+                    // GL thread: post and coalesce, touch nothing here.
+                    final MapView mv = MapView.getMapView();
+                    if (mv == null)
+                        return;
+                    mv.removeCallbacks(centerSettled);
+                    mv.postDelayed(centerSettled, 500);
+                    mv.removeCallbacks(forecastSettled);
+                    mv.postDelayed(forecastSettled, FORECAST_SETTLE_MS);
+                    mv.removeCallbacks(gatesSettled);
+                    mv.postDelayed(gatesSettled, 700);
+                }
+            };
+
+    /**
+     * The gate lines under each layer read the scale bar ("scale bar now 9.43 mi,
+     * hidden"), so they are redrawn when the map stops; before, they kept the reading
+     * from when the page was built while the layer drew on the map (2026-11-15).
+     */
+    private final Runnable gatesSettled = new Runnable() {
+        @Override
+        public void run() {
+            if (pager != null && pager.getCurrentItem() == LAYERS_PAGE
+                    && pages[LAYERS_PAGE].isShown())
+                updateLayerControls();
+        }
+    };
+    private boolean followingMap;
+
+    private void setFavorite(Favorites.Place place) {
+        favorite = place;
+        setMode(place == null ? PointMode.CENTER : PointMode.FAVORITE);
+    }
+
+    /** The icon for the point in use is green; an armed pick is green until the tap. */
+    private void updateModeIcons() {
+        final int on = pluginContext.getResources().getColor(R.color.state_on);
+        modeSelf.setColorFilter(mode == PointMode.SELF ? on : Color.WHITE);
+        modeCenter.setColorFilter(mode == PointMode.CENTER ? on : Color.WHITE);
+        modePick.setColorFilter(pickArmed || mode == PointMode.PICKED ? on : Color.WHITE);
+        favoritesButton.setColorFilter(mode == PointMode.FAVORITE ? on : Color.WHITE);
+    }
+
+    /**
+     * The row is too narrow for "Imperial", so the button wears the unit that tells
+     * the three systems apart: Celsius for metric, Fahrenheit for imperial, knots
+     * for aviation, which is imperial in every way but wind, distance and pressure.
+     * It read "\u00b0C" in aviation until 2026-09-22, which is the one thing it must
+     * never do: say Celsius while the readout is in Fahrenheit.
+     */
+    private void updateUnitsButton() {
+        final String face;
+        switch (units) {
+            case METRIC:
+                face = "\u00b0C";
+                break;
+            case AVIATION:
+                face = "kt";
+                break;
+            default:
+                face = "\u00b0F";
+                break;
+        }
+        unitsButton.setText(face);
+        unitsButton.setContentDescription(units.label());
+    }
+
+    private GeoPoint point() {
+        switch (mode) {
+            case SELF: return MapCompat.selfPoint();
+            case PICKED: return pickedPoint;
+            case FAVORITE: return favorite == null ? null
+                    : new GeoPoint(favorite.latitude, favorite.longitude);
+            default: return MapCompat.mapCenter();
+        }
+    }
+
+    /** What the position line calls the point. */
+    private String modeLabel() {
+        switch (mode) {
+            case SELF: return pluginContext.getString(R.string.self_position);
+            case PICKED: return pluginContext.getString(R.string.picked_point);
+            case FAVORITE: return "\u2605 " + (favorite == null ? "" : favorite.name);
+            default: return pluginContext.getString(R.string.map_center);
+        }
+    }
+
+    private static GeoPoint parsePoint(String s) {
+        if (s == null)
+            return null;
+        final String[] parts = s.split(",");
+        if (parts.length != 2)
+            return null;
+        try {
+            final GeoPoint p = new GeoPoint(Double.parseDouble(parts[0].trim()),
+                    Double.parseDouble(parts[1].trim()));
+            return p.isValid() ? p : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Pick a point: the next map tap is the point (WxReport's Map Lock). The map's
+     * click listeners are pushed and ours put in front, and popped again on the tap,
+     * on a second Pick tap, or when the pane closes, so an armed pick never outlives
+     * the pane and never eats a tap meant for ATAK.
+     */
+    private void armPick() {
+        if (pickArmed) {
+            disarmPick();
+            updateModeIcons();
+            statusText.setText("");
+            return;
+        }
+        final MapView mv = MapView.getMapView();
+        if (mv == null)
+            return;
+        pickArmed = true;
+        updateModeIcons();
+        statusText.setTextColor(pluginContext.getResources().getColor(R.color.state_on));
+        statusText.setText(pluginContext.getString(R.string.pick_prompt));
+        final MapEventDispatcher d = mv.getMapEventDispatcher();
+        d.pushListeners();
+        d.clearListeners(MapEvent.MAP_CLICK);
+        d.clearListeners(MapEvent.ITEM_CLICK);
+        pickListener = new MapEventDispatcher.MapEventDispatchListener() {
+            @Override
+            public void onMapEvent(MapEvent event) {
+                final PointF pf = event.getPointF();
+                GeoPoint p = null;
+                if (pf != null) {
+                    final GeoPointMetaData gp = mv.inverseWithElevation(pf.x, pf.y);
+                    p = gp == null ? null : gp.get();
+                }
+                disarmPick();
+                if (p == null || !p.isValid()) {
+                    updateModeIcons();
+                    return;
+                }
+                pickedPoint = p;
+                setMode(PointMode.PICKED);
+            }
+        };
+        d.addMapEventListener(MapEvent.MAP_CLICK, pickListener);
+        d.addMapEventListener(MapEvent.ITEM_CLICK, pickListener);
+    }
+
+    private void disarmPick() {
+        if (!pickArmed)
+            return;
+        pickArmed = false;
+        pickListener = null;
+        final MapView mv = MapView.getMapView();
+        if (mv != null)
+            mv.getMapEventDispatcher().popListeners();
+    }
+
+    private void refresh(boolean force) {
+        // The fire zones and SAWTI pages follow the same point, whatever the forecast does.
+        if (zonePage != null && pager != null)
+            zonePage.pointChanged(pages[pager.getCurrentItem()] == zonePage.view());
+        if (sawtiPage != null && pager != null)
+            sawtiPage.pointChanged(pages[pager.getCurrentItem()] == sawtiPage.view());
+
+            reportsPage.pointChanged();
+            rainPage.pointChanged();
+            discussion.pointChanged();
+        if (spotPage != null)
+            spotPage.pointChanged();
+        if (selected == null) {
+            statusText.setText(R.string.no_sources);
+            return;
+        }
+
+        final GeoPoint p = point();
+        if (p == null) {
+            positionText.setText(R.string.no_position);
+            statusText.setText(mode == PointMode.SELF
+                    ? "No self position yet (no GPS fix). Tap Refresh once ATAK has one."
+                    : mode == PointMode.PICKED ? "No point picked yet" : "No map center yet");
+            return;
+        }
+
+        // The point being read, and nothing about how it is rounded on the way
+        // out; that is fixed at about 100 m and is not a line read every time.
+        positionText.setText(modeLabel() + " \u2014 " + egress.latitude(p) + ", "
+                + egress.longitude(p));
+        forecastAt = p;
+        statusText.setTextColor(Color.parseColor("#dfb228"));
+        statusText.setText("Getting the forecast\u2026");
+
+        client.fetch(selected, p, force, new WeatherClient.Listener() {
+            @Override
+            public void onSnapshot(Snapshot result, boolean fromCache) {
+                snapshot = result;
+                final long age = result.ageMillis(System.currentTimeMillis());
+                statusText.setTextColor(Color.parseColor("#dfb228"));
+                // The place and how old it is. Which service answered, and whether
+                // the bytes came off disk, are not things a crew can act on.
+                statusText.setText((result.place == null ? "" : result.place + " \u2014 ")
+                        + Snapshot.describeAge(age));
+                render();
+            }
+
+            @Override
+            public void onError(String message, Snapshot stale) {
+                statusText.setTextColor(Color.parseColor("#ff8a65"));
+                if (stale != null) {
+                    snapshot = stale;
+                    final long age = stale.ageMillis(System.currentTimeMillis());
+                    statusText.setText(message + " — showing the last one, "
+                            + Snapshot.describeAge(age));
+                    render();
+                } else {
+                    // Every section, not just Now: the hours strip and the days
+                    // from the last point stayed drawn under the message.
+                    statusText.setText(message);
+                    snapshot = null;
+                    render();
+                }
+            }
+        });
+    }
+
+    private void updateHoursTableButton() {
+        hoursTableButton.setText(hoursTableOpen ? R.string.hide_hours_table
+                : R.string.show_hours_table);
+    }
+
+    private void render() {
+        currentContainer.removeAllViews();
+        trendChips.removeAllViews();
+        hoursLegend.removeAllViews();
+        hoursContainer.removeAllViews();
+        daysLegend.removeAllViews();
+        daysContainer.removeAllViews();
+
+        if (snapshot == null)
+            return;
+
+        final Set<String> wanted = ParamSelection.selectedKeys(selected);
+
+        List<Reading> now = new ArrayList<>();
+        for (Reading r : snapshot.current) {
+            if (wanted.contains(r.key))
+                now.add(r);
+        }
+
+        // A source with no "current" block (NWS is one) still has a first forecast step,
+        // which is the closest thing to now it can offer. Say so rather than showing
+        // an empty heading.
+        boolean fromSeries = false;
+        if (now.isEmpty() && !snapshot.series.isEmpty()) {
+            for (Reading r : snapshot.series.get(0).readings) {
+                if (wanted.contains(r.key))
+                    now.add(r);
+            }
+            fromSeries = true;
+        }
+
+        // A service with no "current" block gives its first forecast hour instead. That
+        // is a fact about the feed, not about the weather, so the heading stays "Now".
+        currentHeading.setText(pluginContext.getString(R.string.heading_now));
+
+        com.atakmap.android.atmosphere.units.Clock.refresh(MapCompat.atakContext());
+        renderNow(now);
+        renderSunMoon();
+
+        renderTrend(wanted);
+        renderHours(wanted);
+        renderLight();
+        renderDays(wanted);
+        attributionText.setText(snapshot.attribution == null ? "" : snapshot.attribution);
+        discussion.refresh(false);
+    }
+
+    /** True when no hour of the whole forecast has a value for the element. */
+    private boolean neverIssued(String key) {
+        if (snapshot == null)
+            return false;
+        for (SeriesEntry e : snapshot.series) {
+            final Reading r = e.reading(key);
+            if (r != null && !Double.isNaN(r.value))
+                return false;
+        }
+        return true;
+    }
+
+    /** A tile whose value is a sentence, not a number: smaller, dimmer, allowed to wrap. */
+    private View noteTile(String label, String note) {
+        final LinearLayout t = (LinearLayout) tile(label, note);
+        final TextView v = (TextView) t.getChildAt(0);
+        v.setTextSize(13);
+        v.setAlpha(0.7f);
+        v.setTypeface(Typeface.DEFAULT);
+        // A tile is a third of the pane; the sentence needs two lines there, and a
+        // number's single line cut it to "Not issued by this of" (XCover, 2026-09-26).
+        v.setSingleLine(false);
+        v.setMaxLines(2);
+        return t;
+    }
+
+    private static boolean isTwentyFoot(String key) {
+        return key != null && key.toLowerCase(Locale.US).contains("twentyfoot");
+    }
+
+    /** The first hour's 10 m wind direction, or null when there is none. */
+    private Reading tenMeterDirection() {
+        if (snapshot == null || snapshot.series.isEmpty())
+            return null;
+        for (Reading r : snapshot.series.get(0).readings)
+            if (kind(r) == Kind.DIR && !isTwentyFoot(r.key) && !Double.isNaN(r.value))
+                return r;
+        return null;
+    }
+
+    /** The first hour's 10 m wind, or null when the source has none or it is blank. */
+    private Reading tenMeterWind() {
+        if (snapshot == null || snapshot.series.isEmpty())
+            return null;
+        for (Reading r : snapshot.series.get(0).readings)
+            if (kind(r) == Kind.WIND && !Double.isNaN(r.value))
+                return r;
+        return null;
+    }
+
+    private static final int TILE_COLUMNS = 3;
+    /** Roboto Medium: the readout face. Not monospace, which spaced the digits like a terminal. */
+    private static final Typeface VALUE_FACE = Typeface.create("sans-serif-medium", Typeface.NORMAL);
+
+    /**
+     * The "now" block as tiles: the number big with its label directly under it, three
+     * across. A label-left, value-right row put the two at opposite edges, and at 95 %
+     * width they were half a screen apart.
+     */
+    private void renderNow(List<Reading> now) {
+        LinearLayout row = null;
+        int inRow = TILE_COLUMNS;
+        for (Reading r : now) {
+            if (inRow == TILE_COLUMNS) {
+                row = new LinearLayout(pluginContext);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                currentContainer.addView(row);
+                inRow = 0;
+            }
+            if (kind(r) == Kind.SKY) {
+                row.addView(skyTile(r));
+            } else if (kind(r) == Kind.WIND20 && Double.isNaN(r.value) && tenMeterWind() != null) {
+                // The grid has hours with no 20-foot wind (76 of 87 at SGX, measured
+                // 2026-09-26). The 10 m wind for the hour, labeled as such, beats a
+                // dash -- and beats a number that does not say which wind it is.
+                row.addView(tile("Wind (10 m)", tenMeterWind().format(units)));
+            } else if (kind(r) == Kind.DIR && isTwentyFoot(r.key) && Double.isNaN(r.value)
+                    && tenMeterDirection() != null) {
+                // The 20-foot wind's direction goes with it: an office that does not
+                // issue the one does not issue the other (STO, 2026-09-26), and the
+                // 10 m direction is what the 10 m wind above was read against.
+                row.addView(tile("Wind from (10 m)", tenMeterDirection().format(units)));
+            } else if (Double.isNaN(r.value) && neverIssued(r.key)) {
+                // The grid defines every element for every office and each office
+                // fills the ones it issues: WBGT is there at SGX, LOX, REV and PDT and
+                // empty at MTR and BOI (measured 2026-09-26). A dash would read as
+                // "no value this hour"; the truth is that this office never has one.
+                row.addView(noteTile(tileLabel(r), "Not issued by this office"));
+            } else {
+                row.addView(tile(tileLabel(r), r.format(units)));
+            }
+            inRow++;
+        }
+        // Pad a short last row so its tiles keep the width of the others.
+        while (row != null && inRow < TILE_COLUMNS) {
+            final View filler = new View(pluginContext);
+            filler.setLayoutParams(new LinearLayout.LayoutParams(0, 1, 1f));
+            row.addView(filler);
+            inRow++;
+        }
+    }
+
+    /** Wind direction is where the wind comes from; the label says so. */
+    private static String tileLabel(Reading r) {
+        switch (kind(r)) {
+            case TEMP: return "Temperature";
+            case DEW: return "Dew point";
+            case FEELS: return "Feels like";
+            case RH: return "Humidity";
+            case WIND: return "Wind (10 m)";
+            case WIND20: return "20-ft wind";
+            case GUST: return "Gusts";
+            case TRANSPORT: return "Transport wind";
+            case DIR: return "Wind from";
+            case TDIR: return "Transport from";
+            case MIXING: return "Mixing height";
+            case WBGT: return "Wet bulb globe";
+            case POP: return "Precip chance";
+            case PRECIP: return "Precip";
+            case SKY: return "Sky cover";
+            default: return r.label;
+        }
+    }
+
+    /** Sky cover as the station-plot okta circle, the percentage in the label under it. */
+    private View skyTile(Reading r) {
+        final LinearLayout t = new LinearLayout(pluginContext);
+        t.setOrientation(LinearLayout.VERTICAL);
+        t.setLayoutParams(new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        t.setPadding(dp(4), dp(6), dp(4), dp(6));
+        t.setGravity(Gravity.CENTER_HORIZONTAL);
+        final SkyCoverView glyph = new SkyCoverView(pluginContext);
+        glyph.setLayoutParams(new LinearLayout.LayoutParams(dp(34), dp(34)));
+        glyph.setPercent(r.valid() ? r.value : Double.NaN);
+        final TextView l = new TextView(pluginContext);
+        l.setText(r.valid() ? "Sky cover " + r.format(units) : "Sky cover");
+        l.setTextSize(11);
+        l.setAlpha(0.6f);
+        l.setGravity(Gravity.CENTER);
+        l.setSingleLine(true);
+        t.addView(glyph);
+        t.addView(l);
+        return t;
+    }
+
+    private View tile(String label, String value) {
+        final LinearLayout t = new LinearLayout(pluginContext);
+        t.setOrientation(LinearLayout.VERTICAL);
+        t.setLayoutParams(new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        t.setPadding(dp(4), dp(6), dp(4), dp(6));
+        t.setGravity(Gravity.CENTER_HORIZONTAL);
+        final TextView v = new TextView(pluginContext);
+        v.setText(value);
+        v.setTextSize(26);
+        v.setTypeface(VALUE_FACE);
+        v.setTextColor(Color.WHITE);
+        v.setGravity(Gravity.CENTER);
+        v.setSingleLine(true);
+        v.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        shrinkToFit(v);
+        final TextView l = new TextView(pluginContext);
+        l.setText(label);
+        l.setTextSize(11);
+        l.setAlpha(0.6f);
+        l.setGravity(Gravity.CENTER);
+        l.setSingleLine(true);
+        t.addView(v);
+        t.addView(l);
+        return t;
+    }
+
+    /**
+     * A reading too wide for its third of the pane is drawn smaller rather than cut
+     * off: "290\u00b0 WNW" read "290\u00b0 WNV" at half width (S22 Ultra, 2026-10-05).
+     * Decided on each layout from the width it actually has, so it is full size again
+     * when the pane is wide; never below 14 sp.
+     */
+    private void shrinkToFit(final TextView v) {
+        final float full = v.getTextSize();
+        final float floor = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP, 14f,
+                pluginContext.getResources().getDisplayMetrics());
+        v.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            @Override
+            public void onLayoutChange(View view, int l, int t, int r, int b, int ol, int ot,
+                    int or, int ob) {
+                final int room = r - l - v.getPaddingLeft() - v.getPaddingRight();
+                if (room <= 0 || r - l == or - ol)
+                    return;
+                final android.graphics.Paint p = new android.graphics.Paint(v.getPaint());
+                p.setTextSize(full);
+                final float wide = p.measureText(v.getText().toString());
+                final float size = wide <= room ? full : Math.max(floor, full * room / wide);
+                if (Math.abs(size - v.getTextSize()) > 0.5f)
+                    v.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            v.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, size);
+                        }
+                    });
+            }
+        });
+    }
+
+    /** Hours are shown as columns; more than this is the days strip's job. */
+    private static final int HOURS_SHOWN = 48;
+    private static final int COLUMN_DP = 92;
+    private static final int HEADER_DP = 36;
+    private static final int ROW_DP = 24;
+
+    /**
+     * One value across the coming hours, the way the operator reads it in a consumer
+     * weather app: a column per hour, the number on a line whose height follows it, a
+     * sun or moon with cloud for the sky, sunrise and sunset as their own columns. The
+     * chip row under it picks the value; direction rides on the wind as an arrow and
+     * sky cover is in every column, so neither is a chip.
+     */
+    private void renderTrend(Set<String> wanted) {
+        final List<Reading> order = keyOrder(wanted);
+        final List<Reading> chips = new ArrayList<>();
+        for (Reading r : order) {
+            final Kind k = kind(r);
+            if (k != Kind.DIR && k != Kind.TDIR && k != Kind.SKY && k != Kind.OTHER)
+                chips.add(r);
+        }
+        final boolean any = !chips.isEmpty() && !snapshot.series.isEmpty();
+        seriesHeading.setVisibility(any ? View.VISIBLE : View.GONE);
+        trendScroll.setVisibility(any ? View.VISIBLE : View.GONE);
+        trendChips.setVisibility(any ? View.VISIBLE : View.GONE);
+        if (!any)
+            return;
+        // The chosen kind must be one this source has, or fall back to the first.
+        Reading chosen = null;
+        for (Reading r : chips)
+            if (kind(r) == trendKind) chosen = r;
+        if (chosen == null) {
+            chosen = chips.get(0);
+            trendKind = kind(chosen);
+        }
+        for (final Reading r : chips) {
+            final Button chip = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, trendChips, false);
+            chip.setText(chipLabel(r));
+            chip.setTextColor(kind(r) == trendKind
+                    ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+            chip.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    trendKind = kind(r);
+                    final SharedPreferences p = MapCompat.prefs();
+                    if (p != null)
+                        p.edit().putString(PREF_TREND, trendKind.name()).apply();
+                    render();
+                }
+            });
+            trendChips.addView(chip);
+        }
+        trend.setColumns(trendColumns(chosen, order));
+        trendScroll.scrollTo(0, 0);
+    }
+
+    /**
+     * The hours as a table: every shown value per hour, the legend pinned on the left,
+     * behind a toggle. The trend strip is the default read and the table is there when
+     * a number for a given hour is wanted; the operator asked to keep both. Closed by
+     * default, the choice kept in prefs, and only built while open, since 48 columns
+     * of TextViews are not free.
+     */
+    private void renderHours(Set<String> wanted) {
+        final List<Reading> order = keyOrder(wanted);
+        final boolean any = !order.isEmpty() && !snapshot.series.isEmpty();
+        hoursTableButton.setVisibility(any ? View.VISIBLE : View.GONE);
+        hoursTable.setVisibility(any && hoursTableOpen ? View.VISIBLE : View.GONE);
+        if (!any || !hoursTableOpen)
+            return;
+        final List<String> labels = new ArrayList<>();
+        for (Reading r : order)
+            labels.add(shortLabel(r));
+        hoursLegend.addView(column("", labels, true));
+        final SimpleDateFormat day = new SimpleDateFormat("EEE", Locale.US);
+        final SimpleDateFormat hour = com.atakmap.android.atmosphere.units.Clock.format("ha");
+        int shown = 0;
+        for (SeriesEntry entry : snapshot.series) {
+            if (shown++ >= HOURS_SHOWN)
+                break;
+            final List<String> values = new ArrayList<>();
+            for (Reading k : order) {
+                final Reading r = entry.reading(k.key);
+                values.add(r == null ? "\u2014" : r.format(units));
+            }
+            final String header;
+            if (entry.timeMillis > 0) {
+                final Date d = new Date(entry.timeMillis);
+                header = day.format(d) + "\n" + hour.format(d).toLowerCase(Locale.US);
+            } else {
+                header = String.valueOf(entry.timeRaw);
+            }
+            hoursContainer.addView(column(header, values, false));
+        }
+    }
+
+    /** The chip text carries the unit, so the columns can print bare numbers. */
+    private String chipLabel(Reading r) {
+        switch (kind(r)) {
+            case TEMP: return "Temperature";
+            case DEW: return "Dew point";
+            case FEELS: return "Feels like";
+            case RH: return "Humidity";
+            case WIND: return "Wind (10 m) " + Units.displayUnit(Quantity.SPEED, units);
+            case WIND20: return "20-ft wind " + Units.displayUnit(Quantity.SPEED, units);
+            case GUST: return "Gusts " + Units.displayUnit(Quantity.SPEED, units);
+            case TRANSPORT: return "Transport wind " + Units.displayUnit(Quantity.SPEED, units);
+            case MIXING: return "Mixing height " + Units.displayUnit(Quantity.HEIGHT, units);
+            case WBGT: return "Wet bulb globe";
+            case POP: return "Precip chance";
+            case PRECIP: return "Precip " + Units.displayUnit(Quantity.PRECIPITATION, units);
+            default: return r.label;
+        }
+    }
+
+    /** A column's number: compact, the unit implied by the chip. */
+    private String columnText(Reading r) {
+        if (r == null || !r.valid())
+            return "\u2014";
+        switch (r.quantity) {
+            case TEMPERATURE:
+                return Math.round(Units.toDisplay(r.quantity, r.value, units)) + "\u00b0";
+            case PERCENT:
+                return Math.round(r.value) + "%";
+            case SPEED:
+                return String.valueOf(Math.round(Units.toDisplay(r.quantity, r.value, units)));
+            default:
+                return Units.format(r.quantity, r.value, units)
+                        .replace(" " + Units.displayUnit(r.quantity, units), "");
+        }
+    }
+
+    private List<TrendStripView.Column> trendColumns(Reading chosen, List<Reading> order) {
+        final List<TrendStripView.Column> cols = new ArrayList<>();
+        String dirKey = null, skyKey = null;
+        for (Reading r : order) {
+            if (kind(r) == Kind.DIR) dirKey = r.key;
+            if (kind(r) == Kind.SKY) skyKey = r.key;
+        }
+        final long now = System.currentTimeMillis();
+        final SimpleDateFormat hourFmt = com.atakmap.android.atmosphere.units.Clock.format("ha");
+        final SimpleDateFormat dayFmt = new SimpleDateFormat("EEE", Locale.US);
+        final SimpleDateFormat dayKey = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+        final SimpleDateFormat clock = com.atakmap.android.atmosphere.units.Clock.format("h:mm");
+        final Map<String, long[]> sunByDay = new LinkedHashMap<>();
+        String lastDay = null;
+        int shown = 0;
+        long prevTime = 0;
+        boolean nowMarked = false;
+        for (SeriesEntry e : snapshot.series) {
+            if (shown++ >= HOURS_SHOWN)
+                break;
+            if (e.timeMillis <= 0)
+                continue;
+            final Date d = new Date(e.timeMillis);
+            final String dk = dayKey.format(d);
+            long[] sun = sunByDay.get(dk);
+            if (sun == null && !sunByDay.containsKey(dk)) {
+                sun = Astro.sunRiseSet(e.timeMillis, TimeZone.getDefault(),
+                        snapshot.latitude, snapshot.longitude);
+                sunByDay.put(dk, sun);
+            }
+            // a sunrise or sunset between the previous hour and this one gets its own column
+            if (sun != null && prevTime > 0) {
+                for (int i = 0; i < 2; i++) {
+                    if (sun[i] > prevTime && sun[i] <= e.timeMillis) {
+                        final TrendStripView.Column sc = new TrendStripView.Column();
+                        sc.sunEvent = true;
+                        sc.sunrise = i == 0;
+                        sc.header = clock.format(new Date(sun[i]));
+                        sc.sunLabel = i == 0 ? "Sunrise" : "Sunset";
+                        cols.add(sc);
+                    }
+                }
+            }
+            final TrendStripView.Column c = new TrendStripView.Column();
+            final boolean isNow = !nowMarked && e.timeMillis <= now + 3_600_000L
+                    && e.timeMillis > now - 3_600_000L;
+            if (isNow) {
+                c.header = "Now";
+                c.now = true;
+                nowMarked = true;
+            } else if (lastDay != null && !dk.equals(lastDay)) {
+                c.header = dayFmt.format(d) + "\n" + hourFmt.format(d).toLowerCase(Locale.US);
+            } else {
+                c.header = hourFmt.format(d).toLowerCase(Locale.US);
+            }
+            lastDay = dk;
+            final Reading v = e.reading(chosen.key);
+            c.value = v == null || !v.valid() ? Double.NaN
+                    : Units.toDisplay(v.quantity, v.value, units);
+            c.text = columnText(v);
+            if ((kind(chosen) == Kind.WIND || kind(chosen) == Kind.GUST) && dirKey != null) {
+                final Reading dir = e.reading(dirKey);
+                if (dir != null && dir.valid())
+                    c.arrowDeg = (dir.value + 180) % 360;   // from -> toward
+            }
+            if (skyKey != null) {
+                final Reading sky = e.reading(skyKey);
+                c.oktas = sky == null || !sky.valid() ? -1 : SkyCoverView.oktas(sky.value);
+            }
+            c.night = sun == null ? false : (e.timeMillis < sun[0] || e.timeMillis >= sun[1]);
+            cols.add(c);
+            prevTime = e.timeMillis;
+        }
+        return cols;
+    }
+
+    /**
+     * The Light section for the point and the day the stepper is on: the light bar,
+     * the twilights, sun and moon rise and set with azimuths, day length, and the
+     * moon's phase and next phases. All computed on the device, so it is there with
+     * no network. Times on this device's clock, as the hourly strip above uses.
+     */
+    private void renderLight() {
+        lightContainer.removeAllViews();
+        // Closed, nothing is computed; opening the fold renders it.
+        if (snapshot == null || !lightOpen)
+            return;
+        com.atakmap.android.atmosphere.units.Clock.refresh(pluginContext);
+        final TimeZone tz = TimeZone.getDefault();
+        final long now = System.currentTimeMillis();
+        final Calendar c = Calendar.getInstance(tz);
+        c.setTimeInMillis(now);
+        c.add(Calendar.DAY_OF_MONTH, lightOffset);
+        c.set(Calendar.HOUR_OF_DAY, 12);
+        c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        final long noon = c.getTimeInMillis();
+        final double lat = snapshot.latitude, lon = snapshot.longitude;
+        final Light.Day d = Light.day(noon, tz, lat, lon);
+        final Light.Day before = Light.day(noon - 86_400_000L, tz, lat, lon);
+
+        final SimpleDateFormat dayFmt = new SimpleDateFormat("EEE MMM d", Locale.US);
+        dayFmt.setTimeZone(tz);
+        final String date = dayFmt.format(new Date(noon));
+        lightDay.setText(lightOffset == 0 ? "Today, " + date
+                : lightOffset == 1 ? "Tomorrow, " + date
+                : lightOffset == -1 ? "Yesterday, " + date : date);
+
+        // The moon is drawn as it is now when now is in the day, else at noon.
+        final long moonAt = now >= d.start && now < d.end ? now : noon;
+        final LightBarView bar = new LightBarView(pluginContext);
+        bar.setDay(d, tz, now, Light.elongation(moonAt));
+        lightContainer.addView(bar);
+
+        final LinearLayout legend = new LinearLayout(pluginContext);
+        legend.setOrientation(LinearLayout.HORIZONTAL);
+        legend.setPadding(dp(4), 0, dp(4), dp(6));
+        for (int i = LightBarView.BAND_COLORS.length - 1; i >= 0; i--)
+            legend.addView(swatchLabel(LightBarView.BAND_COLORS[i], LightBarView.BAND_NAMES[i], 11));
+        lightContainer.addView(legend);
+
+        // Every event of the day in the order it happens.
+        final SimpleDateFormat clock = com.atakmap.android.atmosphere.units.Clock.format("h:mm a");
+        clock.setTimeZone(tz);
+        final List<Object[]> rows = new ArrayList<>();
+        addEvents(rows, d.astroDawn, LightBarView.BAND_COLORS[1], "Astronomical twilight begins", false);
+        addEvents(rows, d.nauticalDawn, LightBarView.BAND_COLORS[2], "Nautical twilight begins", false);
+        addEvents(rows, d.civilDawn, LightBarView.BAND_COLORS[3], "Civil twilight begins", false);
+        addEvents(rows, d.sunrise, LightBarView.BAND_COLORS[4], "Sunrise", true);
+        addEvents(rows, d.sunset, LightBarView.BAND_COLORS[4], "Sunset", true);
+        addEvents(rows, d.civilDusk, LightBarView.BAND_COLORS[3], "Civil twilight ends", false);
+        addEvents(rows, d.nauticalDusk, LightBarView.BAND_COLORS[2], "Nautical twilight ends", false);
+        addEvents(rows, d.astroDusk, LightBarView.BAND_COLORS[1], "Astronomical twilight ends", false);
+        addEvents(rows, d.moonrise, 0xFFD8D8D8, "Moonrise", true);
+        addEvents(rows, d.moonset, 0xFFD8D8D8, "Moonset", true);
+        java.util.Collections.sort(rows, new java.util.Comparator<Object[]>() {
+            @Override
+            public int compare(Object[] a, Object[] b) {
+                return Long.compare((Long) a[0], (Long) b[0]);
+            }
+        });
+        for (Object[] r : rows) {
+            // Rounded to the minute, not cut: 05:31:50 is 5:32.
+            final String t = clock.format(new Date((Long) r[0] + 30_000L)).toLowerCase(Locale.US);
+            final LinearLayout row = (LinearLayout) swatchLabel((Integer) r[1], (String) r[2], 14);
+            // The time in its own column, so "11:50 am" and "5:04 am" line up.
+            final TextView tv = new TextView(pluginContext);
+            tv.setText(t);
+            tv.setTextSize(14);
+            tv.setTextColor(Color.WHITE);
+            tv.setSingleLine(true);
+            tv.setLayoutParams(new LinearLayout.LayoutParams(dp(78),
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+            row.addView(tv, 1);
+            lightContainer.addView(row);
+        }
+        if (d.sunAlwaysUp)
+            lightContainer.addView(note("The sun does not set this day."));
+        else if (d.sunAlwaysDown)
+            lightContainer.addView(note("The sun does not rise this day."));
+        if (d.moonrise.isEmpty())
+            lightContainer.addView(note("No moonrise this day."));
+        if (d.moonset.isEmpty())
+            lightContainer.addView(note("No moonset this day."));
+
+        final int diff = d.daylightMinutes - before.daylightMinutes;
+        lightContainer.addView(note("Daylight " + (d.daylightMinutes / 60) + " h "
+                + (d.daylightMinutes % 60) + " min"
+                + (diff == 0 ? ", the same as the day before"
+                        : ", " + Math.abs(diff) + " min " + (diff < 0 ? "shorter" : "longer")
+                                + " than the day before")));
+
+        // The moon: phase as drawn on the bar, then the next four principal phases.
+        final double elong = Light.elongation(moonAt);
+        final LinearLayout moon = new LinearLayout(pluginContext);
+        moon.setOrientation(LinearLayout.HORIZONTAL);
+        moon.setGravity(Gravity.CENTER_VERTICAL);
+        moon.setPadding(dp(4), dp(8), dp(4), dp(4));
+        final View glyph = new View(pluginContext) {
+            @Override
+            protected void onDraw(android.graphics.Canvas cv) {
+                LightBarView.drawMoon(cv, getWidth() / 2f, getHeight() / 2f,
+                        Math.min(getWidth(), getHeight()) / 2f - 2, elong);
+            }
+        };
+        glyph.setLayoutParams(new LinearLayout.LayoutParams(dp(44), dp(44)));
+        moon.addView(glyph);
+        final TextView mt = new TextView(pluginContext);
+        mt.setTextColor(Color.WHITE);
+        mt.setTextSize(15);
+        mt.setPadding(dp(10), 0, 0, 0);
+        mt.setText(Astro.moonPhaseName(moonAt) + ", "
+                + Math.round(Light.illumination(moonAt) * 100) + "% lit, "
+                + String.format(Locale.US, "%.1f", elong / 360d * 29.530588853) + " days old");
+        moon.addView(mt);
+        lightContainer.addView(moon);
+        final SimpleDateFormat phaseFmt = com.atakmap.android.atmosphere.units.Clock.format("EEE MMM d, h:mm a");
+        phaseFmt.setTimeZone(tz);
+        for (Light.Phase ph : Light.nextPhases(moonAt, 4))
+            lightContainer.addView(note(Light.PHASE_NAMES[ph.kind] + "   "
+                    + phaseFmt.format(new Date(ph.time + 30_000L)).replace("AM", "am")
+                            .replace("PM", "pm")));
+        lightContainer.addView(note("Times in " + tz.getDisplayName(
+                tz.inDaylightTime(new Date(noon)), TimeZone.SHORT, Locale.US) + "."));
+    }
+
+    private static void addEvents(List<Object[]> rows, List<Light.Event> events, int color,
+            String name, boolean withAzimuth) {
+        for (Light.Event e : events)
+            rows.add(new Object[] { e.time, color,
+                    withAzimuth ? name + ", " + Math.round(e.azimuth) + "\u00b0" : name });
+    }
+
+    /** A line of text with a small color square before it. */
+    private View swatchLabel(int color, String text, int sp) {
+        final LinearLayout row = new LinearLayout(pluginContext);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(4), dp(2), dp(8), dp(2));
+        final View sw = new View(pluginContext);
+        sw.setBackgroundColor(color);
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(10), dp(10));
+        lp.rightMargin = dp(6);
+        sw.setLayoutParams(lp);
+        row.addView(sw);
+        final TextView t = new TextView(pluginContext);
+        t.setText(text);
+        t.setTextSize(sp);
+        t.setTextColor(Color.WHITE);
+        t.setSingleLine(true);
+        row.addView(t);
+        return row;
+    }
+
+    private TextView note(String text) {
+        final TextView t = new TextView(pluginContext);
+        t.setText(text);
+        t.setTextSize(14);
+        t.setTextColor(Color.WHITE);
+        t.setPadding(dp(4), dp(3), dp(4), dp(3));
+        return t;
+    }
+
+    /** Sunrise, sunset and the moon for the point, computed on the device. */
+    private void renderSunMoon() {
+        if (snapshot == null)
+            return;
+        final long now = System.currentTimeMillis();
+        final long[] sun = Astro.sunRiseSet(now, TimeZone.getDefault(), snapshot.latitude,
+                snapshot.longitude);
+        final SimpleDateFormat clock = com.atakmap.android.atmosphere.units.Clock.format("h:mm a");
+        final LinearLayout row = new LinearLayout(pluginContext);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        if (sun != null) {
+            row.addView(tile("Sunrise", clock.format(new Date(sun[0])).toLowerCase(Locale.US)));
+            row.addView(tile("Sunset", clock.format(new Date(sun[1])).toLowerCase(Locale.US)));
+        } else {
+            row.addView(tile("Sun", "no rise or set today"));
+            final View filler = new View(pluginContext);
+            filler.setLayoutParams(new LinearLayout.LayoutParams(0, 1, 1f));
+            row.addView(filler);
+        }
+        final int lit = (int) Math.round(Astro.moonIllumination(now) * 100);
+        row.addView(tile(Astro.moonPhaseName(now), lit + "% lit"));
+        currentContainer.addView(row);
+    }
+
+    /** The wanted readings in the order the source lists them, taken from the first hour that has them. */
+    private List<Reading> keyOrder(Set<String> wanted) {
+        final List<Reading> order = new ArrayList<>();
+        final Set<String> seen = new HashSet<>();
+        for (SeriesEntry entry : snapshot.series) {
+            for (Reading r : entry.readings) {
+                if (wanted.contains(r.key) && seen.add(r.key))
+                    order.add(r);
+            }
+            if (!order.isEmpty())
+                break;
+        }
+        return order;
+    }
+
+    /**
+     * The hours folded into days: the numbers a shift is planned on. High and low
+     * temperature, the lowest RH, the strongest wind and gust, the highest chance of
+     * precipitation and the total. Only shown when the forecast covers more than one day.
+     */
+    private void renderDays(Set<String> wanted) {
+        final Map<String, DayAgg> days = new LinkedHashMap<>();
+        final SimpleDateFormat dayKey = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+        final SimpleDateFormat dayHead = new SimpleDateFormat("EEE\nM/d", Locale.US);
+        for (SeriesEntry e : snapshot.series) {
+            if (e.timeMillis <= 0)
+                continue;
+            final Date d = new Date(e.timeMillis);
+            final String k = dayKey.format(d);
+            DayAgg agg = days.get(k);
+            if (agg == null) {
+                agg = new DayAgg(dayHead.format(d));
+                days.put(k, agg);
+            }
+            for (Reading r : e.readings) {
+                if (r.valid() && wanted.contains(r.key))
+                    agg.take(r);
+            }
+        }
+        final boolean any = days.size() >= 2;
+        daysHeading.setVisibility(any ? View.VISIBLE : View.GONE);
+        daysStrip.setVisibility(any ? View.VISIBLE : View.GONE);
+        if (!any)
+            return;
+
+        // Rows exist only when some day has the value, so a source without gusts has no gust row.
+        final String[] rowLabels = {"Hi", "Lo", "Min RH", "Max wind", "Max gust", "Precip %", "Precip"};
+        final boolean[] rowUsed = new boolean[rowLabels.length];
+        for (DayAgg a : days.values()) {
+            for (int i = 0; i < rowLabels.length; i++)
+                rowUsed[i] |= !Double.isNaN(a.row(i));
+        }
+        final List<String> labels = new ArrayList<>();
+        for (int i = 0; i < rowLabels.length; i++)
+            if (rowUsed[i]) labels.add(rowLabels[i]);
+        daysLegend.addView(column("", labels, true));
+        for (DayAgg a : days.values()) {
+            final List<String> values = new ArrayList<>();
+            for (int i = 0; i < rowLabels.length; i++) {
+                if (!rowUsed[i])
+                    continue;
+                final double v = a.row(i);
+                values.add(Double.isNaN(v) ? "\u2014" : Units.format(a.quantity(i), v, units));
+            }
+            daysContainer.addView(column(a.header, values, false));
+        }
+    }
+
+    /** What a reading is, from its quantity and its name, so days can be aggregated. */
+    private enum Kind {
+        TEMP, DEW, FEELS, WBGT, RH, WIND, WIND20, GUST, TRANSPORT, DIR, TDIR, MIXING, POP,
+        PRECIP, SKY, OTHER;
+
+        static Kind fromName(String n) {
+            if (n == null) return TEMP;
+            for (Kind k : values())
+                if (k.name().equals(n)) return k;
+            return TEMP;
+        }
+    }
+
+    private static Kind kind(Reading r) {
+        final String k = (r.key + " " + r.label).toLowerCase(Locale.US);
+        switch (r.quantity) {
+            case TEMPERATURE:
+                if (k.contains("dew")) return Kind.DEW;
+                if (k.contains("wet bulb") || k.contains("wetbulb")) return Kind.WBGT;
+                if (k.contains("feel") || k.contains("apparent")) return Kind.FEELS;
+                return Kind.TEMP;
+            case HEIGHT:
+                return k.contains("mixing") ? Kind.MIXING : Kind.OTHER;
+            case PERCENT:
+                if (k.contains("humid")) return Kind.RH;
+                if (k.contains("precip")) return Kind.POP;
+                if (k.contains("cloud") || k.contains("sky")) return Kind.SKY;
+                return Kind.OTHER;
+            case SPEED:
+                if (k.contains("gust"))
+                    return Kind.GUST;
+                if (k.contains("transport"))
+                    return Kind.TRANSPORT;
+                // The fire weather wind: every prescription and spot forecast is
+                // written in 20-foot winds, and this is the one the readout quotes.
+                if (k.contains("twentyfoot") || k.contains("20-ft"))
+                    return Kind.WIND20;
+                return Kind.WIND;
+            case ANGLE:
+                return k.contains("transport") ? Kind.TDIR : Kind.DIR;
+            case PRECIPITATION:
+                return Kind.PRECIP;
+            default:
+                return Kind.OTHER;
+        }
+    }
+
+    /** Legend text that fits a column. */
+    private static String shortLabel(Reading r) {
+        switch (kind(r)) {
+            case TEMP: return "Temp";
+            case DEW: return "Dew pt";
+            case FEELS: return "Feels";
+            case RH: return "RH";
+            case WIND: return "10 m";
+            case WIND20: return "20-ft";
+            case GUST: return "Gust";
+            case TRANSPORT: return "Transp";
+            case DIR: return "Dir";
+            case TDIR: return "T dir";
+            case MIXING: return "Mix ht";
+            case WBGT: return "WBGT";
+            case POP: return "Precip %";
+            case PRECIP: return "Precip";
+            case SKY: return "Sky";
+            default: return r.label.length() > 9 ? r.label.substring(0, 9) : r.label;
+        }
+    }
+
+    /** One day's extremes, NaN until a reading arrives. */
+    private static final class DayAgg {
+        final String header;
+        double tHi = Double.NaN, tLo = Double.NaN, rhLo = Double.NaN, windHi = Double.NaN,
+                gustHi = Double.NaN, popHi = Double.NaN, precipSum = Double.NaN;
+
+        DayAgg(String header) {
+            this.header = header;
+        }
+
+        void take(Reading r) {
+            switch (kind(r)) {
+                case TEMP:
+                    tHi = Double.isNaN(tHi) ? r.value : Math.max(tHi, r.value);
+                    tLo = Double.isNaN(tLo) ? r.value : Math.min(tLo, r.value);
+                    break;
+                case RH: rhLo = Double.isNaN(rhLo) ? r.value : Math.min(rhLo, r.value); break;
+                case WIND: case WIND20:
+                    windHi = Double.isNaN(windHi) ? r.value : Math.max(windHi, r.value); break;
+                case GUST: gustHi = Double.isNaN(gustHi) ? r.value : Math.max(gustHi, r.value); break;
+                case POP: popHi = Double.isNaN(popHi) ? r.value : Math.max(popHi, r.value); break;
+                case PRECIP: precipSum = Double.isNaN(precipSum) ? r.value : precipSum + r.value; break;
+                default: break;
+            }
+        }
+
+        double row(int i) {
+            switch (i) {
+                case 0: return tHi;
+                case 1: return tLo;
+                case 2: return rhLo;
+                case 3: return windHi;
+                case 4: return gustHi;
+                case 5: return popHi;
+                default: return precipSum;
+            }
+        }
+
+        Quantity quantity(int i) {
+            switch (i) {
+                case 0: case 1: return Quantity.TEMPERATURE;
+                case 2: case 5: return Quantity.PERCENT;
+                case 3: case 4: return Quantity.SPEED;
+                default: return Quantity.PRECIPITATION;
+            }
+        }
+    }
+
+    /**
+     * A column of the strip: a two-line header and one line per row, every line a fixed
+     * height so the legend column and the value columns line up.
+     */
+    private View column(String header, List<String> values, boolean legend) {
+        final LinearLayout col = new LinearLayout(pluginContext);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setLayoutParams(new LinearLayout.LayoutParams(
+                legend ? LinearLayout.LayoutParams.WRAP_CONTENT : dp(COLUMN_DP),
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        col.setPadding(dp(4), 0, dp(4), 0);
+        final TextView h = new TextView(pluginContext);
+        h.setText(header);
+        h.setTextSize(12);
+        h.setMaxLines(2);
+        h.setHeight(dp(HEADER_DP));
+        h.setGravity((legend ? Gravity.START : Gravity.CENTER_HORIZONTAL) | Gravity.BOTTOM);
+        // The day and hour headers, and the row labels down the left, in the heading
+        // cyan, so the white readings stand off them (operator, 2026-10-11: "the hi lo
+        // min rh on the left etc it should offset the readings").
+        h.setTextColor(0xFF00E5FF);
+        h.setTypeface(Typeface.DEFAULT_BOLD);
+        col.addView(h);
+        for (String v : values) {
+            final TextView t = new TextView(pluginContext);
+            t.setText(v);
+            t.setTextSize(15);
+            t.setSingleLine(true);
+            t.setHeight(dp(ROW_DP));
+            t.setGravity((legend ? Gravity.START : Gravity.CENTER_HORIZONTAL) | Gravity.CENTER_VERTICAL);
+            if (legend)
+                t.setTextColor(0xFF00E5FF);
+            else
+                t.setTypeface(VALUE_FACE);
+            col.addView(t);
+        }
+        return col;
+    }
+
+    private int dp(int v) {
+        return Math.round(v * pluginContext.getResources().getDisplayMetrics().density);
+    }
+
+    // ---- dialogs -----------------------------------------------------------------
+
+    private void showVariablesDialog() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null || selected == null)
+            return;
+
+        final List<WxParam> params = selected.params;
+        final String[] labels = new String[params.size()];
+        final boolean[] checked = new boolean[params.size()];
+        final Set<String> keys = new HashSet<>(ParamSelection.selectedKeys(selected));
+        for (int i = 0; i < params.size(); i++) {
+            labels[i] = params.get(i).label;
+            checked[i] = keys.contains(params.get(i).key);
+        }
+
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.variables_title))
+                .setMultiChoiceItems(labels, checked,
+                        new DialogInterface.OnMultiChoiceClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which,
+                                    boolean isChecked) {
+                                if (isChecked)
+                                    keys.add(params.get(which).key);
+                                else
+                                    keys.remove(params.get(which).key);
+                            }
+                        })
+                .setPositiveButton(pluginContext.getString(R.string.close), new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        ParamSelection.setSelected(selected, keys);
+                        // The variable list is part of the request, so this needs a
+                        // fetch, not just a re-render.
+                        refresh(true);
+                    }
+                })
+                .show();
+    }
+
+    // ---- favorites -----------------------------------------------------------------
+
+    private void showFavoritesDialog() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        final List<Favorites.Place> all = new ArrayList<>(favorites.all());
+        final AlertDialog.Builder b = new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.favorites_title));
+        if (all.isEmpty()) {
+            b.setMessage(pluginContext.getString(R.string.favorites_none));
+        } else {
+            final String[] names = new String[all.size()];
+            int checked = -1;
+            for (int i = 0; i < all.size(); i++) {
+                names[i] = all.get(i).name;
+                if (favorite != null && favorite.name.equals(names[i]))
+                    checked = i;
+            }
+            b.setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    dialog.dismiss();
+                    setFavorite(all.get(which));
+                }
+            });
+            b.setNeutralButton(pluginContext.getString(R.string.favorites_remove), new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    showRemoveFavoritesDialog();
+                }
+            });
+        }
+        b.setPositiveButton(pluginContext.getString(R.string.favorites_add), new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                showAddFavoriteDialog();
+            }
+        });
+        b.setNegativeButton(pluginContext.getString(R.string.close), null);
+        b.show();
+    }
+
+    /**
+     * Save the point being read now under a name, suggested from the provider's
+     * nearest city when the last snapshot is for this point, else the coordinates.
+     * Saving does not switch to it: an operator starring their own position wants
+     * to keep following it, not freeze it.
+     */
+    private void showAddFavoriteDialog() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        final GeoPoint p = point();
+        if (p == null) {
+            Toast.makeText(ctx, pluginContext.getString(R.string.no_position), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String suggested = egress.latitude(p) + ", " + egress.longitude(p);
+        if (snapshot != null && snapshot.place != null
+                && Math.abs(snapshot.latitude - p.getLatitude()) < 0.01
+                && Math.abs(snapshot.longitude - p.getLongitude()) < 0.01)
+            suggested = snapshot.place;
+
+        final EditText input = new EditText(ctx);
+        input.setSingleLine(true);
+        input.setText(suggested);
+        input.setSelectAllOnFocus(true);
+        final double lat = p.getLatitude(), lon = p.getLongitude();
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.favorite_name_title))
+                .setView(input)
+                .setPositiveButton(pluginContext.getString(R.string.save), new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        final Favorites.Place saved = favorites.add(
+                                input.getText().toString(), lat, lon);
+                        if (saved != null)
+                            Toast.makeText(ctx, "Saved \u2605 " + saved.name,
+                                    Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void showRemoveFavoritesDialog() {
+        final Context ctx = MapCompat.atakContext();
+        final List<Favorites.Place> all = new ArrayList<>(favorites.all());
+        if (ctx == null || all.isEmpty())
+            return;
+        final String[] names = new String[all.size()];
+        for (int i = 0; i < all.size(); i++)
+            names[i] = all.get(i).name;
+        final boolean[] checked = new boolean[all.size()];
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.favorites_remove_title))
+                .setMultiChoiceItems(names, checked,
+                        new DialogInterface.OnMultiChoiceClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which,
+                                    boolean isChecked) {
+                                checked[which] = isChecked;
+                            }
+                        })
+                .setPositiveButton(pluginContext.getString(R.string.remove), new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        boolean activeGone = false;
+                        for (int i = 0; i < names.length; i++) {
+                            if (!checked[i])
+                                continue;
+                            favorites.remove(names[i]);
+                            if (favorite != null && favorite.name.equals(names[i]))
+                                activeGone = true;
+                        }
+                        // The place being read is gone: back to the map center.
+                        if (activeGone)
+                            setMode(PointMode.CENTER);
+                    }
+                })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    /**
+     * A source file that did not load is shown once, at start. Upstream plugins that
+     * only log this leave the operator staring at a source that never appears.
+     */
+    private void showSourceProblemsIfAny() {
+        final List<String> problems = registry.problems();
+        if (problems.isEmpty())
+            return;
+
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+
+        final StringBuilder sb = new StringBuilder();
+        for (String p : problems)
+            sb.append("• ").append(p).append("\n");
+
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.source_problems))
+                .setMessage(sb.toString().trim())
+                .setPositiveButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private static String hosts(WxSourceDef def) {
+        final List<String> h = def.hosts();
+        if (h.isEmpty())
+            return "no host";
+        final StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < h.size(); i++) {
+            if (i > 0)
+                sb.append(", ");
+            sb.append(h.get(i));
+        }
+        return sb.toString();
+    }
+}

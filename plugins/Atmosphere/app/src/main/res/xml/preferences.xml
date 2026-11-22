@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The manual is reached through ATAK's Tool Preferences. A plugin without this
+     entry ships its PDF inside the APK with no way for anyone to open it, which has
+     happened before and went undetected because the PDF really was in there. Check
+     it on a device by opening Settings then Tool Preferences, not by unzipping. -->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <com.atakmap.android.gui.PanPreference
+        android:key="manual"
+        android:title="@string/manual_title"
+        android:summary="@string/manual_summary" />
+</PreferenceScreen>

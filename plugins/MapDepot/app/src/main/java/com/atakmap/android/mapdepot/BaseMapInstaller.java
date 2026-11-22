@@ -76,9 +76,58 @@ public final class BaseMapInstaller {
      * alongside the packages.
      */
     public static File dirFor(Depot.BaseMap map) {
-        return map.fileName().endsWith(".json")
-                ? FileSystemUtils.getItem("imagery")
-                : mapSourceDir();
+        if (map.fileName().endsWith(".json"))
+            return FileSystemUtils.getItem("imagery");
+        // An overlay in the mapsources folder is one more base map to pick,
+        // and picking it replaces the imagery with roads on a black screen.
+        // In grg/ ATAK lists it as an image overlay and draws it on top.
+        return map.overlay() ? FileSystemUtils.getItem("grg") : mapSourceDir();
+    }
+
+    /**
+     * Where an overlay landed before 1.12, when every source went to the
+     * base map folder. Cleaned up on install and remove so a phone that
+     * downloaded one as a base map does not keep a second copy of it there.
+     */
+    private static File legacyFile(Depot.BaseMap map) {
+        return map.overlay() ? new File(mapSourceDir(), map.fileName()) : null;
+    }
+
+    private static void removeLegacy(Depot.BaseMap map) {
+        final File old = legacyFile(map);
+        if (old != null && old.isFile() && old.delete()) {
+            Log.d(TAG, "removed base map copy of overlay " + old.getName());
+            notifyAtak(old);
+        }
+    }
+
+    /**
+     * Whether an added overlay is drawing, or null when ATAK will not say
+     * (not an overlay, not added, or not registered yet). The roads overlay
+     * lives under Overlay Manager > Image Overlay, which nobody looks for;
+     * the operator (2026-10-11): "people are not going to know where to turn
+     * that off". So the row carries the switch.
+     */
+    public static Boolean isVisible(Depot.BaseMap map) {
+        if (!map.overlay())
+            return null;
+        final com.atakmap.android.hierarchy.action.Visibility v =
+                PackageInstaller.visibilityOf(new File(dirFor(map), map.fileName()));
+        return v == null ? null : Boolean.valueOf(v.isVisible());
+    }
+
+    public static boolean setVisible(Depot.BaseMap map, boolean visible) {
+        final com.atakmap.android.hierarchy.action.Visibility v =
+                PackageInstaller.visibilityOf(new File(dirFor(map), map.fileName()));
+        if (v == null)
+            return false;
+        try {
+            return v.setVisible(visible);
+        } catch (RuntimeException notThisBuild) {
+            Log.w(TAG, "could not set visibility on " + map.fileName() + ": "
+                    + notThisBuild);
+            return false;
+        }
     }
 
     /** Whether this source is already on the device at the right size. */
@@ -126,9 +175,16 @@ public final class BaseMapInstaller {
             @Override
             public void run() {
                 final File f = new File(dirFor(map), map.fileName());
+                if (map.overlay() && f.exists())
+                    PackageInstaller.unload(f, "External GRG Data",
+                            "application/octet-stream");
                 final boolean gone = !f.exists() || f.delete();
-                if (gone)
-                    notifyAtak(f);
+                if (gone) {
+                    if (map.overlay())
+                        removeLegacy(map);
+                    else
+                        notifyAtak(f);
+                }
                 main.post(new Runnable() {
                     @Override
                     public void run() {
@@ -201,7 +257,14 @@ public final class BaseMapInstaller {
         if (!tmp.renameTo(dest))
             throw new IllegalStateException("cannot install " + dest);
 
-        notifyAtak(dest);
+        if (map.overlay()) {
+            // GRG discovery runs once at ATAK start; the import pipeline
+            // registers it now, the same way the district maps arrive.
+            PackageInstaller.importGrg(dest);
+            removeLegacy(map);
+        } else {
+            notifyAtak(dest);
+        }
         Log.d(TAG, "installed " + dest + " (" + dest.length() + " bytes)");
         return dest;
     }

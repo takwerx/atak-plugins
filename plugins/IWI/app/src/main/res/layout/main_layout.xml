@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The pane: IWI's pages (iwi_layout.xml, inflated into iwi_host) and the Settings
+     page (iwi_settings.xml, inflated into iwi_settings_host), swapped by visibility.
+     IwiDropDown does the swapping; IwiPane owns everything inside iwi_host. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:paddingLeft="6dp"
+    android:paddingRight="6dp">
+    <LinearLayout
+        android:id="@+id/iwi_host"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical" />
+    <LinearLayout
+        android:id="@+id/settings_page"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:visibility="gone">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="6dp">
+            <Button
+                android:id="@+id/btn_settings_back"
+                style="@style/TakwerxButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="90dp"
+                android:text="@string/back" />
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="12dp"
+                android:textSize="17sp"
+                android:textStyle="bold"
+                android:textColor="@color/white"
+                android:text="@string/iwi_settings_title" />
+            <ImageButton
+                android:id="@+id/btn_settings_wide"
+                style="@style/TakwerxIconButton"
+                android:layout_weight="0"
+                android:layout_width="44dp"
+                android:layout_height="match_parent"
+                android:layout_marginLeft="6dp"
+                android:contentDescription="@string/iwi_wide_desc"
+                android:src="@drawable/ic_wide" />
+        </LinearLayout>
+        <!-- focusableInTouchMode + beforeDescendants: the scroller does not jump to a
+             button that is rebuilt. -->
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fadeScrollbars="false"
+            android:focusableInTouchMode="true"
+            android:descendantFocusability="beforeDescendants">
+            <LinearLayout
+                android:id="@+id/iwi_settings_host"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="12dp" />
+        </ScrollView>
+    </LinearLayout>
+</LinearLayout>

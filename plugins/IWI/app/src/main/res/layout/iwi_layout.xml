@@ -1,0 +1,758 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- IWI's pages, by visibility swap: the IWI page (the plugin's main screen), a
+     trauma center's details, the Medical Incident Report and the Radio Script
+     (PLAN-IWI, "The pane"). Built inside LCES 2026-11-03..11-07, moved back out.
+     Inflated into main_layout.xml's iwi_host; the trauma center Settings rows are
+     iwi_settings.xml, on the Settings page beside it. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:visibility="visible">
+
+    <!-- Pinned in the pane root: what just happened, or what to do next. -->
+    <TextView
+        android:id="@+id/iwi_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="8dp"
+        android:paddingBottom="4dp"
+        android:textSize="13sp"
+        android:textColor="@color/amber"
+        android:visibility="gone" />
+
+    <!-- The patients by triage color, in view above every page once the IWI is
+         declared: four filled boxes with their counts, 0 included (operator,
+         2026-10-14). Before Declare they are hidden (2026-11-08); item 2 counts. -->
+    <LinearLayout
+        android:id="@+id/iwi_tally"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/iwi_tally_red"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/iwi_tally_yellow"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_marginLeft="6dp"
+            android:gravity="center"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/iwi_tally_green"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_marginLeft="6dp"
+            android:gravity="center"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/iwi_tally_black"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_marginLeft="6dp"
+            android:gravity="center"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <!-- Every patient, whatever the color. -->
+        <TextView
+            android:id="@+id/iwi_tally_total"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1.6"
+            android:layout_marginLeft="10dp"
+            android:gravity="center"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="@color/white" />
+
+    </LinearLayout>
+
+    <!-- Steps, pinned under the counts on every page (operator, 2026-11-06: "it
+         needs to stay at the top"): how many of the six are in and what is next.
+         A tap goes there, page by page; no 1-6 boxes (operator, 2026-11-08). -->
+    <LinearLayout
+        android:id="@+id/iwi_top_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+
+        <Button
+            android:id="@+id/iwi_steps_bar"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:gravity="start|center_vertical" />
+
+        <!-- BACK: the step before the one on the page; grey on the first
+             (operator, 2026-11-08). -->
+        <Button
+            android:id="@+id/iwi_btn_prev"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:minWidth="96dp"
+            android:text="@string/iwi_prev"
+            android:enabled="false" />
+
+        <!-- NEXT: grey until the step on the page is filled in, then green; a tap
+             turns the page to the next step (operator, 2026-11-08). -->
+        <Button
+            android:id="@+id/iwi_btn_next"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:minWidth="96dp"
+            android:text="@string/iwi_next"
+            android:enabled="false" />
+
+        <!-- After the initial call: the follow-ups, in place of the steps
+             (operator, 2026-11-06). Built in code. -->
+        <LinearLayout
+            android:id="@+id/iwi_followup_bar"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:visibility="gone" />
+
+        <!-- Atmosphere's: drag the handle, or tap this, to open the pane wide. On the
+             steps row so the count row can go before Declare (operator, 2026-11-08). -->
+        <ImageButton
+            android:id="@+id/iwi_btn_wide"
+            style="@style/TakwerxIconButton"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_weight="0"
+            android:layout_marginLeft="6dp"
+            android:layout_marginRight="0dp"
+            android:contentDescription="@string/iwi_wide_desc"
+            android:src="@drawable/ic_wide" />
+    </LinearLayout>
+
+    <!-- The IWI page: Back to the LCES main screen pinned above its scroller. -->
+    <LinearLayout
+        android:id="@+id/iwi_main_page"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="6dp">
+
+        <Button
+            android:id="@+id/iwi_btn_main_back"
+            android:visibility="gone"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="90dp"
+            android:text="@string/back" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="12dp"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:textColor="@color/tile_iwi"
+            android:text="@string/iwi_title" />
+    </LinearLayout>
+
+    <ScrollView
+        android:id="@+id/iwi_main_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fadeScrollbars="false"
+        android:focusableInTouchMode="true"
+        android:descendantFocusability="beforeDescendants">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="12dp">
+
+            <!-- A location set and on the map, waiting to be confirmed here rather
+                 than in a pop-up that would cover the map. -->
+            <LinearLayout
+                android:id="@+id/iwi_confirm_block"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/iwi_confirm_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="17sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/white" />
+
+                <TextView
+                    android:id="@+id/iwi_confirm_where"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="2dp"
+                    android:textSize="16sp"
+                    android:textColor="@color/state_on" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="2dp"
+                    android:textSize="13sp"
+                    android:textColor="@color/guide_grey"
+                    android:text="@string/iwi_confirm_note" />
+
+                <!-- Slide to confirm, added from code (operator, 2026-11-06: a tap
+                     could declare by accident). -->
+                <FrameLayout
+                    android:id="@+id/iwi_confirm_slider"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp" />
+
+                <Button
+                    android:id="@+id/iwi_btn_confirm_cancel"
+                    style="@style/TakwerxButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/iwi_cancel" />
+            </LinearLayout>
+
+            <!-- Clear IWI, asked in place with a slider rather than a dialog. -->
+            <LinearLayout
+                android:id="@+id/iwi_clear_block"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="17sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/white"
+                    android:text="@string/iwi_clear_title" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="2dp"
+                    android:textSize="14sp"
+                    android:textColor="@color/guide_grey"
+                    android:text="@string/iwi_clear_note" />
+
+                <FrameLayout
+                    android:id="@+id/iwi_clear_slider"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp" />
+
+                <Button
+                    android:id="@+id/iwi_btn_clear_cancel"
+                    style="@style/TakwerxButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/iwi_cancel" />
+            </LinearLayout>
+
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="6dp">
+
+                <Button
+                    android:id="@+id/iwi_btn_declare"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/iwi_declare" />
+
+                <Button
+                    android:id="@+id/iwi_btn_settings"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="6dp"
+                    android:text="@string/settings" />
+            </LinearLayout>
+
+            <!-- The declared IWI: when, how long ago, where. -->
+            <LinearLayout
+                android:id="@+id/iwi_live_block"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    style="@style/TakwerxSectionHeading"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/iwi_heading_declared" />
+
+                <TextView
+                    android:id="@+id/iwi_live_time"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/white" />
+
+                <TextView
+                    android:id="@+id/iwi_live_patients"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="2dp"
+                    android:textSize="15sp"
+                    android:textColor="@color/white" />
+
+                <TextView
+                    android:id="@+id/iwi_live_where"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="2dp"
+                    android:textSize="15sp"
+                    android:textColor="@color/white" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="6dp">
+
+                    <Button
+                        android:id="@+id/iwi_btn_go_iwi"
+                        style="@style/TakwerxButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="@string/iwi_go_to" />
+
+                    <Button
+                        android:id="@+id/iwi_btn_move"
+                        style="@style/TakwerxButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="6dp"
+                        android:text="@string/iwi_change_location" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Steps: what the initial call needs, filled in before Declare
+                 (operator, 2026-11-06). Built in code. -->
+            <LinearLayout
+                android:id="@+id/iwi_steps_block"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <TextView
+                style="@style/TakwerxSectionHeading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/iwi_heading_report" />
+
+            <Button
+                android:id="@+id/iwi_btn_report"
+                style="@style/TakwerxButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/iwi_mir" />
+
+            <Button
+                android:id="@+id/iwi_btn_script"
+                style="@style/TakwerxButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/iwi_radio_script" />
+
+            <TextView
+                style="@style/TakwerxSectionHeading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/iwi_heading_reference" />
+
+            <!-- Nearest trauma center, a drop-down row: the head says the nearest,
+                 the body carries both lines and the estimate note. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="4dp">
+
+                <Button
+                    android:id="@+id/iwi_fold_trauma_head"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content" />
+
+                <ImageButton
+                    android:id="@+id/iwi_fold_trauma_chev"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:layout_marginRight="0dp"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/iwi_fold_trauma_body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingTop="4dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/iwi_trauma_line1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="44dp"
+                    android:gravity="center_vertical"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:textSize="15sp"
+                    android:textColor="@color/white"
+                    android:clickable="true"
+                    android:focusable="true" />
+
+                <TextView
+                    android:id="@+id/iwi_trauma_line2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="44dp"
+                    android:gravity="center_vertical"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:textSize="15sp"
+                    android:textColor="@color/white"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/iwi_trauma_note"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="8dp"
+                    android:textSize="12sp"
+                    android:textColor="@color/guide_grey" />
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+    </LinearLayout>
+
+    <!-- One trauma center's details. Back is pinned above the text. -->
+    <LinearLayout
+        android:id="@+id/iwi_details_page"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:baselineAligned="false"
+            android:layout_marginTop="6dp">
+
+            <Button
+                android:id="@+id/iwi_btn_details_back"
+                style="@style/TakwerxButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/back" />
+
+            <TextView
+                android:id="@+id/iwi_details_title"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="8dp"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@color/white" />
+
+            <Button
+                android:id="@+id/iwi_btn_go_to"
+                style="@style/TakwerxButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/iwi_go_to" />
+            <!-- The wide button on every page (operator, 2026-11-10): this page covers
+                 the bar that holds it. -->
+            <ImageButton
+                android:id="@+id/iwi_btn_details_wide"
+                style="@style/TakwerxIconButton"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_weight="0"
+                android:layout_marginLeft="6dp"
+                android:contentDescription="@string/iwi_wide_desc"
+                android:src="@drawable/ic_wide" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/iwi_details_subtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="13sp"
+            android:textColor="@color/guide_grey"
+            android:paddingBottom="6dp" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fadeScrollbars="false">
+
+            <TextView
+                android:id="@+id/iwi_details_body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="14sp"
+                android:textColor="@color/white"
+                android:lineSpacingExtra="4dp"
+                android:textIsSelectable="true" />
+        </ScrollView>
+    </LinearLayout>
+
+    <!-- Hospitals: the nearest trauma centers with a helipad, one row each, built in
+         code. A tap puts a labeled marker on the map (operator, 2026-11-09). -->
+    <LinearLayout
+        android:id="@+id/iwi_hospitals_page"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="6dp">
+
+            <Button
+                android:id="@+id/iwi_btn_hospitals_back"
+                style="@style/TakwerxButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="90dp"
+                android:text="@string/back" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="12dp"
+                android:textSize="17sp"
+                android:textStyle="bold"
+                android:textColor="@color/white"
+                android:text="@string/iwi_hospitals_title" />
+            <!-- The wide button on every page (operator, 2026-11-10): this page covers
+                 the bar that holds it. -->
+            <ImageButton
+                android:id="@+id/iwi_btn_hospitals_wide"
+                style="@style/TakwerxIconButton"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_weight="0"
+                android:layout_marginLeft="6dp"
+                android:contentDescription="@string/iwi_wide_desc"
+                android:src="@drawable/ic_wide" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/iwi_hospitals_filters"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal" />
+
+        <TextView
+            android:id="@+id/iwi_hospitals_note"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="13sp"
+            android:textColor="@color/guide_grey"
+            android:paddingTop="4dp"
+            android:paddingBottom="6dp" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fadeScrollbars="false">
+
+            <LinearLayout
+                android:id="@+id/iwi_hospitals_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </ScrollView>
+    </LinearLayout>
+
+    <!-- Medical Incident Report: the form is built in code into report_container. -->
+    <LinearLayout
+        android:id="@+id/iwi_report_page"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="6dp">
+
+            <Button
+                android:id="@+id/iwi_btn_report_back"
+                style="@style/TakwerxButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="90dp"
+                android:text="@string/back" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="12dp"
+                android:textSize="17sp"
+                android:textStyle="bold"
+                android:textColor="@color/white"
+                android:text="@string/iwi_mir" />
+
+            <Button
+                android:id="@+id/iwi_btn_report_script"
+                style="@style/TakwerxButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/iwi_radio_script" />
+        </LinearLayout>
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fadeScrollbars="false">
+
+            <LinearLayout
+                android:id="@+id/iwi_report_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="24dp" />
+        </ScrollView>
+    </LinearLayout>
+
+    <!-- Radio Script: built in code from the report each time it opens. -->
+    <LinearLayout
+        android:id="@+id/iwi_script_page"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="6dp">
+
+            <Button
+                android:id="@+id/iwi_btn_script_back"
+                style="@style/TakwerxButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="90dp"
+                android:text="@string/back" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="12dp"
+                android:textSize="17sp"
+                android:textStyle="bold"
+                android:textColor="@color/white"
+                android:id="@+id/iwi_script_title"
+                android:text="@string/iwi_radio_script" />
+        </LinearLayout>
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fadeScrollbars="false">
+
+            <LinearLayout
+                android:id="@+id/iwi_script_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="24dp" />
+        </ScrollView>
+    </LinearLayout>
+
+</LinearLayout>

@@ -1,0 +1,151 @@
+{
+ "features": [
+  {
+   "attributes": {
+    "objectid": 413,
+    "snumunum": "2622444",
+    "name": "Up River Pond Cx _ BLR",
+    "type": "Fire 2026-09-23 20:00:00 PM PDT",
+    "tid": "1",
+    "lat": "40.8709",
+    "lon": "-124.0124",
+    "rmade": "2026-09-23 19:30:21 PM PDT",
+    "rfill": "2026-09-23 20:13:14 PM PDT",
+    "stat": "C",
+    "stattext": "Completed: 2026-09-23 20:13:14 PM PDT",
+    "wfo": "EKA",
+    "acclevel": null,
+    "acts": null,
+    "deliverdtg": "2026-09-23 20:00:00 PM PDT",
+    "idp_filedate": 1790248680000,
+    "idp_ingestdate": 1790248688000
+   }
+  },
+  {
+   "attributes": {
+    "objectid": 6,
+    "snumunum": "2621219",
+    "name": "Nature Grove - Fire Behavior Request",
+    "type": "Fire 2026-09-18 16:00:00 PM MDT",
+    "tid": "0",
+    "lat": "46.1645",
+    "lon": "-113.9089",
+    "rmade": "2026-09-18 10:00:04 AM MDT",
+    "rfill": "2026-09-18 14:00:18 PM MDT",
+    "stat": "C",
+    "stattext": "Completed: 2026-09-18 14:00:18 PM MDT",
+    "wfo": "MSO",
+    "acclevel": null,
+    "acts": null,
+    "deliverdtg": "2026-09-18 16:00:00 PM MDT",
+    "idp_filedate": 1790248680000,
+    "idp_ingestdate": 1790248688000
+   }
+  },
+  {
+   "attributes": {
+    "objectid": 20,
+    "snumunum": "2621722",
+    "name": "Night Sky Event",
+    "type": "Fire 2026-10-08 17:00:00 PM EDT",
+    "tid": "0",
+    "lat": "37.6113",
+    "lon": "-85.638",
+    "rmade": "2026-09-12 16:09:21 PM EDT",
+    "rfill": "Incomplete",
+    "stat": "P",
+    "stattext": "Request pending",
+    "wfo": "LMK",
+    "acclevel": null,
+    "acts": null,
+    "deliverdtg": "2026-10-08 17:00:00 PM EDT",
+    "idp_filedate": 1790248680000,
+    "idp_ingestdate": 1790248688000
+   }
+  },
+  {
+   "attributes": {
+    "objectid": 126,
+    "snumunum": "2622133",
+    "name": "USCG SAR",
+    "type": "Search and Rescue 2026-09-18 17:00:00 PM EDT",
+    "tid": "9",
+    "lat": "18.2683",
+    "lon": "-61.2933",
+    "rmade": "2026-09-18 16:00:07 PM EDT",
+    "rfill": "2026-09-18 16:17:35 PM EDT",
+    "stat": "C",
+    "stattext": "Completed: 2026-09-18 16:17:35 PM EDT",
+    "wfo": "NHC",
+    "acclevel": null,
+    "acts": null,
+    "deliverdtg": "2026-09-18 17:00:00 PM EDT",
+    "idp_filedate": 1790248680000,
+    "idp_ingestdate": 1790248688000
+   }
+  },
+  {
+   "attributes": {
+    "objectid": 4,
+    "snumunum": "2621056",
+    "name": "UAF/Equinox Marathon",
+    "type": "Other 2026-09-19 15:00:00 PM AKDT",
+    "tid": "7",
+    "lat": "64.8788",
+    "lon": "-148.056",
+    "rmade": "2026-09-19 01:00:05 AM AKDT",
+    "rfill": "2026-09-19 13:43:10 PM AKDT",
+    "stat": "C",
+    "stattext": "Completed: 2026-09-19 13:43:10 PM AKDT",
+    "wfo": "AFG",
+    "acclevel": null,
+    "acts": null,
+    "deliverdtg": "2026-09-19 15:00:00 PM AKDT",
+    "idp_filedate": 1790248680000,
+    "idp_ingestdate": 1790248688000
+   }
+  },
+  {
+   "attributes": {
+    "objectid": 128,
+    "snumunum": "2622135",
+    "name": "DEER VALLEY ",
+    "type": "Hazardous Materials 2026-09-18 15:00:00 PM MDT",
+    "tid": "4",
+    "lat": "39.7029",
+    "lon": "-105.2713",
+    "rmade": "2026-09-18 14:11:43 PM MDT",
+    "rfill": "2026-09-18 14:42:16 PM MDT",
+    "stat": "C",
+    "stattext": "Completed: 2026-09-18 14:42:16 PM MDT",
+    "wfo": "BOU",
+    "acclevel": null,
+    "acts": null,
+    "deliverdtg": "2026-09-18 15:00:00 PM MDT",
+    "idp_filedate": 1790248680000,
+    "idp_ingestdate": 1790248688000
+   }
+  },
+  {
+   "attributes": {
+    "objectid": 66,
+    "snumunum": "2622057",
+    "name": "Upton 3",
+    "type": "Fire 2026-09-17 07:00:00 AM CDT",
+    "tid": "0",
+    "lat": "31.1481",
+    "lon": "-100.223",
+    "rmade": "2026-09-17 06:09:25 AM CDT",
+    "rfill": "2026-09-17 06:18:28 AM CDT",
+    "stat": "C",
+    "stattext": "Completed: 2026-09-17 06:18:28 AM CDT",
+    "wfo": "SJT",
+    "acclevel": null,
+    "acts": null,
+    "deliverdtg": "2026-09-17 07:00:00 AM CDT",
+    "idp_filedate": 1790248680000,
+    "idp_ingestdate": 1790248688000
+   }
+  }
+ ]
+}

@@ -1,0 +1,297 @@
+
+package com.atakmap.android.atmosphere.ui;
+
+import android.content.Context;
+import android.content.Intent;
+import android.view.View;
+import android.widget.TextView;
+
+import com.atak.plugins.impl.PluginLayoutInflater;
+import com.atakmap.android.atmosphere.overlay.TropicalOverlay;
+import com.atakmap.android.atmosphere.plugin.R;
+import com.atakmap.android.dropdown.DropDown.OnStateListener;
+import com.atakmap.android.dropdown.DropDownReceiver;
+import com.atakmap.android.maps.MapItem;
+import com.atakmap.android.maps.MapView;
+import com.atakmap.coremap.log.Log;
+import com.atakmap.map.layer.feature.AttributeSet;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/**
+ * What a tapped storm feature opens: what it is, which storm, then everything the
+ * advisory says about it.
+ *
+ * <p>ATAK's own feature details would do something, but not this: the pane the
+ * operator asked for is Feature Layer's, which prints the source's own fields under
+ * an ATTRIBUTES heading with a Back button that leaves the map where it is. This is
+ * that shape, carried forward.
+ *
+ * <p>The radial's details button broadcasts {@link #ACTION} with the tapped item's
+ * uid. The attributes are already on the item -- {@code AtmosphereFeatures} puts them
+ * there during the hit test, where they have to be fetched by feature id because the
+ * hit-test query returns features without them.
+ */
+public class StormDetailsReceiver extends DropDownReceiver implements OnStateListener {
+
+    private static final String TAG = "AtmosphereTropical";
+
+    public static final String ACTION = "com.atakmap.android.atmosphere.STORM_DETAILS";
+
+    private final View view;
+
+    private final Context pluginContext;
+
+    public StormDetailsReceiver(MapView mapView, Context pluginContext) {
+        super(mapView);
+        this.pluginContext = pluginContext;
+        this.view = PluginLayoutInflater.inflate(pluginContext, R.layout.storm_details, null);
+        // Back closes the details and leaves the map where it is; ATAK's own close is
+        // not where a thumb expects it.
+        view.findViewById(R.id.btn_back).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                closeDropDown();
+            }
+        });
+    }
+
+    /** Something that can open a spot request's forecast; the pane sets it. */
+    public interface SpotOpener {
+        void openSpot(String spotId);
+
+        /** A river gauge opens its record with the hydrograph, not its fields. */
+        void openGauge(String lid);
+
+        /** A buoy opens its record on the buoy page. */
+        void openBuoy(String id);
+
+        /** A fire weather zone opens its planning forecast on the Fire Weather Zones page. */
+        void openZone(String id, String name, String cwa);
+
+        /** A SAWTI zone opens the SAWTI page on that zone and day ("3|2026-09-30"). */
+        void openSawti(String ref);
+
+        /** A Predictive Service Area opens its fire danger and its GACC's chart ("SC08"). */
+        void openErc(String code);
+
+        /** A debris-flow fire's Show the area / Hide the area: its basins drawn or taken off. */
+        void showFire(String ref, boolean show);
+
+        /** Whether that fire's area is drawn now, for the button's label. */
+        boolean isFireShown(String ref);
+    }
+
+    private static SpotOpener spotOpener;
+
+    public static void setSpotOpener(SpotOpener opener) {
+        spotOpener = opener;
+    }
+
+    /**
+     * Open the page a tapped item belongs to, when it has one: a spot request its
+     * forecast, a gauge its hydrograph, a buoy its record, a fire weather zone its
+     * planning forecast. Used by the radial's details button and, since
+     * takwerx/atmosphere#1, by the tap itself, so these open without the radial
+     * ("going right to the plug in window, upon selecting a marker would speed up
+     * things and remove an unneeded step").
+     *
+     * @return true if a page was opened
+     */
+    public static boolean openPage(MapItem item) {
+        if (item == null || spotOpener == null)
+            return false;
+        // A spot request opens its forecast rather than a list of its own fields:
+        // kind and office are on the row already, and the forecast is the thing
+        // somebody tapped it for (operator, 2026-09-25).
+        final String spotId = item.getMetaString("spotId", "");
+        if (!spotId.isEmpty()) {
+            spotOpener.openSpot(spotId);
+            return true;
+        }
+        final String gaugeId = item.getMetaString("gaugeId", "");
+        if (!gaugeId.isEmpty()) {
+            spotOpener.openGauge(gaugeId);
+            return true;
+        }
+        final String buoyId = item.getMetaString("buoyId", "");
+        if (!buoyId.isEmpty()) {
+            spotOpener.openBuoy(buoyId);
+            return true;
+        }
+        final String ref = item.getMetaString("atmosphereRef", "");
+        if (!ref.isEmpty() && "sawti".equals(item.getMetaString("atmosphereLayer", ""))) {
+            spotOpener.openSawti(ref);
+            return true;
+        }
+        if (!ref.isEmpty() && "erc".equals(item.getMetaString("atmosphereLayer", ""))) {
+            spotOpener.openErc(ref);
+            return true;
+        }
+        final String zoneId = item.getMetaString("zoneId", "");
+        if (!zoneId.isEmpty()) {
+            spotOpener.openZone(zoneId, item.getMetaString("zoneName", ""),
+                    item.getMetaString("zoneCwa", ""));
+            return true;
+        }
+        return false;
+    }
+
+    private static final java.util.regex.Pattern URL =
+            java.util.regex.Pattern.compile("https?://[^\\s]+");
+
+    /**
+     * Every web address in the page opens in the browser. Through ATAK's own context
+     * with a new task, because a plugin context cannot start an activity (operator,
+     * 2026-10-12: "make the hyperlinks work for the events page").
+     */
+    private static CharSequence linked(String body) {
+        if (body == null || !body.contains("http"))
+            return body == null ? "" : body;
+        final android.text.SpannableString out = new android.text.SpannableString(body);
+        final java.util.regex.Matcher m = URL.matcher(body);
+        while (m.find()) {
+            String url = m.group();
+            int end = m.end();
+            while (end > m.start() && ".,;)".indexOf(url.charAt(url.length() - 1)) >= 0) {
+                url = url.substring(0, url.length() - 1);
+                end--;
+            }
+            final String target = url;
+            out.setSpan(new android.text.style.ClickableSpan() {
+                @Override
+                public void onClick(android.view.View widget) {
+                    final Context ctx = com.atakmap.android.atmosphere.compat.MapCompat.atakContext();
+                    if (ctx == null)
+                        return;
+                    try {
+                        ctx.startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(target))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                    } catch (RuntimeException e) {
+                        Log.w(TAG, "no browser for " + target, e);
+                    }
+                }
+            }, m.start(), end, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        return out;
+    }
+
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        final String uid = intent.getStringExtra("targetUID");
+        final MapItem item = uid == null ? null
+                : getMapView().getRootGroup().deepFindItem("uid", uid);
+        if (item == null) {
+            Log.d(TAG, "storm details: no map item for " + uid);
+            return;
+        }
+        if (openPage(item))
+            return;
+        final String title = item.getMetaString("title", item.getMetaString("callsign", ""));
+        final String body = item.getMetaString("remarks", "");
+        ((TextView) view.findViewById(R.id.details_title))
+                .setText(title.isEmpty() ? "Storm" : title);
+        ((TextView) view.findViewById(R.id.details_subtitle))
+                .setText(item.getMetaString("storm_set", ""));
+        final TextView attributes = view.findViewById(R.id.details_attributes);
+        attributes.setText(linked(body));
+        attributes.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
+        // The page is reused: without this it opens where the last one was scrolled
+        // to, and a dam's first line (where the dam is) was off the top (2026-11-15).
+        if (attributes.getParent() instanceof android.widget.ScrollView) {
+            final android.widget.ScrollView sv = (android.widget.ScrollView) attributes.getParent();
+            sv.scrollTo(0, 0);
+            sv.post(new Runnable() {
+                @Override
+                public void run() {
+                    sv.scrollTo(0, 0);
+                }
+            });
+        }
+        // A fire's page carries the one action its marker is for: bring the map to the
+        // burn and let the layer draw its basins.
+        final android.widget.Button action = view.findViewById(R.id.details_action);
+        final String ref = item.getMetaString("atmosphereRef", "");
+        if (action != null) {
+            if (ref.startsWith("fire:") && spotOpener != null) {
+                final boolean[] shownNow = { spotOpener.isFireShown(ref) };
+                action.setText(pluginContext.getString(shownNow[0] ? R.string.hide_area : R.string.show_area));
+                action.setVisibility(android.view.View.VISIBLE);
+                // The page stays open and the button flips, so the next tap hides the
+                // area again (operator, 2026-10-12: "did not leave me on the pane").
+                action.setOnClickListener(new android.view.View.OnClickListener() {
+                    @Override
+                    public void onClick(android.view.View v) {
+                        shownNow[0] = !shownNow[0];
+                        spotOpener.showFire(ref, shownNow[0]);
+                        action.setText(pluginContext.getString(shownNow[0] ? R.string.hide_area
+                                : R.string.show_area));
+                    }
+                });
+            } else
+                action.setVisibility(android.view.View.GONE);
+        }
+        showDropDown(view, HALF_WIDTH, FULL_HEIGHT, FULL_WIDTH, HALF_HEIGHT, this);
+    }
+
+    /** The attributes as the pane prints them: sorted, one per line, blanks dropped. */
+    public static String render(AttributeSet attrs) {
+        if (attrs == null)
+            return "";
+        // A layer that has already written its fields in a deliberate order says so
+        // here, and that order is kept. Sorting is only the fallback, for layers
+        // whose attributes come straight off a service and have no order of their own.
+        try {
+            final String ready = attrs.getStringAttribute("_details");
+            if (ready != null && !ready.trim().isEmpty())
+                return ready;
+        } catch (Exception none) {
+            // no pre-rendered text; fall through to sorting
+        }
+        final List<String> keys = new ArrayList<>(attrs.getAttributeNames());
+        Collections.sort(keys, String.CASE_INSENSITIVE_ORDER);
+        final StringBuilder sb = new StringBuilder();
+        for (String k : keys) {
+            String v;
+            try {
+                if (attrs.getAttributeType(k) != String.class)
+                    continue;
+                v = attrs.getStringAttribute(k);
+            } catch (Exception e) {
+                continue;
+            }
+            if (v == null || v.isEmpty() || v.equals("null"))
+                continue;
+            // Underscored keys are plumbing -- a glyph path, a pre-rendered block --
+            // and are never shown.
+            if (k.startsWith("_"))
+                continue;
+            if (sb.length() > 0)
+                sb.append('\n');
+            sb.append(k).append(": ").append(v);
+        }
+        return sb.toString();
+    }
+
+    @Override
+    protected void disposeImpl() {
+    }
+
+    @Override
+    public void onDropDownSelectionRemoved() {
+    }
+
+    @Override
+    public void onDropDownVisible(boolean v) {
+    }
+
+    @Override
+    public void onDropDownSizeChanged(double width, double height) {
+    }
+
+    @Override
+    public void onDropDownClose() {
+    }
+}

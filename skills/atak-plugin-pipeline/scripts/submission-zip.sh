@@ -48,6 +48,66 @@ echo "==> version code (the MDM must see this as an update)"
 "$HERE/check-version-code.sh" "$NAME" --target "$ATAK_VERSION" || {
     echo "error: not zipping a version an MDM could not push as an update — bump PLUGIN_VERSION" >&2; exit 1; }
 
+# Josh Fuller's preflight scans the source the way the pipeline's reviewers
+# will: semgrep rules, secrets, dependencies. It is his tool and moves fast, so
+# pull the latest every run rather than keeping a copy. PREFLIGHT_ARGS passes
+# flags through (e.g. --allow-gaps); PREFLIGHT_SKIP=1 skips it on purpose.
+echo "==> preflight (joshuafuller/atak-plugin-preflight)"
+if [ "${PREFLIGHT_SKIP:-}" = 1 ]; then
+    echo "    skipped: PREFLIGHT_SKIP=1"
+elif [ -f "$ATAK_PREFLIGHT/preflight.py" ]; then
+    git -C "$ATAK_PREFLIGHT" pull -q --ff-only 2>/dev/null \
+        || echo "    warning: could not update $ATAK_PREFLIGHT, running the copy on disk"
+    # shellcheck disable=SC2086
+    python3 "$ATAK_PREFLIGHT/preflight.py" ${PREFLIGHT_ARGS:-} "$PROJECT" || {
+        echo "error: preflight is not clean; read its report and fix the source (PREFLIGHT_ARGS=--allow-gaps for a missing scanner)" >&2; exit 1; }
+else
+    echo "    not installed: git clone https://github.com/joshuafuller/atak-plugin-preflight.git \"$ATAK_PREFLIGHT\""
+fi
+
+# Manual pictures, before anything is built. A release that changes a screen
+# the manual shows has to carry new pictures of it. A picture of the plugin's
+# own UI (pane, dialog, menu, settings) can be shot on a dev-ATAK phone and
+# cropped: the DEVELOPER BUILD watermark is on the map, never inside the crop.
+# So it rides this submission; only map shots need the signed build. Leaving a
+# UI picture for "the signed build" costs a whole resubmission.
+echo "==> manual pictures (did this release change a screen?)"
+if [ -d "$PROJECT/docs/user_manual" ] && git -C "$PROJECT" rev-parse --git-dir >/dev/null 2>&1; then
+    PIC_BASE="$(git -C "$PROJECT" merge-base HEAD "${PICTURES_BASE:-main}" 2>/dev/null || true)"
+    if [ -n "$PIC_BASE" ]; then
+        UI_CHANGED="$(git -C "$PROJECT" diff --name-only --relative "$PIC_BASE" -- app/src/main \
+            | grep -E '/res/layout/|/res/values/strings\.xml$|/ui/' || true)"
+        PICS_CHANGED="$(git -C "$PROJECT" diff --name-only --relative "$PIC_BASE" -- docs/user_manual \
+            | grep -Ei '\.(png|jpe?g)$' || true)"
+        if [ -z "$UI_CHANGED" ]; then
+            echo "  PASS  no layout, string or UI code changed since ${PICTURES_BASE:-main}"
+        elif [ -n "$PICS_CHANGED" ]; then
+            echo "  PASS  screens changed and manual pictures changed with them"
+        elif [ "${PICTURES_CHECKED:-}" = 1 ]; then
+            echo "  PASS  screens changed, no manual picture; PICTURES_CHECKED=1 says none is needed now"
+        else
+            echo "  STOP  this release changes screens and no manual picture:"
+            echo "$UI_CHANGED" | sed 's/^/          /'
+            echo "        Pane, dialog, menu or settings shown in the manual: retake them on a"
+            echo "        dev-ATAK phone, crop to the pane or dialog, and zip again. Only map"
+            echo "        shots wait for the signed build. If no manual picture shows a changed"
+            echo "        screen, or only map shots do, rerun with PICTURES_CHECKED=1."
+            exit 1
+        fi
+    else
+        echo "  WARN  no merge base with ${PICTURES_BASE:-main} (set PICTURES_BASE to your last release); check the pictures by hand"
+    fi
+else
+    echo "  PASS  no manual, or not a git checkout"
+fi
+
+# The download block at the top of README and guide names the version, and the
+# zip carries the README. Re-stamp it to PLUGIN_VERSION so the bump and the block
+# move together; commit what it changed along with the version bump.
+echo "==> download block names $PLUGIN_VERSION"
+"$HERE/check-download-links.sh" "$NAME" --fix >/dev/null 2>&1 || true
+echo "  PASS  re-stamped to $PLUGIN_VERSION where it was not (commit README.md and docs/USER_GUIDE.md if they changed)"
+
 mkdir -p "$DIST"
 rm -f "$OUT"
 
@@ -69,6 +129,7 @@ CANDIDATES=(
     "app/src/main/assets"
     "app/src/main/res"
     "app/src/main/java"
+    "app/src/main/cpp"
     "app/src/gov"
     "template.local.properties"
     "README.md"
@@ -157,7 +218,7 @@ SIZE_HUMAN=$(du -h "$OUT" | cut -f1 | tr -d ' ')
 # fonts, title art and screenshots, so the ceiling moves — but it is still a
 # ceiling, well under the ~30 MB that main.jar alone would add.
 if [ -d "$PROJECT/docs/user_manual" ]; then
-    SIZE_LIMIT=12000000
+    SIZE_LIMIT=16000000   # 16 MB since 2026-10-12: a 120-picture manual zipped to 13 MB; the gate is for the 30 MB SDK jar
     SIZE_NOTE="with the user manual"
 else
     SIZE_LIMIT=2000000
@@ -252,7 +313,9 @@ PROPS
         # build has no .git either. The SDK's getVersionCode() returns 1 here, and
         # a versionCode-1 release is not an update to any MDM.
         AAPT="$(aapt_bin)"
-        EXPECT_CODE="$(version_code "$PLUGIN_VERSION")"
+        # One code per ATAK target: an MDM handed two targets of one release
+        # under one code and two hashes reports an incompatible build.
+        EXPECT_CODE="$(target_version_code "$PLUGIN_VERSION" "$ATAK_VERSION")"
         GOT_CODE=""
         if [ -n "$AAPT" ] && [ -n "$BUILT_APK" ]; then
             GOT_CODE="$("$AAPT" dump badging "$BUILT_APK" 2>/dev/null \
@@ -262,9 +325,9 @@ PROPS
             echo "  FAIL  could not read versionCode from the built APK (aapt: ${AAPT:-none})"
             FAIL=1
         elif [ "$GOT_CODE" = "$EXPECT_CODE" ] && [ "$GOT_CODE" -gt 1 ]; then
-            echo "  PASS  versionCode=$GOT_CODE from PLUGIN_VERSION $PLUGIN_VERSION (no .git needed)"
+            echo "  PASS  versionCode=$GOT_CODE from PLUGIN_VERSION $PLUGIN_VERSION on ATAK $ATAK_VERSION (no .git needed)"
         else
-            echo "  FAIL  versionCode=$GOT_CODE, expected $EXPECT_CODE from PLUGIN_VERSION $PLUGIN_VERSION."
+            echo "  FAIL  versionCode=$GOT_CODE, expected $EXPECT_CODE from PLUGIN_VERSION $PLUGIN_VERSION on ATAK $ATAK_VERSION."
             echo "        A signed release with versionCode 1 cannot be pushed as an update by"
             echo "        any MDM. app/build.gradle must set versionCode = PLUGIN_VERSION_CODE,"
             echo "        not getVersionCode()."

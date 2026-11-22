@@ -1,0 +1,11 @@
+<!--
+    The radial on a detection. Details is the plugin's own; the rest are ATAK's own
+    actions, which work on any map item. Bloodhound is deliberately absent: it needs a
+    real marker to navigate to, and dropping one is a decision for the operator, not a
+    side effect of opening a radial on a satellite pixel.
+-->
+<menu buttonRadius='65' buttonSpan='72' buttonWidth='90' buttonBg='bgs/button.xml'>
+    <button icon='icons/details.png' onClick='actions/showdetection.xml' />
+    <button icon='icons/pairing_line.png' onClick='actions/pairingline.xml' />
+    <button icon='icons/polar_coord.png' onClick='actions/polarCoords.xml' />
+</menu>

@@ -1,10 +1,10 @@
 ATAK Plugin — TAKwerx Market
 
-**Download TAKwerx Market 1.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download TAKwerx Market 1.8** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/takwerx-market/releases/download/v1.5/ATAK-Plugin-TakwerxMarket-1.5--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/takwerx-market/releases/download/v1.5/ATAK-Plugin-TakwerxMarket-1.5--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/takwerx-market/releases/download/v1.5/ATAK-Plugin-TakwerxMarket-1.5--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/takwerx-market/releases/download/v1.8/ATAK-Plugin-TakwerxMarket-1.8--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/takwerx-market/releases/download/v1.8/ATAK-Plugin-TakwerxMarket-1.8--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/takwerx-market/releases/download/v1.8/ATAK-Plugin-TakwerxMarket-1.8--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/takwerx-market/releases
 
@@ -48,8 +48,29 @@ own project. ATAK-CIV is the exception: the tak.gov release is copied to the
 catalog host byte for byte, its TAK Product Center signature intact, and the
 market pins that signature for ATAK's package before Android is asked.
 
+Plugins from other developers are listed too, from their own signed releases.
+To list yours, set up its repository as described in
+[docs/LIST_YOUR_PLUGIN.md](docs/LIST_YOUR_PLUGIN.md) and open a listing
+request: https://github.com/takwerx/takwerx-market/issues/new?template=list-my-plugin.yml
+Every plugin the market offers, takwerx's and other developers', is listed with
+links at https://takwerx.github.io/takwerx-market/ (rebuilt from the live catalog).
+
 _________________________________________________________________
 STATUS
+
+Version 1.8: a phone with vector tile packages (Map Depot's public-lands maps)
+can update to ATAK 5.8.0.5. The TAK Product Center fixed the 5.8.0.4 start-up
+crash in 5.8.0.5, and the market already offered 5.8.0.5, but it still refused
+every 5.8 on such a phone and said a fix was being waited on. It now refuses
+only 5.8.0.x builds below 5.8.0.5, the rule Map Depot 1.11 shipped, and on
+those it says to choose 5.8.0.5 or newer.
+
+Version 1.7: a download's file name carries nothing from the catalog, and the
+market downloads only from the depot's own host and github.com, where the
+release APKs live (tak.gov's scan of 1.6 flagged both). 1.7 also carries the
+change 1.6 was built for: each ATAK target's APK has its own versionCode, so
+an MDM can hold all three builds and push each one as an update. 1.6 went to
+tak.gov once and was superseded on the scan findings before publication.
 
 Version 1.5. Fifteenth submission.
 

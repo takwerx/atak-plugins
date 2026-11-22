@@ -83,8 +83,10 @@ main checkout; `git -C ~/GitHub/atak-plugins branch --show-current` must print
     → PASS. The download block at the top of `README.md` and
     `docs/USER_GUIDE.md` must name `PLUGIN_VERSION` and link the `v<version>`
     assets, and when `~/atak-dist/signed/` holds this version's APKs each one must be
-    linked. A FAIL stops the ship: fix the block, commit it on the branch,
-    re-run. Map Depot 1.6 shipped with every link aimed at a v1.5 release that
+    linked. A FAIL stops the ship: `./scripts/check-download-links.sh <Plugin>
+    --fix` re-stamps the block to `PLUGIN_VERSION`; commit it on the branch,
+    re-run. (`submission-zip.sh` does this itself since 2026-10-19, so a FAIL
+    here means the zips predate that or the block is malformed.) Map Depot 1.6 shipped with every link aimed at a v1.5 release that
     was never created, and the 404s were found by a user.
     `.claude/hooks/release-links-guard.sh` also blocks the subtree push and
     the `gh release create` mechanically, so a ship that skips this step still
@@ -101,6 +103,27 @@ main checkout; `git -C ~/GitHub/atak-plugins branch --show-current` must print
     fix is a version bump and a resubmission, never an edit to the check.
     `release-links-guard.sh` runs the same check (without `--live`) before
     the subtree push and the `gh release create`.
+12. **Manual pictures:** did this release change a screen the manual shows?
+    UI pictures (pane, dialog, menu, settings) should already be in this
+    build: they are shot on the dev phone and cropped before zipping, and
+    `submission-zip.sh` stops when screens changed with no picture. If a
+    changed screen is only visible with the map (features, overlays), the
+    signed build is where its picture comes from: say so, and the operator
+    decides whether that is a next round before shipping or after.
+13. **Public repo in the split (MANDATORY):** `./scripts/sync-public-repo.sh
+    <Plugin>` → PASS. Anything merged on `takwerx/<plugin-repo>` itself (a
+    worker or contributor pull request, the worker workflow, the Market's
+    community list) is not in the subtree split, and step 3's push is refused
+    as non-fast-forward halfway through the ship. Until 2026-10-31 every ship
+    hit that and patched a throwaway export branch, and the next one hit it
+    again. A FAIL lists the commits: `--merge` brings them in on this branch
+    (it commits; on a conflict it writes nothing and names the files),
+    then re-run the publish scrub, since what came in is now tracked.
+14. **FirstNet (MANDATORY):** `./scripts/check-firstnet.sh <Plugin>` → PASS.
+    Every server the plugin calls has a probe result from a FirstNet device,
+    and one that rejects FirstNet's IPv6 or never answers it is handled by
+    the IPv4 fallback (Sit Rep's `net/Http.java`). `submission-zip.sh` ran it
+    already; run it again, because a probe result can change in between.
 
 ## Step 1 — The ship prompt (HARD STOP)
 
@@ -113,6 +136,9 @@ Present exactly this via AskUserQuestion and wait:
 > - open issues: `<count surfaced / none>` · commit scan: `<clean / acknowledged>`
 > - download links: `check-download-links PASS (<Plugin> <version>)`
 > - version code: `check-version-code PASS (<Plugin> <version> -> <code>)`, signed APKs for every target
+> - FirstNet: `check-firstnet PASS (<Plugin>: N hosts)`
+> - public repo: `sync-public-repo PASS (push is a fast-forward)`
+> - manual pictures: `<current / UI retaken on the dev build / map shots pending: which>`
 > - this will: merge the branch into `main` (merge commit), push main, subtree-push
 >   `plugins/<Name>` to `takwerx/<plugin-repo>` main, tag `v<version>` there,
 >   create its GitHub Release with the signed APKs, and refresh the depot
@@ -255,6 +281,8 @@ Pre-flight:
    already-shipped version, because neither the version nor the APKs moved.
 5. **Commit scan** as in step 9 above: clean, or each hit acknowledged.
 6. Main checkout on `main`: `git -C ~/GitHub/atak-plugins branch --show-current`.
+7. `./scripts/sync-public-repo.sh <Plugin>` → PASS, as in step 13 above
+   (`--merge` on a FAIL, then the scrub again).
 
 Prompt, via AskUserQuestion:
 

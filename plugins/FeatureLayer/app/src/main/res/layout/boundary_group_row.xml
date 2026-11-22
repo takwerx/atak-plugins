@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One state (or set of states) in the layer list: the head switches every kind of
+     boundary in it, the arrow opens the kinds, each a layer row of its own (operator,
+     2026-10-12: "keeping the side pane menus compact then expandable ... expanding that
+     state to all things in that state, county, city etc."). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="6dp"
+    android:paddingBottom="8dp">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+        <Button
+            android:id="@+id/group_toggle"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:gravity="left|center_vertical"
+            android:ellipsize="middle" />
+        <ImageButton
+            android:id="@+id/group_expand"
+            style="@style/TakwerxIconButton"
+            android:layout_width="44dp"
+            android:layout_weight="0"
+            android:layout_marginRight="0dp"
+            android:contentDescription="Show or hide the boundaries in this state"
+            android:src="@drawable/ic_expand" />
+    </LinearLayout>
+    <!-- "You are in Elko County, NV · Elko": every kind's answer on one line. -->
+    <TextView
+        android:id="@+id/group_where"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="13sp"
+        android:textColor="#FFFFFF"
+        android:paddingTop="4dp"
+        android:paddingLeft="4dp"
+        android:visibility="gone" />
+    <LinearLayout
+        android:id="@+id/group_body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingLeft="16dp"
+        android:visibility="gone" />
+</LinearLayout>

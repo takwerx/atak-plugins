@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    An empty container for the radio's web GUI. The WebView is added to this in
+    code rather than declared here, because the SDK's helloworld sample is
+    explicit that it must be constructed with the host's context on the main
+    thread; a WebView inflated from a plugin's layout with the plugin context
+    fails.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical" />

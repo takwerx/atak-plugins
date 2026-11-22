@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The main screen above the list: the map switch and Settings, then the six
+     IRPG pages read every time. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="6dp">
+        <Button
+            android:id="@+id/btn_lessons"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content" />
+        <!-- Settings takes only its own width so the switch can read in full. -->
+        <Button
+            android:id="@+id/btn_settings"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="@string/settings" />
+    </LinearLayout>
+    <!-- Search the whole book; the hits take the list's place below the tiles. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="6dp">
+        <EditText
+            android:id="@+id/search"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:hint="@string/search_hint"
+            android:textColorHint="#8A8A8A"
+            android:textColor="@color/white"
+            android:textSize="15sp"
+            android:imeOptions="actionSearch|flagNoExtractUi"
+            android:inputType="text"
+            android:maxLines="1"
+            android:singleLine="true" />
+        <Button
+            android:id="@+id/btn_clear"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:minWidth="80dp"
+            android:text="@string/clear" />
+    </LinearLayout>
+    <TextView
+        style="@style/TakwerxSectionHeading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/heading_irpg" />
+    <!-- The pages read every time: three, then Briefing and the whole book. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="4dp"
+        android:baselineAligned="false">
+        <Button android:id="@+id/tile_orders" style="@style/TakwerxButton"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="match_parent" android:text="@string/tile_orders" />
+        <Button android:id="@+id/tile_lces" style="@style/TakwerxButton"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="match_parent" android:layout_marginLeft="6dp"
+            android:text="@string/tile_lces" />
+        <Button android:id="@+id/tile_denominators" style="@style/TakwerxTwoLineTile"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="wrap_content" android:layout_marginLeft="6dp"
+            android:text="@string/tile_denominators" />
+    </LinearLayout>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="6dp"
+        android:baselineAligned="false">
+        <Button android:id="@+id/tile_briefing" style="@style/TakwerxButton"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="match_parent" android:text="@string/tile_briefing" />
+        <Button android:id="@+id/tile_irpg" style="@style/TakwerxButton"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="match_parent" android:layout_marginLeft="6dp"
+            android:text="@string/tile_irpg" />
+    </LinearLayout>
+</LinearLayout>

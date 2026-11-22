@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One run on the model page: its name (tap for its details), its map switch, Delete. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:baselineAligned="false"
+    android:paddingTop="4dp">
+    <Button
+        android:id="@+id/run_name"
+        style="@style/TakwerxButton"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical|start"
+        android:text="20:43 run" />
+    <Button
+        android:id="@+id/run_toggle"
+        style="@style/TakwerxButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="6dp"
+        android:minWidth="64dp"
+        android:text="ON" />
+    <Button
+        android:id="@+id/run_delete"
+        style="@style/TakwerxButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="6dp"
+        android:text="Delete" />
+</LinearLayout>

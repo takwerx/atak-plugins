@@ -16,6 +16,37 @@ git subtree split --prefix=plugins/<Name> -b <name>-export
 git push https://github.com/<owner>/<plugin-repo>.git <name>-export:refs/heads/main
 ```
 
+Once anything is merged on the plugin repo itself (a contributor's pull
+request, a workflow file), the split no longer contains its `main` and that
+push is refused as non-fast-forward. Merging the public main back into
+`plugins/<Name>` is not enough on its own: the plain split drops a parent it
+was never told is subtree history, and the push is refused all the same. What
+works is two commits on your branch, on a clean tree:
+
+```bash
+pre=plugins/<Name>
+git fetch https://github.com/<owner>/<plugin-repo>.git main && P=$(git rev-parse FETCH_HEAD)
+S=$(git subtree split --prefix=$pre HEAD)
+M=$(git merge-tree --write-tree --merge-base=$(git merge-base $S $P) $S $P | head -1)  # non-zero exit = conflict
+export GIT_INDEX_FILE=$(mktemp -d)/index
+git read-tree HEAD && git rm -r -q --cached $pre && git read-tree --prefix=$pre/ $M
+T=$(git write-tree); unset GIT_INDEX_FILE
+N=$(git commit-tree $(git rev-parse $T:$pre) -p $S -p $P -m "Merge <plugin-repo> main")
+C=$(git commit-tree $T -p HEAD -m "Merge <plugin-repo> main into $pre")
+R=$(git commit-tree $T -p $C -p $N -m "Split '$pre/' into commit '$N'
+
+git-subtree-dir: $pre
+git-subtree-mainline: $C
+git-subtree-split: $N")
+git reset --keep $R
+```
+
+The last commit is the one `git subtree split --rejoin` writes; its trailers
+tell every later split that `$C` splits to `$N`, which has the public main as
+a parent, so the push is a fast-forward. `split --onto=$P --rejoin` looks like
+a shortcut and works exactly once: on the next sync the earlier recorded split
+is inside the public history and it dies with "cache ... already exists".
+
 ### The plugin page standard
 
 **README.md** — in this exact order, nothing between them
@@ -72,9 +103,23 @@ or the on-device market ever shows the problem, because the system installer
 happily replaces a same-code package.
 
 `app/build.gradle` therefore sets `versionCode = PLUGIN_VERSION_CODE`, computed
-as `MAJOR*10000 + MINOR*100 + PATCH` (1.3 → 10300), identical on every machine.
-`new-plugin.sh` writes it; `submission-zip.sh` reads the clean-extract APK with
-`aapt` and fails the zip when the code is not that number.
+from `PLUGIN_VERSION` and the ATAK target as `(MAJOR*10000 + MINOR*100 + PATCH)
+* 10000 + ATAK_MAJOR*1000 + ATAK_MINOR*10 + ATAK_PATCH` (1.3 on 5.8.0 →
+103005080), identical on every machine. `new-plugin.sh` writes it;
+`submission-zip.sh` reads the clean-extract APK with `aapt` and fails the zip
+when the code is not that number.
+
+The ATAK target is part of the code because a release is one APK per ATAK
+version, all the same package. With one code per release, an MDM handed the
+5.7 and 5.8 builds sees two different binaries claiming one revision: it can
+neither upgrade one with the other nor treat them as one file, and reports an
+incompatible build. Folding the target in gives each build its own code,
+ordered 5.6 < 5.7 < 5.8, so a phone moving up an ATAK version takes the
+matching plugin as a normal update; moving down needs the plugin uninstalled
+first. A unique code lets the MDM hold every target, it does not pick the right
+one: the 5.8 build installs on any phone and only ATAK refuses to load it, so
+assign each build to a device group by ATAK version. Ceilings: plugin major 20,
+ATAK major 9, ATAK patch 9; the build throws past them.
 
 Consequences worth knowing:
 
@@ -86,8 +131,9 @@ Consequences worth knowing:
   Uninstall the plugin first. Devices that only ever had code 1 upgrade normally.
 
 `scripts/check-version-code.sh <Plugin> --signed --live` holds the whole rule:
-above every signed release, one APK per target the README links, each with that
-code, the same package and the same signing certificate as last time.
+above every signed release, one APK per target the README links, each with its
+target's code above the last signed APK for that target and none shared, the
+same package and the same signing certificate as last time.
 
 ## The download links are part of the release
 

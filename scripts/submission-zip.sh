@@ -55,6 +55,73 @@ echo "==> version code (the MDM must see this as an update)"
 "$REPO_ROOT/scripts/check-version-code.sh" "$NAME" --target "$ATAK_VERSION" || {
     echo "error: not zipping a version an MDM could not push as an update — bump PLUGIN_VERSION" >&2; exit 1; }
 
+# FirstNet gives the device IPv6, and some agency firewalls reject FirstNet's
+# IPv6 or never answer it (Census, EPA; Sit Rep in Arlington VA, 2026-11-17).
+# No desk test sees it, so every host the plugin calls has a probe result from a
+# FirstNet device, and a host that fails there needs the IPv4 fallback.
+echo "==> FirstNet (every server the plugin calls works from FirstNet LTE)"
+"$REPO_ROOT/scripts/check-firstnet.sh" "$NAME" || {
+    echo "error: probe new hosts with check-firstnet.sh --probe $NAME on a FirstNet device, or add the IPv4 fallback" >&2; exit 1; }
+
+PF="${ATAK_PREFLIGHT:-$HOME/atak-plugin-preflight}"
+# Josh Fuller's preflight scans the source the way the pipeline's reviewers
+# will: semgrep rules, secrets, dependencies. It is his tool and moves fast, so
+# pull the latest every run rather than keeping a copy. PREFLIGHT_ARGS passes
+# flags through (e.g. --allow-gaps); PREFLIGHT_SKIP=1 skips it on purpose.
+echo "==> preflight (joshuafuller/atak-plugin-preflight)"
+if [ "${PREFLIGHT_SKIP:-}" = 1 ]; then
+    echo "    skipped: PREFLIGHT_SKIP=1"
+elif [ -f "$PF/preflight.py" ]; then
+    git -C "$PF" pull -q --ff-only 2>/dev/null \
+        || echo "    warning: could not update $PF, running the copy on disk"
+    # shellcheck disable=SC2086
+    python3 "$PF/preflight.py" ${PREFLIGHT_ARGS:-} "$PROJECT" || {
+        echo "error: preflight is not clean; read its report and fix the source (PREFLIGHT_ARGS=--allow-gaps for a missing scanner)" >&2; exit 1; }
+else
+    echo "    not installed: git clone https://github.com/joshuafuller/atak-plugin-preflight.git \"$PF\""
+fi
+
+# Manual pictures, before anything is built. A release that changes a screen
+# the manual shows has to carry new pictures of it, and a picture of the
+# plugin's own UI (pane, dialog, menu, settings) is shot on the dev phone and
+# cropped: the DEVELOPER BUILD watermark is on the map, never inside the crop.
+# So it rides this submission; only map shots wait for a signed build.
+# Atmosphere 0.3 went to tak.gov on 2026-09-28 with two stale UI pictures and
+# had to be resubmitted as 0.4 (operator: "anytime we can take and crop use
+# the dev build and not waste a trip").
+echo "==> manual pictures (did this release change a screen?)"
+if [ -d "$PROJECT/docs/user_manual" ]; then
+    PIC_BASE="$(git -C "$REPO_ROOT" merge-base HEAD main 2>/dev/null || true)"
+    REL="${PROJECT#"$REPO_ROOT"/}"
+    if [ -n "$PIC_BASE" ]; then
+        UI_CHANGED="$(git -C "$REPO_ROOT" diff --name-only "$PIC_BASE" -- "$REL/app/src/main" \
+            | grep -E '/res/layout/|/res/values/strings\.xml$|/ui/' || true)"
+        PICS_CHANGED="$(git -C "$REPO_ROOT" diff --name-only "$PIC_BASE" -- "$REL/docs/user_manual" \
+            | grep -Ei '\.(png|jpe?g)$' || true)"
+        if [ -z "$UI_CHANGED" ]; then
+            echo "  PASS  no layout, string or UI code changed since main"
+        elif [ -n "$PICS_CHANGED" ]; then
+            echo "  PASS  screens changed and $(echo "$PICS_CHANGED" | wc -l | tr -d ' ') manual picture(s) changed with them"
+        elif [ "${PICTURES_CHECKED:-}" = 1 ]; then
+            echo "  PASS  screens changed, no manual picture; PICTURES_CHECKED=1 says none is needed now"
+        else
+            echo "  STOP  this release changes screens and no manual picture:"
+            echo "$UI_CHANGED" | sed 's/^/          /'
+            echo "        Does the manual show any of them? Pane, dialog, menu or settings:"
+            echo "        retake them NOW on the dev phone and crop to the pane or dialog --"
+            echo "        the watermark is on the map, not in the crop -- then zip again."
+            echo "        Only map shots wait for the signed build. If no manual picture"
+            echo "        shows a changed screen, or only map shots do, rerun with"
+            echo "        PICTURES_CHECKED=1 and say which in the handoff."
+            exit 1
+        fi
+    else
+        echo "  WARN  no merge base with main; check the manual pictures by hand"
+    fi
+else
+    echo "  PASS  no manual in this plugin"
+fi
+
 # The branch must contain every commit on main. Shared release rules reach
 # main on their own tooling ship, and a plugin branch that has not merged main
 # builds without them: FOBS 0.5's zips were built on 2026-09-06 without the
@@ -62,6 +129,21 @@ echo "==> version code (the MDM must see this as an update)"
 echo "==> branch contains main (shared rules current; merged in now if it was not)"
 "$REPO_ROOT/scripts/check-main-merged.sh" --merge || {
     echo "error: not zipping from a branch behind main; see above for why main could not be merged in" >&2; exit 1; }
+
+# The download block at the top of README and guide names the version, and the
+# zip carries the README. Re-stamp it to PLUGIN_VERSION here and commit, so the
+# bump and the block move together: Cursorwerx 0.3 and 0.4 both reached the
+# ship prompt still linking the release before, fixed by hand each time.
+echo "==> download block names $PLUGIN_VERSION (re-stamped and committed if it did not)"
+"$REPO_ROOT/scripts/check-download-links.sh" "$NAME" --fix >/dev/null 2>&1 || true
+if ! git -C "$REPO_ROOT" diff --quiet -- "plugins/$NAME/README.md" "plugins/$NAME/docs/USER_GUIDE.md"; then
+    git -C "$REPO_ROOT" commit -q -m "$NAME $PLUGIN_VERSION: download block names the v$PLUGIN_VERSION release" \
+        -- "plugins/$NAME/README.md" "plugins/$NAME/docs/USER_GUIDE.md" || {
+        echo "error: could not commit the re-stamped download block" >&2; exit 1; }
+    echo "  PASS  re-stamped to $PLUGIN_VERSION and committed ($(git -C "$REPO_ROOT" log -1 --format=%h))"
+else
+    echo "  PASS  already $PLUGIN_VERSION"
+fi
 
 mkdir -p "$DIST"
 rm -f "$OUT"
@@ -76,6 +158,10 @@ CANDIDATES=(
     "$NAME/app/src/main/assets/"
     "$NAME/app/src/main/res/"
     "$NAME/app/src/main/java/"
+    # Native code (ndkBuild): Android.mk and the C/C++ it names. Left out, the
+    # clean-extract build dies on "ndkBuild.path ... Android.mk doesn't exist"
+    # (FireCast, 2026-10-29, the first plugin with a cpp/ tree).
+    "$NAME/app/src/main/cpp/"
     "$NAME/app/src/gov/"
     "$NAME/template.local.properties"
     "$NAME/README.md"
@@ -169,9 +255,11 @@ SIZE_HUMAN=$(du -h "$OUT" | cut -f1 | tr -d ' ')
 # Without a manual a submission is a few hundred KB, and anything larger means the SDK
 # jar or build output crept in. A manual legitimately carries its own fonts, title art
 # and screenshots, so the ceiling moves -- but it is still a ceiling, and still well
-# under the ~30 MB that main.jar alone would add.
+# under the ~30 MB that main.jar alone would add. 16 MB since 2026-10-12: Atmosphere
+# 0.14's manual, 120 pictures and a 2 MB vector title page, zipped to 13.2 MB with
+# every picture already squeezed, and the gate is for the jar, not the pictures.
 if [ -d "$PROJECT/docs/user_manual" ]; then
-    SIZE_LIMIT=12000000
+    SIZE_LIMIT=16000000
     SIZE_NOTE="with the user manual"
 else
     SIZE_LIMIT=2000000
@@ -239,7 +327,9 @@ echo "==> clean-extract build test (a zip that fails here fails on tak.gov)"
             "$TMP/$NAME/app/build.gradle" | head -1)"
     BUILD_SDK="$ATAK_SDK"
     if [ -n "$WANT" ]; then
-        MATCH="$(ls -d "$HOME"/atak-sdk/ATAK-CIV-"$WANT"* 2>/dev/null | sort -V | tail -1)"
+        # Folders holding main.jar only: a downloaded ATAK-CIV-<v>-SDK.zip beside
+        # them sorts last and was picked as the SDK (2026-11-18).
+        MATCH="$(for d in "$HOME/atak-sdk"/ATAK-CIV-"$WANT"*/; do [ -f "$d/main.jar" ] && echo "${d%/}"; done | sort -V | tail -1)"
         if [ -n "$MATCH" ]; then
             BUILD_SDK="$MATCH"
         else
@@ -282,12 +372,17 @@ EOF
         # build has no .git either. The SDK's getVersionCode() returns 1 here, and
         # a versionCode-1 release is not an update to any MDM -- Watchtower refused
         # Cam Depot 1.2 over 1.1 on 2026-09-06 because both were 1 to it. Every
-        # plugin derives the code from PLUGIN_VERSION as MAJOR*10000+MINOR*100+PATCH
-        # (PLUGIN_VERSION_CODE in app/build.gradle); this checks the APK agrees.
+        # plugin derives the code from PLUGIN_VERSION and the ATAK target as
+        # (MAJOR*10000+MINOR*100+PATCH)*10000 + ATAK major*1000+minor*10+patch
+        # (PLUGIN_VERSION_CODE in app/build.gradle): one code per target, because
+        # an MDM handed two targets of one release under one code and two hashes
+        # reports an incompatible build (takwerx/feature-layer#1, 2026-09-20).
+        # This checks the APK agrees.
         # No `| head -1` after sed: only the package: line matches, and head would
         # close the pipe early under pipefail (see the SIGPIPE note below).
         AAPT="$(ls "$ANDROID_HOME"/build-tools/*/aapt 2>/dev/null | sort -V | tail -1)"
-        EXPECT_CODE="$(printf '%s' "$PLUGIN_VERSION" | awk -F. '{printf "%d", $1*10000 + $2*100 + $3}')"
+        EXPECT_CODE="$(printf '%s %s' "$PLUGIN_VERSION" "$ATAK_VERSION" | awk '{ split($1, p, "."); split($2, a, ".");
+            printf "%d", (p[1]*10000 + p[2]*100 + p[3]) * 10000 + a[1]*1000 + a[2]*10 + a[3] }')"
         GOT_CODE=""
         if [ -n "$AAPT" ] && [ -n "$BUILT_APK" ]; then
             GOT_CODE="$("$AAPT" dump badging "$BUILT_APK" 2>/dev/null \
@@ -297,9 +392,9 @@ EOF
             echo "  FAIL  could not read versionCode from the built APK (aapt: ${AAPT:-none})"
             FAIL=1
         elif [ "$GOT_CODE" = "$EXPECT_CODE" ] && [ "$GOT_CODE" -gt 1 ]; then
-            echo "  PASS  versionCode=$GOT_CODE from PLUGIN_VERSION $PLUGIN_VERSION (no .git needed)"
+            echo "  PASS  versionCode=$GOT_CODE from PLUGIN_VERSION $PLUGIN_VERSION on ATAK $ATAK_VERSION (no .git needed)"
         else
-            echo "  FAIL  versionCode=$GOT_CODE, expected $EXPECT_CODE from PLUGIN_VERSION $PLUGIN_VERSION."
+            echo "  FAIL  versionCode=$GOT_CODE, expected $EXPECT_CODE from PLUGIN_VERSION $PLUGIN_VERSION on ATAK $ATAK_VERSION."
             echo "        A signed release with versionCode 1 cannot be pushed as an update by"
             echo "        any MDM. app/build.gradle must set versionCode = PLUGIN_VERSION_CODE,"
             echo "        not getVersionCode() -- see CLAUDE.md, release checklist."

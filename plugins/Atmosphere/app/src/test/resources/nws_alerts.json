@@ -1,0 +1,348 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.81b35a4471393e2181e3c66ed3f9901ad3332af0.001.1",
+   "type": "Feature",
+   "geometry": null,
+   "properties": {
+    "@type": "wx:Alert",
+    "id": "urn:oid:2.49.0.1.840.0.81b35a4471393e2181e3c66ed3f9901ad3332af0.001.1",
+    "areaDesc": "Modoc County Except for the Surprise Valley",
+    "geocode": {
+     "SAME": [
+      "006049"
+     ],
+     "UGC": [
+      "CAZ285"
+     ]
+    },
+    "affectedZones": [
+     "https://api.weather.gov/zones/fire/CAZ285"
+    ],
+    "sent": "2026-09-23T10:43:00-07:00",
+    "effective": "2026-09-23T10:43:00-07:00",
+    "onset": "2026-09-24T14:00:00-07:00",
+    "expires": "2026-09-23T22:45:00-07:00",
+    "ends": "2026-09-24T20:00:00-07:00",
+    "status": "Actual",
+    "messageType": "Alert",
+    "category": "Met",
+    "severity": "Severe",
+    "certainty": "Likely",
+    "urgency": "Expected",
+    "event": "Red Flag Warning",
+    "senderName": "NWS Medford OR",
+    "headline": "Red Flag Warning issued September 23 at 10:43AM PDT until September 24 at 8:00PM PDT by NWS Medford OR",
+    "description": "The National Weather Service in Medford has issued a Red Flag",
+    "instruction": "Follow all fire restrictions. You can find your county's",
+    "response": "Prepare",
+    "scope": "Public",
+    "code": "IPAWSv1.0",
+    "language": "en-US",
+    "eventCode": {
+     "SAME": [
+      "NWS"
+     ],
+     "NationalWeatherService": [
+      "FWW"
+     ]
+    }
+   }
+  },
+  {
+   "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.2aa64ac6b3e19e449b39b38e59e21104ba301287.002.1",
+   "type": "Feature",
+   "geometry": null,
+   "properties": {
+    "@type": "wx:Alert",
+    "id": "urn:oid:2.49.0.1.840.0.2aa64ac6b3e19e449b39b38e59e21104ba301287.002.1",
+    "areaDesc": "Northern Sierra Front - Carson City/Douglas/Storey/Southern Washoe/Eastern Lyon/Far Southern Lassen Counties; Southern Sierra Front - Alpine/Northern Mono/Southern Lyon/Western Mineral Counties",
+    "geocode": {
+     "SAME": [
+      "006035",
+      "006091",
+      "032005",
+      "032019",
+      "032029",
+      "032031",
+      "032510",
+      "006003",
+      "006017",
+      "006051",
+      "032021"
+     ],
+     "UGC": [
+      "NVZ420",
+      "NVZ421"
+     ]
+    },
+    "affectedZones": [
+     "https://api.weather.gov/zones/fire/NVZ420",
+     "https://api.weather.gov/zones/fire/NVZ421"
+    ],
+    "sent": "2026-09-23T12:47:00-07:00",
+    "effective": "2026-09-23T12:47:00-07:00",
+    "onset": "2026-09-25T12:00:00-07:00",
+    "expires": "2026-09-24T16:00:00-07:00",
+    "ends": "2026-09-25T22:00:00-07:00",
+    "status": "Actual",
+    "messageType": "Alert",
+    "category": "Met",
+    "severity": "Severe",
+    "certainty": "Possible",
+    "urgency": "Future",
+    "event": "Fire Weather Watch",
+    "senderName": "NWS Reno NV",
+    "headline": "Fire Weather Watch issued September 23 at 12:47PM PDT until September 25 at 10:00PM PDT by NWS Reno NV",
+    "description": "The National Weather Service in Reno has issued a Fire Weather",
+    "instruction": "Avoid outdoor activities that can cause a spark near dry",
+    "response": "Prepare",
+    "scope": "Public",
+    "code": "IPAWSv1.0",
+    "language": "en-US",
+    "eventCode": {
+     "SAME": [
+      "NWS"
+     ],
+     "NationalWeatherService": [
+      "FWA"
+     ]
+    }
+   }
+  },
+  {
+   "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.b543575c09c5ff91a6c92dfa750182f5776cde98.014.1",
+   "type": "Feature",
+   "geometry": null,
+   "properties": {
+    "@type": "wx:Alert",
+    "id": "urn:oid:2.49.0.1.840.0.b543575c09c5ff91a6c92dfa750182f5776cde98.014.1",
+    "areaDesc": "Southwest of Saint Lawrence Island from 15 to 100 NM",
+    "geocode": {
+     "SAME": [
+      "058851"
+     ],
+     "UGC": [
+      "PKZ851"
+     ]
+    },
+    "affectedZones": [
+     "https://api.weather.gov/zones/forecast/PKZ851"
+    ],
+    "sent": "2026-09-23T15:49:00-08:00",
+    "effective": "2026-09-23T15:49:00-08:00",
+    "onset": "2026-09-23T17:00:00-08:00",
+    "expires": "2026-09-24T06:00:00-08:00",
+    "ends": "2026-09-24T17:00:00-08:00",
+    "status": "Actual",
+    "messageType": "Alert",
+    "category": "Met",
+    "severity": "Moderate",
+    "certainty": "Likely",
+    "urgency": "Expected",
+    "event": "Gale Warning",
+    "senderName": "NWS Fairbanks AK",
+    "headline": "Gale Warning issued September 23 at 3:49PM AKDT until September 24 at 5:00PM AKDT by NWS Fairbanks AK",
+    "description": "Northwestern Alaska Coastal Waters out 100 NM",
+    "instruction": null,
+    "response": "Avoid",
+    "scope": "Public",
+    "code": "IPAWSv1.0",
+    "language": "en-US",
+    "eventCode": {
+     "SAME": [
+      "NWS"
+     ],
+     "NationalWeatherService": [
+      "GLW"
+     ]
+    }
+   }
+  },
+  {
+   "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.917c53918fac2b1019724855ae7b6d799b85afea.004.1",
+   "type": "Feature",
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -85.18,
+       41.04
+      ],
+      [
+       -85.16,
+       41.09
+      ],
+      [
+       -85.12,
+       41.09
+      ],
+      [
+       -85.14,
+       41.04
+      ],
+      [
+       -85.04,
+       40.94
+      ],
+      [
+       -85.06,
+       40.93
+      ],
+      [
+       -85.18,
+       41.04
+      ]
+     ]
+    ]
+   },
+   "properties": {
+    "@type": "wx:Alert",
+    "id": "urn:oid:2.49.0.1.840.0.917c53918fac2b1019724855ae7b6d799b85afea.004.1",
+    "areaDesc": "Allen, IN",
+    "geocode": {
+     "SAME": [
+      "018003"
+     ],
+     "UGC": [
+      "INC003"
+     ]
+    },
+    "affectedZones": [
+     "https://api.weather.gov/zones/county/INC003"
+    ],
+    "sent": "2026-09-24T01:11:00-04:00",
+    "effective": "2026-09-24T01:11:00-04:00",
+    "onset": "2026-09-24T01:11:00-04:00",
+    "expires": "2026-09-24T19:15:00-04:00",
+    "ends": "2026-09-25T20:00:00-04:00",
+    "status": "Actual",
+    "messageType": "Update",
+    "category": "Met",
+    "severity": "Severe",
+    "certainty": "Observed",
+    "urgency": "Immediate",
+    "event": "Flood Warning",
+    "senderName": "NWS Northern Indiana",
+    "headline": "Flood Warning issued September 24 at 1:11AM EDT until September 25 at 8:00PM EDT by NWS Northern Indiana",
+    "description": "...The Flood Warning is extended for the following rivers in",
+    "instruction": "Turn around, don't drown when encountering flooded roads. Most flood",
+    "response": "Avoid",
+    "scope": "Public",
+    "code": "IPAWSv1.0",
+    "language": "en-US",
+    "eventCode": {
+     "SAME": [
+      "FLS"
+     ],
+     "NationalWeatherService": [
+      "FLW"
+     ]
+    }
+   }
+  },
+  {
+   "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.eab952878eeca53ad1e5707f99aa3441557d43f3.002.1",
+   "type": "Feature",
+   "geometry": null,
+   "properties": {
+    "@type": "wx:Alert",
+    "id": "urn:oid:2.49.0.1.840.0.eab952878eeca53ad1e5707f99aa3441557d43f3.002.1",
+    "areaDesc": "Coastal waters from Cape Blanco OR to Pt. St. George CA out 10 nm; Waters from Cape Blanco OR to Pt. St. George CA from 10 to 60 nm",
+    "geocode": {
+     "SAME": [
+      "057356",
+      "057376"
+     ],
+     "UGC": [
+      "PZZ356",
+      "PZZ376"
+     ]
+    },
+    "affectedZones": [
+     "https://api.weather.gov/zones/forecast/PZZ356",
+     "https://api.weather.gov/zones/forecast/PZZ376"
+    ],
+    "sent": "2026-09-23T22:26:00-07:00",
+    "effective": "2026-09-23T22:26:00-07:00",
+    "onset": "2026-09-23T22:26:00-07:00",
+    "expires": "2026-09-24T11:30:00-07:00",
+    "ends": "2026-09-24T02:00:00-07:00",
+    "status": "Actual",
+    "messageType": "Update",
+    "category": "Met",
+    "severity": "Minor",
+    "certainty": "Likely",
+    "urgency": "Expected",
+    "event": "Small Craft Advisory",
+    "senderName": "NWS Medford OR",
+    "headline": "Small Craft Advisory issued September 23 at 10:26PM PDT until September 24 at 2:00AM PDT by NWS Medford OR",
+    "description": "* WHAT...For the Small Craft Advisory, north winds 15 to 20 kt",
+    "instruction": "Recreational boaters should remain in port. Commercial vessels",
+    "response": "Avoid",
+    "scope": "Public",
+    "code": "IPAWSv1.0",
+    "language": "en-US",
+    "eventCode": {
+     "SAME": [
+      "NWS"
+     ],
+     "NationalWeatherService": [
+      "SCY"
+     ]
+    }
+   }
+  },
+  {
+   "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0-KEEPALIVE-23283",
+   "type": "Feature",
+   "geometry": null,
+   "properties": {
+    "@type": "wx:Alert",
+    "id": "urn:oid:2.49.0.1.840.0-KEEPALIVE-23283",
+    "areaDesc": "Montgomery",
+    "geocode": {
+     "SAME": [
+      "024031"
+     ],
+     "UGC": [
+      "MDC031"
+     ]
+    },
+    "affectedZones": [
+     "https://api.weather.gov/zones/county/MDC031"
+    ],
+    "sent": "2026-09-24T05:23:09+00:00",
+    "effective": "2026-09-24T05:23:09+00:00",
+    "onset": null,
+    "expires": "2026-09-24T05:33:09+00:00",
+    "ends": null,
+    "status": "Test",
+    "messageType": "Alert",
+    "category": "Met",
+    "severity": "Unknown",
+    "certainty": "Unknown",
+    "urgency": "Unknown",
+    "event": "Test Message",
+    "senderName": "NWS",
+    "headline": null,
+    "description": "Monitoring message only. Please disregard.",
+    "instruction": "Monitoring message only. Please disregard.",
+    "response": "None",
+    "scope": "Public",
+    "code": "IPAWSv1.0",
+    "language": "en-US",
+    "eventCode": {
+     "SAME": [
+      "NWS"
+     ],
+     "NationalWeatherService": [
+      "TST"
+     ]
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fire weather zones: three neighboring zone outlines, a small flame in one. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.6" android:strokeLineJoin="round"
+        android:pathData="M2.5 4 L11 3 L12.5 10 L9 12.5 L3 11 Z M11 3 L21.5 4.5 L20.5 12 L12.5 10 M3 11 L2 20.5 L10 21 L9 12.5 M12.5 10 L20.5 12 L22 20 L10 21"/>
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M16 12.8 C16.4 14.4 15.1 15 14.8 16.2 C14.6 17.8 15.6 19 16.8 19 C18 19 19 17.9 18.8 16.5 C18.6 15.4 17.8 15 17.6 14 C17.3 14.7 16.9 15.1 16.6 15.3 C16.9 14.3 16.3 13.4 16 12.8 Z"/>
+</vector>

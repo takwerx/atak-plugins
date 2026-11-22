@@ -1,6 +1,7 @@
 package com.atakmap.android.evaczone;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
@@ -8,7 +9,10 @@ import android.preference.PreferenceManager;
 
 import com.atakmap.android.ipc.AtakBroadcast;
 import com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter;
+import com.atakmap.android.maps.MapItem;
 import com.atakmap.android.maps.MapView;
+import com.atakmap.android.menu.MapMenuEventListener;
+import com.atakmap.android.menu.MapMenuReceiver;
 import com.atakmap.coremap.filesystem.FileSystemUtils;
 import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoPoint;
@@ -327,6 +331,70 @@ public class ZoneManager {
         return l != null && l.isVisible();
     }
 
+    // ---- a tap on a zone ----------------------------------------------------------
+
+    private MapMenuEventListener menuListener;
+
+    /**
+     * A tap on a zone opens its details in the pane, with no radial in between.
+     *
+     * <p>ATAK asks the menu listeners before it opens a radial; answering true stops the
+     * radial and tells ATAK the tap was handled, so no callout is left pinned to the map.
+     * Only items that carry {@code evaczone_source} are claimed: every other plugin's
+     * items keep their radial. AirAware's {@code registerTap} is the model.
+     */
+    private void registerTap() {
+        menuListener = new MapMenuEventListener() {
+            @Override
+            public boolean onShowMenu(final MapItem item) {
+                if (item == null || details == null)
+                    return false;
+                final String sourceId = item.getMetaString("evaczone_source", null);
+                if (sourceId == null)
+                    return false;
+                final long fid = item.getMetaLong("featureid", -1);
+                // A moment later, not now: a pick from ATAK's Select Item list posts its own
+                // show-details right after, and that closes a page opened inline.
+                mapView.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (!started || details == null)
+                            return;
+                        clearAtakSelection();
+                        details.show(sourceId, fid, false);
+                    }
+                }, 250);
+                return true;
+            }
+
+            @Override
+            public void onHideMenu(MapItem item) {
+            }
+        };
+        final MapMenuReceiver menus = MapMenuReceiver.getInstance();
+        if (menus != null)
+            menus.addEventListener(menuListener);
+        else
+            Log.w(TAG, "no radial menu receiver; taps keep ATAK's own menu");
+    }
+
+    private void unregisterTap() {
+        final MapMenuReceiver menus = MapMenuReceiver.getInstance();
+        if (menus != null && menuListener != null)
+            menus.removeEventListener(menuListener);
+        menuListener = null;
+    }
+
+    /** Takes ATAK's own selection and the callout it pins to the top off the map. */
+    private static void clearAtakSelection() {
+        try {
+            AtakBroadcast.getInstance().sendBroadcast(new Intent("com.atakmap.android.maps.UNFOCUS"));
+            AtakBroadcast.getInstance().sendBroadcast(new Intent("com.atakmap.android.maps.HIDE_DETAILS"));
+        } catch (RuntimeException e) {
+            Log.d(TAG, "could not clear ATAK's selection: " + e);
+        }
+    }
+
     // ---- lifecycle ----------------------------------------------------------------
 
     public void start() {
@@ -342,6 +410,7 @@ public class ZoneManager {
         final DocumentedIntentFilter filter = new DocumentedIntentFilter();
         filter.addAction(ACTION_DETAILS, "show the attributes of an evacuation zone");
         AtakBroadcast.getInstance().registerReceiver(details, filter);
+        registerTap();
         loadBundledCatalog();
         restore();
         main.postDelayed(timer, TICK_MS);
@@ -360,6 +429,7 @@ public class ZoneManager {
 
     public void stop() {
         started = false;
+        unregisterTap();
         main.removeCallbacks(timer);
         main.removeCallbacks(moveTick);
         main.removeCallbacks(selfTick);

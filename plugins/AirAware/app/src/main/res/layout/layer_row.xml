@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One layer: the head IS its switch and says its state, the arrow opens that layer's
+     own controls. The arrow works while the layer is off, so it can be set up before it
+     is turned on. Atmosphere's layers page and Feature Layer's layer rows, same idea. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="4dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <Button
+            android:id="@+id/layer_toggle"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:gravity="left|center_vertical"
+            android:ellipsize="middle" />
+
+        <ImageButton
+            android:id="@+id/layer_expand"
+            style="@style/TakwerxIconButton"
+            android:layout_width="44dp"
+            android:layout_weight="0"
+            android:layout_marginRight="0dp"
+            android:contentDescription="Show or hide this layer's controls"
+            android:src="@drawable/ic_expand" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/layer_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="12sp"
+        android:textColor="@color/dim_text"
+        android:paddingTop="2dp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/layer_body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="4dp"
+        android:visibility="gone" />
+
+</LinearLayout>

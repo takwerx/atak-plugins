@@ -60,15 +60,32 @@
         android:minWidth="60dp"
         android:visibility="gone" />
 
-    <Button
-        style="@style/TakwerxButton"
-        android:id="@+id/region_action"
-        android:layout_width="wrap_content"
+    <!-- A flight row carries two choices, stacked so the name keeps its
+         width: Add streams the imagery, the second button downloads the
+         offline copy with its size on it. The second is gone everywhere else. -->
+    <LinearLayout
+        android:layout_width="132dp"
         android:layout_height="wrap_content"
-        android:focusable="false"
-        android:focusableInTouchMode="false"
         android:layout_gravity="center_vertical"
-        android:minWidth="84dp"
-        android:text="@string/download" />
-
+        android:orientation="vertical">
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/region_action"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:focusable="false"
+            android:focusableInTouchMode="false"
+            android:minWidth="84dp"
+            android:text="@string/download" />
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/region_action2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:focusable="false"
+            android:focusableInTouchMode="false"
+            android:minWidth="84dp"
+            android:visibility="gone" />
+    </LinearLayout>
 </LinearLayout>
