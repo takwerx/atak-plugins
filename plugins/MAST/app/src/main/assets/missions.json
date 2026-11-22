@@ -43,15 +43,8 @@
       "id": "swiftwater",
       "name": "Swift Water / Flood",
       "plugins": [
-        { "name": "Atmosphere",    "pkg": "com.atakmap.android.atmosphere.plugin" },
-        { "name": "Feature Layer", "pkg": "com.atakmap.android.featurelayer.plugin" },
-        { "name": "IPAWS Alerts",  "pkg": "com.atakmap.android.ipaws.plugin" },
-        { "name": "Evac Zone",     "pkg": "com.atakmap.android.evaczone.plugin" },
-        { "name": "Traffic",       "pkg": "com.atakmap.android.traffic.plugin" },
-        { "name": "Map Depot",     "pkg": "com.atakmap.android.mapdepot.plugin" },
-        { "name": "Cam Depot",     "pkg": "com.atakmap.android.camdepot.plugin" },
-        { "name": "Comms",         "pkg": "com.atakmap.android.comms.plugin" },
-        { "name": "Sit Rep",       "pkg": "com.atakmap.android.sitrep.plugin" }
+        { "name": "Atmosphere", "pkg": "com.atakmap.android.atmosphere.plugin" },
+        { "name": "Cam Depot",  "pkg": "com.atakmap.android.camdepot.plugin" }
       ]
     },
     {
