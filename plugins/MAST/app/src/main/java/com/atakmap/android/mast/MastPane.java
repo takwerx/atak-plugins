@@ -1,6 +1,9 @@
 package com.atakmap.android.mast;
 
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.app.AlertDialog;
+import android.content.ClipData;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -11,6 +14,7 @@ import android.preference.PreferenceManager;
 import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.style.ForegroundColorSpan;
+import android.view.DragEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -33,7 +37,9 @@ import org.json.JSONException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The MAST pane: the front door to the mission plugins (PLAN-MAST-v0.1, direction
@@ -74,8 +80,20 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
     private final View viewRow;
     private final Button showToolsBtn;
     private final Button showPluginsBtn;
+    private final Button doneBtn;
     private List<Missions.Mission> missions;
     private boolean picking;
+    /** Edit mode: tiles wiggle, drag to move, tap to replace or remove. */
+    private boolean editing;
+    /** The page as laid out, which a drag reorders before it is saved. */
+    private List<String> work;
+    private String workMission;
+    private String workView;
+    private String dragId;
+    private Missions.Mission dragMission;
+    private String dragView;
+    private final List<ObjectAnimator> wiggles = new ArrayList<>();
+    private final Map<String, AtakTools.Tool> toolCache = new HashMap<>();
 
     public MastPane(MapView mapView, Context pluginContext) {
         super(mapView);
@@ -91,6 +109,14 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
         viewRow = root.findViewById(R.id.mast_view_row);
         showToolsBtn = root.findViewById(R.id.mast_show_tools);
         showPluginsBtn = root.findViewById(R.id.mast_show_plugins);
+        doneBtn = root.findViewById(R.id.mast_done);
+        doneBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                endEditing();
+            }
+        });
+        scroll.setOnDragListener(dragListener);
         missionBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -101,6 +127,7 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
             @Override
             public void onClick(View v) {
                 prefs.edit().putString(PREF_VIEW, VIEW_TOOLS).apply();
+                work = null;
                 showCurrent();
             }
         });
@@ -108,6 +135,7 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
             @Override
             public void onClick(View v) {
                 prefs.edit().putString(PREF_VIEW, VIEW_PLUGINS).apply();
+                work = null;
                 showCurrent();
             }
         });
@@ -137,32 +165,65 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
             return;
         }
         picking = false;
-        missionBtn.setText(missionLabel(m));
-        tiles.removeAllViews();
-        viewRow.setVisibility(View.VISIBLE);
         final boolean showTools = VIEW_TOOLS.equals(prefs.getString(PREF_VIEW, VIEW_PLUGINS));
+        final String view = showTools ? VIEW_TOOLS : VIEW_PLUGINS;
+        if (work == null || !m.id.equals(workMission) || !view.equals(workView)) {
+            work = shown(page(m, view), showTools);
+            workMission = m.id;
+            workView = view;
+        }
+        missionBtn.setText(missionLabel(m));
+        viewRow.setVisibility(editing ? View.GONE : View.VISIBLE);
+        doneBtn.setVisibility(editing ? View.VISIBLE : View.GONE);
         showToolsBtn.setSelected(showTools);
         showPluginsBtn.setSelected(!showTools);
-        final String view = showTools ? VIEW_TOOLS : VIEW_PLUGINS;
-        final List<String> ids = page(m, view);
-        section.setText(plugin.getString(showTools ? R.string.section_tools
-                : R.string.section_plugins, m.name));
-        for (int i = 0; i < ids.size(); i++) {
-            final String id = ids.get(i);
+        section.setText(editing ? plugin.getString(R.string.section_editing)
+                : plugin.getString(showTools ? R.string.section_tools
+                        : R.string.section_plugins, m.name));
+        renderTiles(m, view);
+        if (!editing)
+            toTop();
+    }
+
+    /** What a page shows: its ids, less any tool this ATAK does not have. */
+    private List<String> shown(List<String> ids, boolean tools) {
+        final List<String> out = new ArrayList<>();
+        for (String id : ids)
+            if (!tools || tool(id) != null)
+                out.add(id);
+        return out;
+    }
+
+    /** Lays out {@link #work}: the page's tiles, then the blank Choose tiles. */
+    private void renderTiles(final Missions.Mission m, final String view) {
+        final boolean tools = VIEW_TOOLS.equals(view);
+        stopWiggle();
+        tiles.removeAllViews();
+        for (int i = 0; i < work.size(); i++) {
+            final String id = work.get(i);
             final Button b;
-            if (showTools) {
-                final AtakTools.Tool t = AtakTools.load(host, id);
-                if (t == null)
-                    continue; // this ATAK has no such tool
+            if (tools) {
+                final AtakTools.Tool t = tool(id);
                 b = toolTile(t);
             } else {
                 b = pluginTile(new Missions.Plugin(pluginName(id), id));
             }
-            final int at = i;
+            if (editing) {
+                b.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        editTile(m, view, id);
+                    }
+                });
+                if (id.equals(dragId))
+                    b.setAlpha(0.25f); // the gap the dragged tile will drop into
+                else
+                    wiggle(b, i);
+            }
             b.setOnLongClickListener(new View.OnLongClickListener() {
                 @Override
                 public boolean onLongClick(View v) {
-                    editTile(m, view, at);
+                    startDrag(m, view, id, v);
                     return true;
                 }
             });
@@ -170,16 +231,151 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
         }
         // Blank slots after the last tile, like an empty place in ATAK's toolbar:
         // always at least one, and enough to finish the row.
-        final int filled = countTiles(tiles);
-        final int blanks = 3 - (filled % 3);
+        final int blanks = 3 - (work.size() % 3);
         for (int i = 0; i < blanks; i++)
             addTile(tiles, blankTile(m, view));
         padLastRow(tiles);
-        toTop();
+    }
+
+    // ---- moving tiles, the way a phone's home screen does ----------------------------
+
+    /**
+     * Long press: the page goes into edit mode and the tile is picked up in the same
+     * motion. While it is dragged, the others make room where it would land; the
+     * drop saves the order. The listener is on the scroller, which outlives the tiles
+     * it rebuilds, so it keeps every drag event while the grid is laid out again.
+     */
+    private void startDrag(final Missions.Mission m, final String view, String id, View v) {
+        // Start the drag on the tile under the finger while it is still on screen;
+        // the page is laid out again only after (2026-11-22: rebuilding first left
+        // the drag nothing to start from).
+        dragId = id;
+        dragMission = m;
+        dragView = view;
+        final ClipData data = ClipData.newPlainText("mast", id);
+        final View.DragShadowBuilder shadow = new View.DragShadowBuilder(v);
+        boolean ok;
+        if (android.os.Build.VERSION.SDK_INT >= 24)
+            ok = v.startDragAndDrop(data, shadow, id, 0);
+        else
+            ok = v.startDrag(data, shadow, id, 0);
+        if (!ok) {
+            dragId = null;
+            Log.w(TAG, "drag did not start");
+        }
+        if (!editing) {
+            editing = true;
+            showCurrent();
+        } else {
+            renderTiles(m, view);
+        }
+    }
+
+    private final View.OnDragListener dragListener = new View.OnDragListener() {
+        @Override
+        public boolean onDrag(View v, DragEvent e) {
+            if (dragId == null || dragMission == null)
+                return false;
+            switch (e.getAction()) {
+                case DragEvent.ACTION_DRAG_STARTED:
+                    return true;
+                case DragEvent.ACTION_DRAG_LOCATION:
+                    autoScroll(e.getY());
+                    moveTo(slotAt(e.getX(), e.getY()));
+                    return true;
+                case DragEvent.ACTION_DROP:
+                    return true;
+                case DragEvent.ACTION_DRAG_ENDED:
+                    final Missions.Mission m = dragMission;
+                    final String view = dragView;
+                    dragId = null;
+                    dragMission = null;
+                    if (!work.equals(page(m, view)))
+                        prefs.edit().putString(pageKey(m, view),
+                                new JSONArray(work).toString()).apply();
+                    renderTiles(m, view);
+                    return true;
+                default:
+                    return true;
+            }
+        }
+    };
+
+    /** The slot under a point on the scroller, or -1 off the tiles. */
+    private int slotAt(float x, float y) {
+        final float ty = y + scroll.getScrollY() - tiles.getTop();
+        int row = 0;
+        for (int i = 0; i < tiles.getChildCount(); i++) {
+            final View r = tiles.getChildAt(i);
+            if (!(r instanceof LinearLayout))
+                continue;
+            if (ty >= r.getTop() && ty < r.getBottom()) {
+                final int col = Math.max(0, Math.min(2,
+                        (int) (x * 3 / Math.max(1, r.getWidth()))));
+                return row * 3 + col;
+            }
+            row++;
+        }
+        return -1;
+    }
+
+    private void moveTo(int slot) {
+        if (slot < 0)
+            return;
+        final int target = Math.min(slot, work.size() - 1);
+        final int from = work.indexOf(dragId);
+        if (from < 0 || from == target)
+            return;
+        work.add(target, work.remove(from));
+        renderTiles(dragMission, dragView);
+    }
+
+    /** Near the top or bottom edge, the page scrolls under the dragged tile. */
+    private void autoScroll(float y) {
+        final int edge = dp(70);
+        if (y < edge)
+            scroll.scrollBy(0, -dp(12));
+        else if (y > scroll.getHeight() - edge)
+            scroll.scrollBy(0, dp(12));
+    }
+
+    private void wiggle(View b, int i) {
+        final ObjectAnimator a = ObjectAnimator.ofFloat(b, "rotation",
+                -1.6f, 1.6f);
+        a.setDuration(130 + (i % 3) * 15);
+        a.setRepeatCount(ValueAnimator.INFINITE);
+        a.setRepeatMode(ValueAnimator.REVERSE);
+        a.setStartDelay((i * 37) % 120);
+        a.start();
+        wiggles.add(a);
+    }
+
+    private void stopWiggle() {
+        for (ObjectAnimator a : wiggles)
+            a.cancel();
+        wiggles.clear();
+    }
+
+    /** Done: out of edit mode. The order was saved at each drop. */
+    private void endEditing() {
+        editing = false;
+        dragId = null;
+        stopWiggle();
+        showCurrent();
+    }
+
+    /** A tool, read from ATAK once per pane; each tile gets its own copy of the icon. */
+    private AtakTools.Tool tool(String file) {
+        if (!toolCache.containsKey(file))
+            toolCache.put(file, AtakTools.load(host, file));
+        return toolCache.get(file);
     }
 
     private void showPicker() {
         picking = true;
+        editing = false;
+        stopWiggle();
+        doneBtn.setVisibility(View.GONE);
         viewRow.setVisibility(View.GONE);
         final Missions.Mission m = current();
         missionBtn.setText(m == null ? plugin.getString(R.string.mission_none)
@@ -228,6 +424,7 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
             @Override
             public void onClick(View v) {
                 prefs.edit().putString(PREF_MISSION, m.id).apply();
+                work = null;
                 showCurrent();
             }
         });
@@ -261,11 +458,9 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
     /** An ATAK tool: closes MAST and sends the broadcast ATAK's own menu item sends. */
     private Button toolTile(final AtakTools.Tool t) {
         final Button b = tile(t.title);
-        if (t.icon != null) {
-            final int size = dp(48);
-            t.icon.setBounds(0, 0, size, size);
-            b.setCompoundDrawables(null, t.icon, null, null);
-        }
+        if (t.icon != null)
+            setIcon(b, t.icon.getConstantState() == null ? t.icon
+                    : t.icon.getConstantState().newDrawable().mutate());
         b.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -360,6 +555,7 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
 
     private void savePage(Missions.Mission m, String view, List<String> ids) {
         prefs.edit().putString(pageKey(m, view), new JSONArray(ids).toString()).apply();
+        work = null;
         showCurrent();
     }
 
@@ -389,21 +585,19 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
         return b;
     }
 
-    /** Long press on a tile: replace, move, remove, or put the base set back. */
-    private void editTile(final Missions.Mission m, final String view, final int at) {
-        final List<String> ids = page(m, view);
-        if (at < 0 || at >= ids.size())
+    /** In edit mode, a tap on a tile: replace it, remove it, or put the base set back. */
+    private void editTile(final Missions.Mission m, final String view, final String id) {
+        final List<String> ids = new ArrayList<>(work);
+        final int at = ids.indexOf(id);
+        if (at < 0)
             return;
         final String[] items = {
                 plugin.getString(R.string.edit_replace),
-                plugin.getString(R.string.edit_left),
-                plugin.getString(R.string.edit_right),
                 plugin.getString(R.string.edit_remove),
                 plugin.getString(R.string.edit_reset)
         };
         new AlertDialog.Builder(host)
-                .setTitle(VIEW_TOOLS.equals(view) ? toolTitle(ids.get(at))
-                        : pluginName(ids.get(at)))
+                .setTitle(VIEW_TOOLS.equals(view) ? toolTitle(id) : pluginName(id))
                 .setItems(items, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int which) {
@@ -412,18 +606,6 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
                                 choose(m, view, at);
                                 return;
                             case 1:
-                                if (at > 0) {
-                                    ids.add(at - 1, ids.remove(at));
-                                    savePage(m, view, ids);
-                                }
-                                return;
-                            case 2:
-                                if (at < ids.size() - 1) {
-                                    ids.add(at + 1, ids.remove(at));
-                                    savePage(m, view, ids);
-                                }
-                                return;
-                            case 3:
                                 ids.remove(at);
                                 savePage(m, view, ids);
                                 return;
@@ -445,6 +627,7 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
                             @Override
                             public void onClick(DialogInterface d, int which) {
                                 prefs.edit().remove(pageKey(m, view)).apply();
+                                work = null;
                                 showCurrent();
                             }
                         })
@@ -459,7 +642,7 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
      */
     private void choose(final Missions.Mission m, final String view, final int at) {
         final boolean tools = VIEW_TOOLS.equals(view);
-        final List<String> ids = page(m, view);
+        final List<String> ids = new ArrayList<>(work != null ? work : page(m, view));
         final LinearLayout grid = new LinearLayout(plugin);
         grid.setOrientation(LinearLayout.VERTICAL);
         final ScrollView sv = new ScrollView(plugin);
@@ -696,6 +879,10 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
 
     @Override
     protected boolean onBackButtonPressed() {
+        if (editing) {
+            endEditing();
+            return true;
+        }
         if (picking && current() != null) {
             showCurrent();
             return true;
@@ -717,6 +904,11 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
 
     @Override
     public void onDropDownClose() {
+        if (editing) {
+            editing = false;
+            dragId = null;
+            stopWiggle();
+        }
     }
 
     @Override
