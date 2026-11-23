@@ -49,6 +49,11 @@ and others), with an Open or Get button.
 _________________________________________________________________
 STATUS
 
+Version 0.6: place search finds more of what people type. Abbreviations
+("Ft. Lauderdale", "St. Louis", "Mt. Vernon"), nicknames ("NYC", "Philly"),
+a kind word ("Orange County", "City of Miami"), names without their accents
+("Espanola") and part of a name ("Vegas") now find the place.
+
 Version 0.5: cooling and warming centers. Where a city publishes its list,
 Places shows them within Nearby, with type, hours, address and phone. Chicago
 is the first city. The flood section tries once more when FEMA's server drops
