@@ -63,6 +63,12 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
     private static final String PREF_MISSION = "mast_mission";
     /** Which tiles a mission page shows; remembered like the mission. */
     private static final String PREF_VIEW = "mast_view";
+    /**
+     * Set by an MDM (Atlas Plugin Pref Config, declared in res/xml/mast_mdm.xml):
+     * the pages are the agency's and cannot be edited on the device. Off, or never
+     * set, the user arranges them as they like.
+     */
+    private static final String PREF_LOCKED = "mast_locked";
     private static final String VIEW_TOOLS = "tools";
     private static final String VIEW_PLUGINS = "plugins";
     /** TakwerxSectionHeading's cyan. */
@@ -95,6 +101,8 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
     private int hoverSlot = -1;
     private final List<ObjectAnimator> wiggles = new ArrayList<>();
     private final Map<String, AtakTools.Tool> toolCache = new HashMap<>();
+    /** True while MAST writes its own page, so the listener does not lay it out twice. */
+    private boolean selfWrite;
 
     public MastPane(MapView mapView, Context pluginContext) {
         super(mapView);
@@ -118,6 +126,8 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
             }
         });
         scroll.setOnDragListener(dragListener);
+        // An MDM writes these keys while ATAK runs; the pane follows at once.
+        prefs.registerOnSharedPreferenceChangeListener(prefListener);
         missionBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -144,7 +154,58 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
 
     public void setMissions(List<Missions.Mission> missions) {
         this.missions = missions;
+        writeBaseSets();
     }
+
+    /**
+     * Every page is written to the preferences the first time, the base set where
+     * nothing is saved yet. ATAK's exported .pref then carries every page, so a
+     * device set up by hand gives Atlas the whole layout, not only the pages changed.
+     */
+    private void writeBaseSets() {
+        if (missions == null)
+            return;
+        final SharedPreferences.Editor ed = prefs.edit();
+        boolean any = false;
+        for (Missions.Mission m : missions)
+            for (String view : new String[] { VIEW_TOOLS, VIEW_PLUGINS })
+                if (!prefs.contains(pageKey(m, view))) {
+                    ed.putString(pageKey(m, view), encode(base(m, view)));
+                    any = true;
+                } else if (prefs.getString(pageKey(m, view), "").trim().startsWith("[")) {
+                    // The JSON form MAST wrote before 2026-11-22, as a comma list.
+                    ed.putString(pageKey(m, view), encode(page(m, view)));
+                    any = true;
+                }
+        if (any) {
+            selfWrite = true;
+            ed.apply();
+            selfWrite = false;
+        }
+    }
+
+    private boolean locked() {
+        return prefs.getBoolean(PREF_LOCKED, false);
+    }
+
+    private final SharedPreferences.OnSharedPreferenceChangeListener prefListener =
+            new SharedPreferences.OnSharedPreferenceChangeListener() {
+                @Override
+                public void onSharedPreferenceChanged(SharedPreferences sp, String key) {
+                    if (selfWrite || key == null || !key.startsWith("mast_"))
+                        return;
+                    root.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (locked() && editing)
+                                endEditing();
+                            work = null;
+                            if (isVisible() && !picking)
+                                showCurrent();
+                        }
+                    });
+                }
+            };
 
     private Missions.Mission current() {
         if (missions == null)
@@ -221,14 +282,20 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
                 else
                     wiggle(b, i);
             }
-            b.setOnLongClickListener(new View.OnLongClickListener() {
-                @Override
-                public boolean onLongClick(View v) {
-                    startDrag(m, view, id, v);
-                    return true;
-                }
-            });
+            if (!locked())
+                b.setOnLongClickListener(new View.OnLongClickListener() {
+                    @Override
+                    public boolean onLongClick(View v) {
+                        startDrag(m, view, id, v);
+                        return true;
+                    }
+                });
             addTile(tiles, b);
+        }
+        // Managed by an MDM: the agency's tiles only, nothing to add.
+        if (locked()) {
+            padLastRow(tiles);
+            return;
         }
         // Blank slots after the last tile, like an empty place in ATAK's toolbar:
         // always at least one, and enough to finish the row.
@@ -247,6 +314,8 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
      * it rebuilds, so it keeps every drag event while the grid is laid out again.
      */
     private void startDrag(final Missions.Mission m, final String view, String id, View v) {
+        if (locked())
+            return;
         // Start the drag on the tile under the finger while it is still on screen;
         // the page is laid out again only after (2026-11-22: rebuilding first left
         // the drag nothing to start from).
@@ -296,9 +365,11 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
                     dragId = null;
                     dragMission = null;
                     hoverSlot = -1;
-                    if (!work.equals(page(m, view)))
-                        prefs.edit().putString(pageKey(m, view),
-                                new JSONArray(work).toString()).apply();
+                    if (!work.equals(page(m, view))) {
+                        selfWrite = true;
+                        prefs.edit().putString(pageKey(m, view), encode(work)).apply();
+                        selfWrite = false;
+                    }
                     renderTiles(m, view);
                     return true;
                 default:
@@ -562,18 +633,40 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
      */
     private List<String> page(Missions.Mission m, String view) {
         final String saved = prefs.getString(pageKey(m, view), null);
+        if (saved == null)
+            return base(m, view);
+        final boolean tools = VIEW_TOOLS.equals(view);
         final List<String> ids = new ArrayList<>();
-        if (saved != null) {
+        String text = saved.trim();
+        if (text.startsWith("[")) {
+            // Saved by MAST before 2026-11-22 as a JSON array.
             try {
-                final JSONArray a = new JSONArray(saved);
+                final JSONArray a = new JSONArray(text);
                 for (int i = 0; i < a.length(); i++)
                     ids.add(a.getString(i));
                 return ids;
             } catch (JSONException e) {
                 Log.w(TAG, "page " + pageKey(m, view) + " unreadable, base set used", e);
-                ids.clear();
+                return base(m, view);
             }
         }
+        // A comma list, as an admin types it in Atlas: "rangeandbearing, routes".
+        for (String part : text.split(",")) {
+            String id = part.trim();
+            // A name, never a path: tool ids are opened under ATAK's actionbar assets.
+            if (id.isEmpty() || id.contains("/") || id.contains(".."))
+                continue;
+            if (tools && !id.endsWith(".xml"))
+                id = id + ".xml";
+            if (!ids.contains(id))
+                ids.add(id);
+        }
+        return ids;
+    }
+
+    /** The tiles MAST ships for a page (missions.json). */
+    private static List<String> base(Missions.Mission m, String view) {
+        final List<String> ids = new ArrayList<>();
         if (VIEW_TOOLS.equals(view))
             ids.addAll(m.tools);
         else
@@ -582,8 +675,23 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
         return ids;
     }
 
+    /** A page as stored: a comma list, tools without ".xml", readable in an MDM console. */
+    private static String encode(List<String> ids) {
+        final StringBuilder sb = new StringBuilder();
+        for (String id : ids) {
+            if (sb.length() > 0)
+                sb.append(", ");
+            sb.append(id.endsWith(".xml") ? id.substring(0, id.length() - 4) : id);
+        }
+        return sb.toString();
+    }
+
     private void savePage(Missions.Mission m, String view, List<String> ids) {
-        prefs.edit().putString(pageKey(m, view), new JSONArray(ids).toString()).apply();
+        if (locked())
+            return;
+        selfWrite = true;
+        prefs.edit().putString(pageKey(m, view), encode(ids)).apply();
+        selfWrite = false;
         work = null;
         showCurrent();
     }
@@ -655,9 +763,7 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
                         new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface d, int which) {
-                                prefs.edit().remove(pageKey(m, view)).apply();
-                                work = null;
-                                showCurrent();
+                                savePage(m, view, base(m, view));
                             }
                         })
                 .setNegativeButton(plugin.getString(R.string.cancel), null)
@@ -942,5 +1048,6 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
 
     @Override
     protected void disposeImpl() {
+        prefs.unregisterOnSharedPreferenceChangeListener(prefListener);
     }
 }

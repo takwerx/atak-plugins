@@ -30,4 +30,40 @@
     <string name="cancel">Cancel</string>
     <string name="ok">OK</string>
 
+    <!-- MDM settings (res/xml/mast_mdm.xml), shown in the Atlas console -->
+    <string name="mdm_cat_control">MAST on this device</string>
+    <string name="mdm_locked">Managed by MDM: pages cannot be edited</string>
+    <string name="mdm_locked_summary">On: users see the pages set here and cannot change them. Off: users arrange the pages themselves.</string>
+    <string name="mdm_mission">Mission</string>
+    <string name="mdm_view">Page shown: ATAK Tools or Plugins</string>
+    <string name="mdm_page_tools">ATAK Tools page (comma list)</string>
+    <string name="mdm_page_plugins">Plugins page (comma list of packages)</string>
+    <string name="mdm_cat_wildfire">Wildfire</string>
+    <string name="mdm_cat_tactical">Tactical Response</string>
+    <string name="mdm_cat_hazmat">Hazmat</string>
+    <string name="mdm_cat_swiftwater">Swift Water / Flood</string>
+    <string name="mdm_cat_sar">Search and Rescue</string>
+    <string-array name="mdm_mission_names">
+        <item>Wildfire</item>
+        <item>Tactical Response</item>
+        <item>Hazmat</item>
+        <item>Swift Water / Flood</item>
+        <item>Search and Rescue</item>
+    </string-array>
+    <string-array name="mdm_mission_ids">
+        <item>wildfire</item>
+        <item>tactical_response</item>
+        <item>hazmat</item>
+        <item>swiftwater</item>
+        <item>search_rescue</item>
+    </string-array>
+    <string-array name="mdm_view_names">
+        <item>ATAK Tools</item>
+        <item>Plugins</item>
+    </string-array>
+    <string-array name="mdm_view_ids">
+        <item>tools</item>
+        <item>plugins</item>
+    </string-array>
+
 </resources>
