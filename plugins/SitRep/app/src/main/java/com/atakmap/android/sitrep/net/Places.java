@@ -34,6 +34,10 @@ public final class Places {
         final double areaLand;
         /** A named town with no Census boundary (GNIS): its point; NaN otherwise. */
         final double lat, lon;
+        /** How it matched: 0 the start of the name, 1 inside it, 2 a near spelling. */
+        int tier;
+        /** The bare name, as {@link #canon}: to match a nickname. */
+        String base = "";
 
         Place(String label, String layer, String geoid, String state, double areaLand) {
             this(label, layer, geoid, state, areaLand, Double.NaN, Double.NaN);
@@ -63,7 +67,8 @@ public final class Places {
 
     /** As above, nearest to the map's center first when it is given. */
     public static List<Place> search(String typed, final String preferState, final GeoPoint center) throws Exception {
-        String t = typed == null ? "" : typed.trim().toUpperCase(Locale.US).replaceAll("[^A-Z0-9 .,'-]", "");
+        // "Española" typed or "Espanola": compared without accents from here on.
+        String t = plain(typed == null ? "" : typed).trim().toUpperCase(Locale.US).replaceAll("[^A-Z0-9 .,'-]", "");
         // "bayview idaho", "Bayview, ID": the state off the end, as a filter (2026-11-13:
         // the whole string was matched as a name and found nothing).
         String fips = null;
@@ -72,41 +77,132 @@ public final class Places {
             fips = typedState[0];
             t = typedState[1];
         }
-        final String q = t.replace(",", " ").replaceAll("\\s+", " ").trim().replace("'", "''");
+        final String q = t.replace(",", " ").replaceAll("\\s+", " ").trim();
+        // "Orange County", "City of Miami", "Jefferson Parish": Census keeps the kind
+        // apart from the name (BASENAME "Orange"), so the name is searched with and
+        // without the kind word; a county word lists counties first.
+        String kindless = null;
+        boolean wantCounty = false;
+        final java.util.regex.Matcher lead = java.util.regex.Pattern
+                .compile("^(CITY|TOWN|VILLAGE|BOROUGH|TOWNSHIP|COUNTY) OF (.{2,})$").matcher(q);
+        final java.util.regex.Matcher tail = java.util.regex.Pattern
+                .compile("^(.{2,}?) (COUNTY|CNTY|PARISH|BOROUGH|CITY|TOWN|VILLAGE|TOWNSHIP|TWP|CDP)\\.?$").matcher(q);
+        if (lead.matches()) {
+            kindless = lead.group(2);
+            wantCounty = "COUNTY".equals(lead.group(1));
+        } else if (tail.matches()) {
+            kindless = tail.group(1);
+            wantCounty = tail.group(2).matches("COUNTY|CNTY|PARISH|BOROUGH");
+        }
         final List<Place> out = new ArrayList<>();
-        if (q.length() < 2)
+        if (q.replace(" ", "").length() < 2)
             return out;
+        // Names crews use: "NYC", "Philly", "New York City".
+        final String[] nickTo = NICK.get(q) != null ? NICK.get(q) : kindless == null ? null : NICK.get(kindless);
+        final List<String> spellings = new ArrayList<>();
+        for (String x : spellings(q))
+            add(spellings, x);
+        if (kindless != null)
+            for (String x : spellings(kindless))
+                add(spellings, x);
+        // "Mc Allen", "De Kalb", "Winston Salem": also run together and hyphenated.
+        final String typedName = kindless != null ? kindless : q;
+        if (typedName.contains(" ") && !typedName.contains(".")) {
+            add(spellings, typedName.replace(" ", ""));
+            add(spellings, typedName.replace(" ", "-"));
+        }
+        while (spellings.size() > 10)
+            spellings.remove(spellings.size() - 1);
+        final List<String> sql = new ArrayList<>();
+        for (String x : spellings)
+            sql.add(x.replace("'", "''"));
         final String inState = fips == null ? "" : " AND STATE='" + fips + "'";
         final java.util.Set<String> named = new java.util.HashSet<>();
-        int census = census("UPPER(BASENAME) LIKE '" + q + "%'" + inState, 25, null, named, out);
-        // A typo finds nothing by exact start ("Seatle"; the S22's squashed search box,
-        // 2026-11-14, left the operator typing blind): the same three-letter fuzzy match
-        // the town search uses, so the city's own boundary is offered, not only a point.
-        final String bareQ = q.replace(" ", "");
-        if (census == 0 && bareQ.length() >= 4 && bareQ.substring(0, 3).matches("[A-Z0-9]{3}"))
-            census("UPPER(BASENAME) LIKE '" + bareQ.substring(0, 3) + "%'" + inState, 200, bareQ, named, out);
+        // A nickname is asked for on its own, in its state: in with the other spellings
+        // ("LA" and "LOS ANGELES") the 25-name limit filled with La Habra and the like.
+        if (nickTo != null)
+            census("UPPER(BASENAME) = '" + nickTo[0].replace("'", "''") + "' AND STATE='" + fipsOf(nickTo[1]) + "'",
+                    5, null, named, out);
+        int census = census(likeAny("UPPER(BASENAME)", sql, false) + inState, 25, null, named, out);
+        int mark = out.size();
+        // A typo, or a letter with an accent ("Espanola" for Española), finds nothing by
+        // exact start: names starting with the same three letters, kept when they are a
+        // few letters from what was typed (2026-11-14, "Seatle").
+        final String bareQ = squash(kindless != null ? kindless : q);
+        final boolean fuzzy = bareQ.length() >= 4 && bareQ.substring(0, 3).matches("[A-Z0-9]{3}");
+        if (census == 0 && fuzzy) {
+            // The map's state first: the country-wide list stops at 400 names.
+            final String home = fips != null ? null : fipsOf(preferState);
+            if (home != null)
+                census += census("UPPER(BASENAME) LIKE '" + bareQ.substring(0, 3) + "%' AND STATE='" + home + "'",
+                        400, bareQ, named, out);
+            census += census("UPPER(BASENAME) LIKE '" + bareQ.substring(0, 3) + "%'" + inState, 400, bareQ, named,
+                    out);
+            mark = out.size();
+        }
         // Towns with no Census boundary (Bayview, Idaho): USGS GNIS populated places,
         // a point each; the report's area is a circle around it. GET: the USGS
         // firewall refuses a POST whose LIKE has "+" for spaces (403, 2026-11-13).
         final String stp = fips == null ? null : POSTAL.get(fips);
         try {
-            int found = gnis("UPPER(gaz_name) LIKE '" + q + "%'", stp, null, named, out);
+            int found = gnis(likeAny("UPPER(gaz_name)", sql, false), stp, null, named, out);
+            mark = out.size();
             // Fuzzy: few answers, so every town starting with the same three letters,
             // kept when it is close to what was typed with spaces ignored ("bay view",
             // "bayveiw" -> Bayview).
-            final String bare = q.replace(" ", "");
-            // Three letters only, never a cut-off quote in the where clause.
-            if (found < 3 && bare.length() >= 4 && bare.substring(0, 3).matches("[A-Z0-9]{3}"))
-                gnis("UPPER(gaz_name) LIKE '" + bare.substring(0, 3) + "%'", stp, bare, named, out);
+            if (found < 3 && fuzzy)
+                gnis("UPPER(gaz_name) LIKE '" + bareQ.substring(0, 3) + "%'", stp, bareQ, named, out);
         } catch (Exception e) {
             // Census answers alone are still a result.
         }
+        mark = out.size();
+        // A word from inside the name: "Lauderdale" for Fort Lauderdale, "Vegas" for
+        // Las Vegas. Only when the start found little, and only Census (GNIS is too
+        // large to scan this way).
+        if (out.size() < 5 && bareQ.length() >= 4) {
+            final List<String> inner = new ArrayList<>();
+            for (String x : sql)
+                if (x.replace(" ", "").length() >= 4 && inner.size() < 4)
+                    inner.add(x);
+            try {
+                if (!inner.isEmpty())
+                    census(likeAny("UPPER(BASENAME)", inner, true) + inState, 25, null, named, out);
+            } catch (Exception e) {
+                // what the start found is still a result
+            }
+            tier(out, mark, 1);
+        }
         // Nearest to the map first (2026-11-13: "bayview" listed 40 Bayviews and cut
         // the one in Idaho the operator was looking at); without a center, the map's
-        // state first, then the largest.
+        // state first, then the largest. "Orange County" puts counties first.
+        // Before distance: the city a nickname means ("NYC": New York, NY, not New York,
+        // NM), then the kind typed ("Jefferson Parish": the parish), then how the name
+        // matched (start, inside, near spelling).
+        final boolean counties = wantCounty;
+        // "Ft Myers": Fort Myers before Fort Myers Beach.
+        final java.util.Set<String> exact = new java.util.HashSet<>();
+        for (String x : spellings)
+            exact.add(canon(x));
+        final String kindWord = !wantCounty ? null
+                : (tail.matches() ? tail.group(2) : "COUNTY").replace("CNTY", "COUNTY");
         Collections.sort(out, new Comparator<Place>() {
             @Override
             public int compare(Place a, Place b) {
+                if (nickTo != null) {
+                    final boolean an = isNick(a, nickTo), bn = isNick(b, nickTo);
+                    if (an != bn)
+                        return an ? -1 : 1;
+                }
+                if (counties) {
+                    final int ac = kindRank(a, kindWord), bc = kindRank(b, kindWord);
+                    if (ac != bc)
+                        return ac - bc;
+                }
+                if (a.tier != b.tier)
+                    return a.tier - b.tier;
+                final boolean ae = exact.contains(a.base), be = exact.contains(b.base);
+                if (ae != be)
+                    return ae ? -1 : 1;
                 if (center != null) {
                     final double da = away(a, center), db = away(b, center);
                     if (da != db)
@@ -119,6 +215,156 @@ public final class Places {
             }
         });
         return out.size() > 40 ? new ArrayList<>(out.subList(0, 40)) : out;
+    }
+
+    static final String COUNTY_LAYER = "State_County/MapServer/1";
+
+    /** Sets the tier of every place added since {@code from}; returns the new end. */
+    private static int tier(List<Place> out, int from, int tier) {
+        for (int i = from; i < out.size(); i++)
+            out.get(i).tier = tier;
+        return out.size();
+    }
+
+    /** The Census place (not a town point) a nickname means, in its state. */
+    private static boolean isNick(Place p, String[] to) {
+        return !"gnis".equals(p.layer) && !COUNTY_LAYER.equals(p.layer) && to[1].equals(p.state)
+                && canon(to[0]).equals(p.base);
+    }
+
+    /** 0: a county named with the word typed (Parish); 1: another county; 2: anything else. */
+    private static int kindRank(Place p, String word) {
+        if (!COUNTY_LAYER.equals(p.layer))
+            return 2;
+        return p.label.toUpperCase(Locale.US).contains(" " + word + ",") ? 0 : 1;
+    }
+
+    private static void add(List<String> list, String x) {
+        if (x != null && !x.isEmpty() && !list.contains(x))
+            list.add(x);
+    }
+
+    /** Without accents: Española -> Espanola. */
+    static String plain(String s) {
+        return java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}+", "");
+    }
+
+    /**
+     * A name as one key whatever its spelling: GNIS writes "Saint Petersburg" and
+     * Census "St. Petersburg", and one city was listed twice.
+     */
+    static String canon(String s) {
+        final String u = " " + plain(s).toUpperCase(Locale.US).replaceAll("[^A-Z0-9 ]", " ") + " ";
+        return squash(u.replace(" SAINTE ", " STE ").replace(" SAINT ", " ST ").replace(" FORT ", " FT ")
+                .replace(" MOUNT ", " MT "));
+    }
+
+    /** Letters and digits only, no accents, upper case: for comparing names. */
+    static String squash(String s) {
+        return plain(s).toUpperCase(Locale.US).replaceAll("[^A-Z0-9]", "");
+    }
+
+    private static String fipsOf(String postal) {
+        if (postal == null || postal.isEmpty())
+            return null;
+        for (Map.Entry<String, String> e : POSTAL.entrySet())
+            if (e.getValue().equals(postal))
+                return e.getKey();
+        return null;
+    }
+
+    /** Names crews use for a place, to the name Census gives it. */
+    private static final Map<String, String[]> NICK = new HashMap<>();
+    static {
+        final String[] n = { "NYC=NEW YORK|NY", "NEW YORK CITY=NEW YORK|NY", "NY CITY=NEW YORK|NY",
+                "LA=LOS ANGELES|CA", "L.A.=LOS ANGELES|CA", "SF=SAN FRANCISCO|CA", "SAN FRAN=SAN FRANCISCO|CA",
+                "FRISCO=SAN FRANCISCO|CA", "PHILLY=PHILADELPHIA|PA", "NOLA=NEW ORLEANS|LA",
+                "NAWLINS=NEW ORLEANS|LA", "KC=KANSAS CITY|MO", "SLC=SALT LAKE CITY|UT", "OKC=OKLAHOMA CITY|OK",
+                "ABQ=ALBUQUERQUE|NM", "VEGAS=LAS VEGAS|NV", "DC=WASHINGTON|DC", "D.C.=WASHINGTON|DC",
+                "INDY=INDIANAPOLIS|IN", "SACTO=SACRAMENTO|CA", "SD=SAN DIEGO|CA", "JAX=JACKSONVILLE|FL",
+                "CHITOWN=CHICAGO|IL", "CHI-TOWN=CHICAGO|IL", "PDX=PORTLAND|OR", "ATL=ATLANTA|GA",
+                "BMORE=BALTIMORE|MD", "CINCY=CINCINNATI|OH", "STL=ST. LOUIS|MO", "SAINT LOUIS=ST. LOUIS|MO",
+                "SAINT PAUL=ST. PAUL|MN", "SAINT PETE=ST. PETERSBURG|FL", "ST PETE=ST. PETERSBURG|FL",
+                "ST. PETE=ST. PETERSBURG|FL" };
+        for (String x : n) {
+            final int eq = x.indexOf('='), bar = x.indexOf('|');
+            NICK.put(x.substring(0, eq), new String[] { x.substring(eq + 1, bar), x.substring(bar + 1) });
+        }
+    }
+
+    /** Other spellings of the short words in place names, by the word without its dot. */
+    private static final Map<String, String[]> SHORT = new HashMap<>();
+    static {
+        final String[] fort = { "FORT", "FT." }, saint = { "ST.", "SAINT" }, sainte = { "STE.", "SAINTE" },
+                mount = { "MOUNT", "MT." }, point = { "PORT", "POINT", "PT." };
+        SHORT.put("FT", fort);
+        SHORT.put("FORT", fort);
+        SHORT.put("ST", saint);
+        SHORT.put("SAINT", saint);
+        SHORT.put("STE", sainte);
+        SHORT.put("SAINTE", sainte);
+        SHORT.put("MT", mount);
+        SHORT.put("MOUNT", mount);
+        SHORT.put("PT", point);
+        SHORT.put("N", new String[] { "NORTH" });
+        SHORT.put("S", new String[] { "SOUTH" });
+        SHORT.put("E", new String[] { "EAST" });
+        SHORT.put("W", new String[] { "WEST" });
+        SHORT.put("NO", new String[] { "NORTH" });
+        SHORT.put("SO", new String[] { "SOUTH" });
+        SHORT.put("LK", new String[] { "LAKE" });
+        SHORT.put("HTS", new String[] { "HEIGHTS" });
+        SHORT.put("HGTS", new String[] { "HEIGHTS" });
+        SHORT.put("SPGS", new String[] { "SPRINGS" });
+        SHORT.put("SPRGS", new String[] { "SPRINGS" });
+        SHORT.put("BCH", new String[] { "BEACH" });
+        SHORT.put("VLG", new String[] { "VILLAGE" });
+        SHORT.put("VLY", new String[] { "VALLEY" });
+        SHORT.put("CTR", new String[] { "CENTER" });
+        SHORT.put("JCT", new String[] { "JUNCTION" });
+        SHORT.put("PK", new String[] { "PARK" });
+    }
+
+    /** Short words that are never the start of a longer one, so they change at the end too. */
+    private static final java.util.Set<String> WHOLE = new java.util.HashSet<>(java.util.Arrays.asList(
+            "LK", "HTS", "HGTS", "SPGS", "SPRGS", "BCH", "VLG", "VLY", "CTR", "JCT"));
+
+    /**
+     * What was typed, then the same with Ft/St/Mt/Pt and Fort/Saint/Mount spelled each
+     * other way. At most 8. The last word is left alone unless it is a whole word
+     * already (a dot after it, or more words follow), so "St" still finds Stockton.
+     */
+    static List<String> spellings(String q) {
+        final String[] words = q.split(" ");
+        List<String> out = new ArrayList<>();
+        out.add("");
+        for (int i = 0; i < words.length; i++) {
+            final String w = words[i];
+            final String bare = w.endsWith(".") ? w.substring(0, w.length() - 1) : w;
+            final String[] alt = SHORT.get(bare);
+            final List<String> forms = new ArrayList<>();
+            forms.add(w);
+            if (alt != null && (i < words.length - 1 || w.endsWith(".") || WHOLE.contains(bare)))
+                for (String a : alt)
+                    if (!forms.contains(a))
+                        forms.add(a);
+            final List<String> next = new ArrayList<>();
+            for (String head : out)
+                for (String f : forms)
+                    if (next.size() < 8)
+                        next.add(head.isEmpty() ? f : head + " " + f);
+            out = next;
+        }
+        return out;
+    }
+
+    /** {@code field LIKE 'a%' OR field LIKE 'b%'} (or '%a%' when inside), in brackets. */
+    static String likeAny(String field, List<String> starts, boolean inside) {
+        final StringBuilder b = new StringBuilder("(");
+        for (int i = 0; i < starts.size(); i++)
+            b.append(i == 0 ? "" : " OR ").append(field).append(" LIKE '").append(inside ? "%" : "")
+                    .append(starts.get(i)).append("%'");
+        return b.append(')').toString();
     }
 
     /** Rough meters from the center to a place's point; places with none go last. */
@@ -215,12 +461,12 @@ public final class Places {
                 continue;
             final String st = a.optString("state_alpha", "");
             final String name = a.optString("gaz_name", "").trim();
-            final String key = name.toUpperCase(Locale.US) + "|" + st;
+            final String key = canon(name) + "|" + st;
             if (name.isEmpty() || !POSTAL.containsValue(st) || !named.add(key))
                 continue;
             int d = 0;
             if (near != null) {
-                final String n = name.toUpperCase(Locale.US).replace(" ", "");
+                final String n = squash(name);
                 d = edits(near, n.length() > near.length() + 3 ? n.substring(0, near.length() + 3) : n);
                 if (d > Math.max(1, near.length() / 4)) {
                     named.remove(key);
@@ -228,9 +474,12 @@ public final class Places {
                 }
             }
             final String county = a.optString("county_name", "").trim();
-            picked.add(new Object[] { d, new Place(name + ", " + st + " (town, no boundary"
+            final Place p = new Place(name + ", " + st + " (town, no boundary"
                     + (county.isEmpty() ? "" : ", " + county + " County") + ")",
-                    "gnis", String.valueOf(a.optLong("gaz_id")), st, 0, lat, lon) });
+                    "gnis", String.valueOf(a.optLong("gaz_id")), st, 0, lat, lon);
+            p.base = canon(name);
+            p.tier = d == 0 ? 0 : 2;
+            picked.add(new Object[] { d, p });
         }
         Collections.sort(picked, new Comparator<Object[]>() {
             @Override
@@ -250,11 +499,36 @@ public final class Places {
     private static int census(String where, int max, String near, java.util.Set<String> named, List<Place> out)
             throws Exception {
         final List<Object[]> picked = new ArrayList<>();
-        for (String layer : LAYERS) {
-            final String form = "f=json&returnGeometry=false&resultRecordCount=" + max
-                    + "&where=" + Esri.enc(where)
-                    + "&outFields=" + Esri.enc("NAME,BASENAME,STATE,GEOID,AREALAND,INTPTLAT,INTPTLON");
-            final JSONObject o = Esri.parse(Http.post(BASE + layer + "/query", form));
+        // The three layers at once: one after the other made a search take 5 to 7 s.
+        final String form = "f=json&returnGeometry=false&resultRecordCount=" + max
+                + "&where=" + Esri.enc(where)
+                + "&outFields=" + Esri.enc("NAME,BASENAME,STATE,GEOID,AREALAND,INTPTLAT,INTPTLON");
+        final String[] body = new String[LAYERS.length];
+        final Exception[] fail = new Exception[1];
+        final Thread[] th = new Thread[LAYERS.length];
+        for (int k = 0; k < LAYERS.length; k++) {
+            final int n = k;
+            th[k] = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        body[n] = Http.post(BASE + LAYERS[n] + "/query", form);
+                    } catch (Exception e) {
+                        synchronized (fail) {
+                            fail[0] = e;
+                        }
+                    }
+                }
+            }, "sitrep-places");
+            th[k].start();
+        }
+        for (Thread x : th)
+            x.join();
+        if (fail[0] != null)
+            throw fail[0];
+        for (int k = 0; k < LAYERS.length; k++) {
+            final String layer = LAYERS[k];
+            final JSONObject o = Esri.parse(body[k]);
             final JSONArray f = o.optJSONArray("features");
             if (f == null)
                 continue;
@@ -267,17 +541,24 @@ public final class Places {
                 if (!geoid.matches("\\d{5,7}") || st == null)
                     continue;
                 final String base = a.optString("BASENAME", "").toUpperCase(Locale.US);
+                // The same place from an earlier query (start, then fuzzy or inside).
+                if (named.contains(layer + "#" + geoid))
+                    continue;
                 int d = 0;
                 if (near != null) {
-                    final String n = base.replace(" ", "");
+                    final String n = squash(base);
                     d = edits(near, n.length() > near.length() + 3 ? n.substring(0, near.length() + 3) : n);
                     if (d > Math.max(1, near.length() / 4))
                         continue;
                 }
                 final String name = a.optString("NAME", "").replace(" CDP", " (community)");
-                picked.add(new Object[] { d, new Place(name + ", " + st, layer, geoid, st, a.optDouble("AREALAND", 0),
-                        num(a.optString("INTPTLAT", "")), num(a.optString("INTPTLON", ""))) });
-                named.add(base + "|" + st);
+                final Place p = new Place(name + ", " + st, layer, geoid, st, a.optDouble("AREALAND", 0),
+                        num(a.optString("INTPTLAT", "")), num(a.optString("INTPTLON", "")));
+                p.base = canon(base);
+                p.tier = d == 0 ? 0 : 2;
+                picked.add(new Object[] { d, p });
+                named.add(p.base + "|" + st);
+                named.add(layer + "#" + geoid);
             }
         }
         Collections.sort(picked, new Comparator<Object[]>() {
