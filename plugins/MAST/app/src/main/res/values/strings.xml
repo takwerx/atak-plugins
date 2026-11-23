@@ -30,6 +30,11 @@
     <string name="cancel">Cancel</string>
     <string name="ok">OK</string>
 
+    <!-- Tool Preferences -->
+    <string name="prefs_summary">User manual</string>
+    <string name="manual_title">MAST User Manual</string>
+    <string name="manual_summary">How to pick a mission and arrange its pages.</string>
+
     <!-- MDM settings (res/xml/mast_mdm.xml), shown in the Atlas console -->
     <string name="mdm_cat_control">MAST on this device</string>
     <string name="mdm_locked">Managed by MDM: pages cannot be edited</string>

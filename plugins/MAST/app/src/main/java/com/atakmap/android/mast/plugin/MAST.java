@@ -25,6 +25,8 @@ import gov.tak.platform.marshal.MarshalManager;
 public class MAST implements IPlugin {
 
     private static final String TAG = "MAST";
+    /** The Tool Preferences entry, which is where the manual is opened. */
+    private static final String PREFS_KEY = "mast_preferences";
 
     /** Opens the pane; a system receiver, so adb reaches it too (Atmosphere's way). */
     public static final String SHOW_ACTION = "com.atakmap.android.mast.SHOW";
@@ -85,6 +87,7 @@ public class MAST implements IPlugin {
                     Toast.LENGTH_LONG).show();
         }
         uiService.addToolbarItem(toolbarItem);
+        registerPreferences();
         showReceiver = new android.content.BroadcastReceiver() {
             @Override
             public void onReceive(Context context, android.content.Intent intent) {
@@ -106,6 +109,7 @@ public class MAST implements IPlugin {
         if (uiService == null)
             return;
         uiService.removeToolbarItem(toolbarItem);
+        unregisterPreferences();
         if (showReceiver != null) {
             try {
                 AtakBroadcast.getInstance().unregisterSystemReceiver(showReceiver);
@@ -117,6 +121,29 @@ public class MAST implements IPlugin {
         if (pane != null) {
             pane.dispose();
             pane = null;
+        }
+    }
+
+    private void registerPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.register(
+                    new com.atakmap.app.preferences.ToolsPreferenceFragment.ToolPreference(
+                            pluginContext.getString(R.string.app_name),
+                            pluginContext.getString(R.string.prefs_summary),
+                            PREFS_KEY,
+                            // ic_toolbar: this row sits on ATAK's dark UI.
+                            pluginContext.getResources().getDrawable(R.drawable.ic_toolbar),
+                            new MastPreferenceFragment(pluginContext)));
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not register preferences: " + notThisBuild);
+        }
+    }
+
+    private void unregisterPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.unregister(PREFS_KEY);
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not unregister preferences: " + notThisBuild);
         }
     }
 }
