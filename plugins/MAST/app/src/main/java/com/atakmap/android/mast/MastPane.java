@@ -675,8 +675,11 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
             // Saved by MAST before 2026-11-22 as a JSON array.
             try {
                 final JSONArray a = new JSONArray(text);
-                for (int i = 0; i < a.length(); i++)
-                    ids.add(a.getString(i));
+                for (int i = 0; i < a.length(); i++) {
+                    final String id = a.getString(i);
+                    if (!id.isEmpty() && !id.contains("/") && !id.contains(".."))
+                        ids.add(id);
+                }
                 return ids;
             } catch (JSONException e) {
                 Log.w(TAG, "page " + pageKey(m, view) + " unreadable, base set used", e);
