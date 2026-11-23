@@ -518,8 +518,36 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
 
     // ---- tiles ----------------------------------------------------------------------
 
+    /**
+     * The mission's badge (operator's art, docs/icon-source/missions), by id. A map in
+     * code, not a lookup by resource name, which release proguard does not keep.
+     */
+    private static int badge(String missionId) {
+        switch (missionId) {
+            case "wildfire": return R.drawable.mission_wildfire;
+            case "tactical_response": return R.drawable.mission_tactical_response;
+            case "hazmat": return R.drawable.mission_hazmat;
+            case "swiftwater": return R.drawable.mission_swiftwater;
+            case "search_rescue": return R.drawable.mission_search_rescue;
+            default: return 0;
+        }
+    }
+
     private Button missionTile(final Missions.Mission m) {
-        final Button b = tile(m.name);
+        final int art = badge(m.id);
+        // The badge carries the mission's name, so the tile shows the badge alone; a
+        // mission with no art (a custom one) keeps its name as text.
+        final Button b = tile(art == 0 ? m.name : "");
+        if (art != 0) {
+            final Drawable d = plugin.getResources().getDrawable(art);
+            // The tile is 120dp: thin padding, and room for the empty text line.
+            final int size = dp(86);
+            d.setBounds(0, 0, size, size);
+            b.setPadding(dp(4), dp(6), dp(4), dp(4));
+            b.setCompoundDrawablePadding(0);
+            b.setCompoundDrawables(null, d, null, null);
+            b.setContentDescription(m.name);
+        }
         b.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
