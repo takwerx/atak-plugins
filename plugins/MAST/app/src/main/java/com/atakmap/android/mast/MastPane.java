@@ -540,11 +540,16 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
         final Button b = tile(art == 0 ? m.name : "");
         if (art != 0) {
             final Drawable d = plugin.getResources().getDrawable(art);
-            // The tile is 120dp: thin padding, and room for the empty text line.
-            final int size = dp(86);
+            // Centered in the 120dp tile: no text line under it (size 0, no font
+            // padding) and the same padding on every side. The badge's corners are
+            // transparent, so only its own white frame shows.
+            final int size = dp(100);
             d.setBounds(0, 0, size, size);
-            b.setPadding(dp(4), dp(6), dp(4), dp(4));
+            b.setTextSize(0);
+            b.setIncludeFontPadding(false);
+            b.setPadding(dp(4), dp(10), dp(4), dp(10));
             b.setCompoundDrawablePadding(0);
+            b.setGravity(android.view.Gravity.CENTER);
             b.setCompoundDrawables(null, d, null, null);
             b.setContentDescription(m.name);
         }
