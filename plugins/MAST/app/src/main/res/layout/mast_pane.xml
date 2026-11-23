@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The MAST pane, the front door to the mission plugins: a pinned Mission button
+    (opens the mission picker) over a scroller holding either the mission's plugin
+    tiles or the mission tiles, built in code from assets/missions.json. Every button
+    is TakwerxButton (CLAUDE.md, "Plugin UI standard").
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="8dp">
+
+    <Button
+        android:id="@+id/mast_mission"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <!-- On a mission page: which tiles show, ATAK's own tools or the mission's
+         plugins. Hidden on the picker and on a mission with no tools. -->
+    <LinearLayout
+        android:id="@+id/mast_view_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/mast_show_tools"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:text="@string/view_tools" />
+
+        <Button
+            android:id="@+id/mast_show_plugins"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/view_plugins" />
+    </LinearLayout>
+
+    <!-- Edit mode (long press a tile): takes the place of the row above. -->
+    <Button
+        android:id="@+id/mast_done"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/edit_done"
+        android:textColor="#00E676"
+        android:visibility="gone" />
+
+    <ScrollView
+        android:id="@+id/mast_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="4dp"
+        android:fadeScrollbars="false"
+        android:focusableInTouchMode="true"
+        android:descendantFocusability="beforeDescendants">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/mast_section"
+                style="@style/TakwerxSectionHeading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+            <LinearLayout
+                android:id="@+id/mast_tiles"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    MAST's Tool Preferences screen: only the user manual. The mission pages are
+    arranged on the pane itself, and the MDM settings (mast_mdm.xml) are kept off
+    this screen on purpose, so a user cannot turn the MDM lock off.
+-->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <com.atakmap.android.gui.PanPreference
+        android:key="manual"
+        android:title="@string/manual_title"
+        android:summary="@string/manual_summary" />
+
+</PreferenceScreen>
