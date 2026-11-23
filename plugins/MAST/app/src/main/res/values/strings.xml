@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">MAST</string>
+    <string name="app_desc">Mission Adaptable Support Tools: pick the mission, open its plugins</string>
+
+    <!-- Pane -->
+    <string name="mission_current">Mission: %s</string>
+    <string name="mission_none">Pick a mission</string>
+    <string name="section_plugins">%s plugins</string>
+    <string name="section_pick">Pick a mission</string>
+    <string name="section_tools">%s ATAK tools</string>
+    <string name="view_tools">ATAK Tools</string>
+    <string name="view_plugins">Plugins</string>
+    <string name="choose_tool">+\nChoose Tool</string>
+    <string name="choose_plugin">+\nChoose Plugin</string>
+    <string name="choose_tool_title">Choose an ATAK Tool</string>
+    <string name="choose_plugin_title">Choose a Plugin</string>
+    <string name="choose_none">Everything you can add is already on this page.</string>
+    <string name="edit_replace">Replace</string>
+    <string name="edit_remove">Remove</string>
+    <string name="edit_reset">Reset Page</string>
+    <string name="edit_done">Done</string>
+    <string name="section_editing">Drag to move. Tap to replace or remove.</string>
+    <string name="reset_message">Put back the tiles MAST ships for %s on this page? Your changes to this page are lost.</string>
+    <string name="plugin_not_installed">%s\nNot installed</string>
+    <string name="plugin_missing">%s is not on this device. Get it from the TAKwerx Market.</string>
+    <string name="open_market">Open Market</string>
+    <string name="mission_load_failed">MAST could not read its mission file: %s</string>
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+
+    <!-- Tool Preferences -->
+    <string name="prefs_summary">User manual</string>
+    <string name="manual_title">MAST User Manual</string>
+    <string name="manual_summary">How to pick a mission and arrange its pages.</string>
+
+    <!-- MDM settings (res/xml/mast_mdm.xml), shown in the Atlas console -->
+    <string name="mdm_cat_control">MAST on this device</string>
+    <string name="mdm_locked">Managed by MDM: pages cannot be edited</string>
+    <string name="mdm_locked_summary">On: users see the pages set here and cannot change them. Off: users arrange the pages themselves.</string>
+    <string name="mdm_mission">Mission</string>
+    <string name="mdm_view">Page shown: ATAK Tools or Plugins</string>
+    <string name="mdm_page_tools">ATAK Tools page (comma list)</string>
+    <string name="mdm_page_plugins">Plugins page (comma list of packages)</string>
+    <string name="mdm_cat_wildfire">Wildfire</string>
+    <string name="mdm_cat_tactical">Tactical Response</string>
+    <string name="mdm_cat_hazmat">Hazmat</string>
+    <string name="mdm_cat_swiftwater">Swift Water / Flood</string>
+    <string name="mdm_cat_sar">Search and Rescue</string>
+    <string-array name="mdm_mission_names">
+        <item>Wildfire</item>
+        <item>Tactical Response</item>
+        <item>Hazmat</item>
+        <item>Swift Water / Flood</item>
+        <item>Search and Rescue</item>
+    </string-array>
+    <string-array name="mdm_mission_ids">
+        <item>wildfire</item>
+        <item>tactical_response</item>
+        <item>hazmat</item>
+        <item>swiftwater</item>
+        <item>search_rescue</item>
+    </string-array>
+    <string-array name="mdm_view_names">
+        <item>ATAK Tools</item>
+        <item>Plugins</item>
+    </string-array>
+    <string-array name="mdm_view_ids">
+        <item>tools</item>
+        <item>plugins</item>
+    </string-array>
+
+</resources>

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    MAST's settings for an MDM. Atlas (Plugin Pref Config) reads this file out of
+    the APK and offers these keys in its console; its Import .pref fills them from
+    a .pref that Extract current pref pulled off a device set up by hand. Nothing
+    in ATAK shows this screen, so the lock is reachable only by the MDM.
+
+    The keys live in ATAK's default preferences, which is the group Atlas writes
+    when a plugin names no group of its own. A page is a comma list: tool item
+    names from ATAK's action bar, or plugin package names.
+-->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    android:title="@string/app_name">
+
+    <PreferenceCategory android:title="@string/mdm_cat_control">
+        <CheckBoxPreference
+            android:key="mast_locked"
+            android:title="@string/mdm_locked"
+            android:summary="@string/mdm_locked_summary"
+            android:defaultValue="false" />
+        <ListPreference
+            android:key="mast_mission"
+            android:title="@string/mdm_mission"
+            android:entries="@array/mdm_mission_names"
+            android:entryValues="@array/mdm_mission_ids" />
+        <ListPreference
+            android:key="mast_view"
+            android:title="@string/mdm_view"
+            android:entries="@array/mdm_view_names"
+            android:entryValues="@array/mdm_view_ids" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/mdm_cat_wildfire">
+        <EditTextPreference android:key="mast_page_wildfire_tools" android:title="@string/mdm_page_tools" />
+        <EditTextPreference android:key="mast_page_wildfire_plugins" android:title="@string/mdm_page_plugins" />
+    </PreferenceCategory>
+    <PreferenceCategory android:title="@string/mdm_cat_tactical">
+        <EditTextPreference android:key="mast_page_tactical_response_tools" android:title="@string/mdm_page_tools" />
+        <EditTextPreference android:key="mast_page_tactical_response_plugins" android:title="@string/mdm_page_plugins" />
+    </PreferenceCategory>
+    <PreferenceCategory android:title="@string/mdm_cat_hazmat">
+        <EditTextPreference android:key="mast_page_hazmat_tools" android:title="@string/mdm_page_tools" />
+        <EditTextPreference android:key="mast_page_hazmat_plugins" android:title="@string/mdm_page_plugins" />
+    </PreferenceCategory>
+    <PreferenceCategory android:title="@string/mdm_cat_swiftwater">
+        <EditTextPreference android:key="mast_page_swiftwater_tools" android:title="@string/mdm_page_tools" />
+        <EditTextPreference android:key="mast_page_swiftwater_plugins" android:title="@string/mdm_page_plugins" />
+    </PreferenceCategory>
+    <PreferenceCategory android:title="@string/mdm_cat_sar">
+        <EditTextPreference android:key="mast_page_search_rescue_tools" android:title="@string/mdm_page_tools" />
+        <EditTextPreference android:key="mast_page_search_rescue_plugins" android:title="@string/mdm_page_plugins" />
+    </PreferenceCategory>
+</PreferenceScreen>
