@@ -8,9 +8,11 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Evacuation orders and warnings touching the area, from the feeds the Evac Zone
@@ -20,10 +22,12 @@ import java.util.Map;
 public final class Evacuations extends Section {
 
     static final String CATALOG = "https://mapdepot.takwerx.org/evaczone/catalog.json";
+    /** The takwerx Genasys relay: GET only, and an envelope, never a polygon. */
+    static final String RELAY = "https://cams.takwerx.org/evaczone/";
 
     public Evacuations() {
         super("evacuations", "Evacuations", true,
-                "The agency evacuation feeds in the takwerx Evac Zone catalog (Cal OES, Oregon OSFM, county feeds).");
+                "The evacuation feeds in the takwerx Evac Zone catalog: Genasys Protect, Cal OES, CAL FIRE, Oregon, county feeds.");
         seeIn = "See them on the map in Evac Zone.";
         openName = "Evac Zone";
         openPackage = "com.atakmap.android.evaczone.plugin";
@@ -38,33 +42,69 @@ public final class Evacuations extends Section {
             throw new java.io.IOException("no sources in the evacuation catalog");
         final Map<String, List<String>> byStatus = new LinkedHashMap<>();
         final Map<String, List<String>> planned = new LinkedHashMap<>();
+        final Set<String> seen = new HashSet<>();
         boolean covered = false;
         for (int i = 0; i < sources.length(); i++) {
             final JSONObject s = sources.optJSONObject(i);
-            if (s == null || !counties.states.contains(s.optString("st")))
+            if (s == null)
                 continue;
-            final String url = s.optString("url", "");
-            if (!url.startsWith("https://") || !"polygon".equals(s.optString("geometry")))
+            // "US" is the Genasys feed for every state without its own source; its
+            // where clause already leaves those states out.
+            final String st = s.optString("st");
+            if (!counties.states.contains(st) && !("US".equals(st) && !counties.states.isEmpty()))
+                continue;
+            if (!s.optString("url", "").startsWith("https://") || !"polygon".equals(s.optString("geometry")))
                 continue;
             if (!overlaps(area, s.optJSONArray("bounds")))
                 continue;
             covered = true;
             final boolean live = "live".equals(s.optString("kind"));
-            final String status = field(s.optString("status_field", ""));
-            final String name = field(s.optString("name_field", ""));
-            final String fields = status == null && name == null ? "OBJECTID"
-                    : (status == null ? "" : status) + (status != null && name != null ? "," : "") + (name == null ? "" : name);
-            final String layer = url.replaceAll("/+$", "") + "/" + Math.max(0, s.optInt("layer", 0));
-            final List<JSONObject> rows = Esri.attributes(layer, s.optString("where", "1=1"), area, fields);
-            for (JSONObject a : rows) {
-                final String zone = name == null ? null : clean(a.optString(name, ""));
-                if (live) {
-                    String st = status == null ? "In effect" : clean(a.optString(status, ""));
-                    if (st == null || st.isEmpty())
-                        st = "Status not given";
-                    add(byStatus, st, zone);
-                } else {
-                    add(planned, clean(s.optString("title", "Pre-planned zones")), zone);
+            // The source's own feed first; then the "also" feeds, which add only the
+            // zones the first does not have (Evac Zone draws them the same way).
+            final List<JSONObject> feeds = new ArrayList<>();
+            feeds.add(s);
+            final JSONArray also = s.optJSONArray("also");
+            for (int j = 0; also != null && j < also.length(); j++)
+                if (also.optJSONObject(j) != null)
+                    feeds.add(also.optJSONObject(j));
+            for (JSONObject feed : feeds) {
+                final String url = feed.optString("url", "");
+                if (!url.startsWith("https://"))
+                    continue;
+                final String status = field(feed.optString("status_field", ""));
+                final String name = field(feed.optString("name_field", ""));
+                final String fields = status == null && name == null ? "OBJECTID"
+                        : (status == null ? "" : status) + (status != null && name != null ? "," : "") + (name == null ? "" : name);
+                final String layer = url.replaceAll("/+$", "") + "/" + Math.max(0, feed.optInt("layer", 0));
+                final String where = feed.optString("where", "1=1");
+                List<JSONObject> rows;
+                try {
+                    rows = url.startsWith(RELAY)
+                            ? Esri.attributesByGet(layer, where, area, fields)
+                            : Esri.attributes(layer, where, area, fields);
+                } catch (java.io.IOException e) {
+                    // The source's own feed failing fails the section; an "also" feed
+                    // only adds zones, so the others still answer without it.
+                    if (feed == s)
+                        throw e;
+                    continue;
+                }
+                for (JSONObject a : rows) {
+                    final String id = name == null ? null : clean(a.optString(name, ""));
+                    if (live && id != null && !id.isEmpty() && !seen.add(shortId(id)))
+                        continue;
+                    String zone = id == null ? null : shortId(id);
+                    final String known = clean(a.optString("known_as", ""));
+                    if (zone != null && known != null && !known.isEmpty() && !known.equals(zone))
+                        zone += " (" + known + ")";
+                    if (live) {
+                        String stat = status == null ? "In effect" : clean(a.optString(status, ""));
+                        if (stat == null || stat.isEmpty())
+                            stat = "Status not given";
+                        add(byStatus, stat, zone);
+                    } else {
+                        add(planned, clean(s.optString("title", "Pre-planned zones")), zone);
+                    }
                 }
             }
         }
@@ -106,6 +146,23 @@ public final class Evacuations extends Section {
             }
             r.line("  " + (z == null || z.isEmpty() ? "Zone not named" : clip(z, 80)));
         }
+    }
+
+    /**
+     * "PVL-E044" for "US-CA-XTU-PVL-E044": a Genasys id cut the way CAL FIRE and Evac
+     * Zone show it, so one zone in two feeds is counted once. Anything else is itself.
+     */
+    static String shortId(String id) {
+        final String[] p = id.split("-");
+        if (p.length >= 4 && "US".equals(p[0]) && p[1].length() == 2 && p[2].length() == 3) {
+            final StringBuilder sb = new StringBuilder();
+            for (int i = 3; i < p.length; i++)
+                sb.append(i > 3 ? "-" : "").append(p[i]);
+            return sb.toString();
+        }
+        if (p.length == 3 && "US".equals(p[0]) && p[1].length() == 2)
+            return p[2];
+        return id;
     }
 
     private static void add(Map<String, List<String>> m, String k, String v) {
