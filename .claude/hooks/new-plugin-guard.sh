@@ -1,7 +1,7 @@
 #!/bin/bash
 # new-plugin-guard: PreToolUse hook keeping plugin work out of the MAIN checkout.
 #
-# ~/GitHub/atak-plugins is nobody's workspace: it stays on main so /ship can
+# ~/GitHub/atak-plugins is nobody's workspace: it stays on main so /release can
 # merge there and refresh_depot.py can read there. Every plugin is edited in
 # its own worktree, ~/GitHub/atak-plugins-<plugin> (CLAUDE.md, "Working in
 # parallel"). The rule was prose, and prose lost: a session that starts talking

@@ -1,6 +1,6 @@
 #!/bin/bash
 # sync-public-repo: the plugin's public repo must hold nothing the monorepo
-# does not, or /ship's subtree push to it is refused as non-fast-forward.
+# does not, or /release's subtree push to it is refused as non-fast-forward.
 #
 # A plugin reaches takwerx/<repo> by `git subtree split` + push, so anything
 # merged THERE (a pull request from the Claude worker or a contributor, the
@@ -20,7 +20,7 @@
 #      its git-subtree-* trailers) naming a split commit whose parents are the
 #      old split AND the public main
 # The second is what makes the push a fast-forward: a merge alone is not
-# enough, because the plain split /ship runs drops any parent it was never
+# enough, because the plain split /release runs drops any parent it was never
 # told is subtree history. `split --onto <public> --rejoin` does the same once,
 # then dies ("cache ... already exists") on every later sync, because the
 # earlier recorded split is inside the public history; writing the commit
@@ -132,7 +132,7 @@ MERGECOMMIT="$(git commit-tree "$TREE" -p HEAD -m "$MSG")"
 REJOIN="$(git commit-tree "$TREE" -p "$MERGECOMMIT" -p "$NEWSPLIT" -m "Split '$PREFIX/' into commit '$NEWSPLIT'
 
 Records the split whose parents are the old split and takwerx/$REPO main,
-so the plain subtree split /ship runs builds on it and the push is a
+so the plain subtree split /release runs builds on it and the push is a
 fast-forward (scripts/sync-public-repo.sh).
 
 git-subtree-dir: $PREFIX

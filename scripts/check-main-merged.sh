@@ -1,7 +1,7 @@
 #!/bin/bash
 # check-main-merged: the current branch must contain every commit on main.
 #
-# main only moves through /ship, and every shared release rule (scripts/,
+# main only moves through /release, and every shared release rule (scripts/,
 # .claude/, CLAUDE.md, the build-file invariants in each plugin's
 # app/build.gradle) lands there on its own tooling ship. A plugin branch that
 # has not merged main since then builds and ships WITHOUT those rules, and
@@ -19,7 +19,7 @@
 # worktree, and submission-zip.sh runs it before zipping. --merge touches only
 # a clean tree with no merge or rebase in progress, and on a conflict aborts
 # and names the files, so a branch is never left half-merged; a conflict is
-# the one case left for a person. /ship runs the plain check in pre-flight.
+# the one case left for a person. /release runs the plain check in pre-flight.
 # Exit 1 when behind (or --merge could not bring main in), 2 when not on a
 # branch or there is no main.
 set -u
@@ -37,7 +37,7 @@ BRANCH="$(git branch --show-current)"
 git rev-parse --verify -q main >/dev/null || { echo "check-main-merged: no local main branch" >&2; exit 2; }
 
 # origin/main ahead of main means main was pushed from somewhere this Mac has
-# not pulled: the main checkout must catch up first, or /ship merges onto a
+# not pulled: the main checkout must catch up first, or /release merges onto a
 # stale main. Best effort; being offline is not a finding.
 if git fetch -q origin main 2>/dev/null; then
   ahead="$(git rev-list --count main..origin/main 2>/dev/null || echo 0)"

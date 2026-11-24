@@ -1,7 +1,7 @@
 #!/bin/bash
 # git-guard: PreToolUse hook enforcing the CLAUDE.md release hard-stops for the
 # PUBLIC repo takwerx/atak-plugins. Blocks merge-into-main, git tag creation,
-# pushes to main/tags, and gh release create — unless /ship has created a fresh
+# pushes to main/tags, and gh release create — unless /release has created a fresh
 # authorization sentinel (.claude/.ship-authorized, valid 30 minutes).
 # Ported from infra-TAK; same semantics, different repo.
 GG_INPUT="$(cat)" GG_ROOT="${CLAUDE_PROJECT_DIR:-$PWD}" exec python3 <<'PYEOF'
@@ -78,7 +78,7 @@ def _is_public_repo():
 if not _is_public_repo():
     sys.exit(0)
 
-# Sentinel created by /ship after the operator answers the ship prompt; valid 30 min.
+# Sentinel created by /release after the operator answers the ship prompt; valid 30 min.
 sentinel = os.path.join(root, ".claude", ".ship-authorized")
 try:
     if time.time() - os.path.getmtime(sentinel) < 1800:
@@ -90,9 +90,9 @@ def block(what):
     sys.stderr.write(
         f"BLOCKED by git-guard: {what}. This is a release hard-stop (CLAUDE.md): "
         "merge-to-main, tagging, pushing main/tags, and gh release create require "
-        "explicit operator authorization via the /ship skill, which presents the "
+        "explicit operator authorization via the /release skill, which presents the "
         "ship prompt and unlocks these operations for 30 minutes. Do NOT retry or "
-        "work around this; if the operator wants to ship, invoke /ship.\n")
+        "work around this; if the operator wants to ship, invoke /release.\n")
     sys.exit(2)
 
 if re.search(r'\bgh\s+release\s+create\b', cmd):
@@ -120,7 +120,7 @@ if m:
         block("git tag creation/deletion")
 
 if re.search(r'\bgit\b[^|;&]*\bmerge\b', cmd) and not re.search(r'--abort|--continue|--quit', cmd):
-    # /ship merges in the main checkout with `git -C ~/GitHub/atak-plugins`, so
+    # /release merges in the main checkout with `git -C ~/GitHub/atak-plugins`, so
     # the directory the merge runs in decides. A directory the guard could not
     # resolve (a shell variable it does not know) used to read as "not main"
     # and let the merge through; it now blocks, and the fix is a literal path.

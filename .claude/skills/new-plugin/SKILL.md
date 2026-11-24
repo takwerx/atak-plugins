@@ -117,7 +117,7 @@ failure this skill exists to prevent: two sessions on one checkout, and a
 plugin's history starting in the wrong place. Answer questions, but every edit
 happens in the new worktree.
 
-## Before its first `/ship`
+## Before its first `/release`
 
 Not this session's job, but say it once so it is not discovered at ship time:
 
