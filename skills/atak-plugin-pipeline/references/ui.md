@@ -58,6 +58,16 @@ grid of dark buttons reads better than a full-screen list.
 - **Sharing is `SendDialog.Builder`** (Export → Send → pick an app), which gets
   you Drive, Gmail and the rest for free. Never build your own share sheet.
 
+- **Leave a way back.** ATAK keeps a stack of dropdowns: a pane that is
+  retained (`setRetain(true)`) and still open when another screen opens is
+  hidden under it, and Back on that screen brings it back. So never call
+  `closeDropDown()` before the broadcast that opens ATAK's Maps, Overlay
+  Manager or another plugin's pane; a closed pane is off the stack and the user
+  has no way back but the toolbar. Show the pane with `ignoreBackButton =
+  false`: with `true`, Back can never close it at all. A map tool is the
+  exception: ATAK ends a tool when a pane opens, so close the pane, start the
+  tool, and reopen the pane from the tool's callback.
+
 ## Read ATAK's own assets before guessing
 
 `assets/actions` and `assets/menus` inside `atak.apk` define the radial menus and
