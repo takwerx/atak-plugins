@@ -49,6 +49,11 @@ and others), with an Open or Get button.
 _________________________________________________________________
 STATUS
 
+Version 0.7: Evacuations shows Genasys Protect evacuation zones, in every
+state where an agency issues them through Genasys. In California and Oregon
+it also shows the Cal OES, CAL FIRE, Oregon and county zones that Genasys
+does not have, and a zone in two feeds counts once.
+
 Version 0.6: place search finds more of what people type. Abbreviations
 ("Ft. Lauderdale", "St. Louis", "Mt. Vernon"), nicknames ("NYC", "Philly"),
 a kind word ("Orange County", "City of Miami"), names without their accents
