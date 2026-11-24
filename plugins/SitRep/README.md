@@ -1,10 +1,10 @@
 ATAK Plugin — Sit Rep
 
-**Download Sit Rep 0.6** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Sit Rep 0.7** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/sit-rep/releases/download/v0.6/ATAK-Plugin-SitRep-0.6--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/sit-rep/releases/download/v0.6/ATAK-Plugin-SitRep-0.6--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/sit-rep/releases/download/v0.6/ATAK-Plugin-SitRep-0.6--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/sit-rep/releases/download/v0.7/ATAK-Plugin-SitRep-0.7--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/sit-rep/releases/download/v0.7/ATAK-Plugin-SitRep-0.7--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/sit-rep/releases/download/v0.7/ATAK-Plugin-SitRep-0.7--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/sit-rep/releases
 
@@ -48,6 +48,11 @@ and others), with an Open or Get button.
 
 _________________________________________________________________
 STATUS
+
+Version 0.7: Evacuations shows Genasys Protect evacuation zones, in every
+state where an agency issues them through Genasys. In California and Oregon
+it also shows the Cal OES, CAL FIRE, Oregon and county zones that Genasys
+does not have, and a zone in two feeds counts once.
 
 Version 0.6: place search finds more of what people type. Abbreviations
 ("Ft. Lauderdale", "St. Louis", "Mt. Vernon"), nicknames ("NYC", "Philly"),

@@ -148,6 +148,39 @@ public final class Esri {
     }
 
     /**
+     * Polygon features touching the area, from a relay that answers GET only and takes
+     * an envelope, never a polygon (the takwerx Genasys relay). Asks for the area's box,
+     * then keeps the rows with an outer ring that touches the area itself.
+     */
+    public static List<JSONObject> attributesByGet(String layer, String where, Area area, String outFields)
+            throws IOException {
+        final String box = String.format(java.util.Locale.US, "%.6f,%.6f,%.6f,%.6f",
+                area.west, area.south, area.east, area.north);
+        final String url = layer + "/query?where=" + enc(where == null ? "1=1" : where)
+                + "&f=json&returnGeometry=true&outSR=4326&maxAllowableOffset=0.0005"
+                + "&outFields=" + enc(outFields)
+                + "&geometry=" + enc(box) + "&geometryType=esriGeometryEnvelope&inSR=4326"
+                + "&spatialRel=esriSpatialRelIntersects";
+        final JSONArray feats = features(Http.get(url));
+        final List<JSONObject> out = new ArrayList<>(feats.length());
+        for (int i = 0; i < feats.length(); i++) {
+            final JSONObject f = feats.optJSONObject(i);
+            final JSONObject a = f == null ? null : f.optJSONObject("attributes");
+            final JSONObject g = f == null ? null : f.optJSONObject("geometry");
+            final JSONArray rings = g == null ? null : g.optJSONArray("rings");
+            if (a == null || rings == null)
+                continue;
+            for (int r = 0; r < rings.length(); r++) {
+                if (area.touches(rings.optJSONArray(r))) {
+                    out.add(a);
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
      * Point features in the area's box widened by {@code miles}, for a service that
      * refuses a distance buffer (the National Inventory of Dams). The caller measures
      * the real distance.
