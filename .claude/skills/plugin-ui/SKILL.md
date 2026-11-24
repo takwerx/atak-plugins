@@ -624,6 +624,32 @@ How (AirAware `registerTap` / `openFor`, Atmosphere `tapOpensPage`):
 
 ## 11. Lifetime
 
+### Getting back: the pane stays under what it opens
+
+A pane that opens another screen (ATAK's Maps, Overlay Manager, a tool,
+another plugin's pane) must leave a way back to itself. ATAK keeps a stack of
+dropdowns: a pane that is **retained and still open** when the next one shows
+is hidden under it, and Back on the top one brings it back. So:
+
+- `setRetain(true)` on the receiver, before `showDropDown`.
+- **Never `closeDropDown()` before sending the broadcast** that opens the next
+  screen. A closed pane is off the stack, and the operator is left with no way
+  back but the toolbar. Tactical Response's Base maps tile did this, and the
+  operator called getting back "one of the hard things" (2026-11-23); removing
+  the one `closeDropDown()` fixed it (`4a90658f`, seen on dev ATAK 5.8.0.3).
+- Show with `ignoreBackButton = false`. With `true`, Back can never close the
+  pane at all (Atmosphere, 2026-09-26). For "Back narrows first, then
+  closes", override `onBackButtonPressed()` to narrow and return true when
+  wide; retention comes from `setRetain(true)`, not from the flag.
+- A map tool is different: ATAK ends a tool when a pane opens, so a pane that
+  starts a tool closes itself and reopens when the tool's callback fires
+  (Tactical Response `startShape` / `onShapeDone`).
+
+Test it on the device: open the pane, tap every control that opens another
+screen, press Back once on each. The pane must be there again.
+
+### What lives as long as the plugin
+
 - A manager created in `onStart` owns the data, the map listener, the timer and
   the worker, and lives as long as the plugin. Never inside a `Tool`; ATAK ends
   tools whenever something else opens.
@@ -641,6 +667,7 @@ grep -rn "<Spinner\|<Button" res/layout | grep -v TakwerxButton   # must print n
 # each hit below needs a look: a gate compared here is on the wrong scale
 grep -rn "getMapResolution\|minResolution\|FALLBACK_BAR_PIXELS" java | grep -iv scalebar
 grep -rn '"All ON"\|: ON"\|: OFF"' java res                        # action labels, colons
+grep -rn -A4 "closeDropDown()" java | grep "sendBroadcast"        # closes before it opens: no way back
 ```
 
 Then look at the screen and ask:
@@ -654,6 +681,8 @@ Then look at the screen and ask:
 6. Could a firefighter read every word on it without asking what it means?
 7. Does a tap on each kind of thing on the map do what the PLAN says, pane or
    radial, and does Back leave nothing behind on the map?
+8. From every control that opens another screen, does one Back return to this
+   pane?
 
 ---
 
@@ -677,3 +706,4 @@ Then look at the screen and ask:
 | Feature layer | IPAWS `AlertOverlay`; Atmosphere `AtmosphereFeatures` |
 | A tap opens the pane, no radial | AirAware `registerTap`, `openFor`; Atmosphere `tapOpensPage` |
 | Wide pane | IAP `IapDropDown`; Atmosphere `AtmosphereDropDown` |
+| Back returns from an ATAK screen | Tactical Response `TacticalPane.sendAtak` |
