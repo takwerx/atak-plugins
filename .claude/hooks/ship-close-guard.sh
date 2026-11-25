@@ -1,5 +1,5 @@
 #!/bin/bash
-# ship-close-guard: PreToolUse hook for Bash. /ship closes by removing
+# ship-close-guard: PreToolUse hook for Bash. /release closes by removing
 # .claude/.ship-authorized; the sentinel names the plugin being shipped. Block
 # that removal while scripts/check-depot-catalog.sh fails for it, so a ship
 # cannot be reported done with the depot catalog still offering the previous

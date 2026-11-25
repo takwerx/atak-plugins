@@ -1,9 +1,9 @@
 ---
-name: ship
-description: The ONLY path to main, a tag, or a GitHub Release in takwerx/atak-plugins. Invoke when the operator gives an unambiguous ship instruction ("send it to main", "merge to main", "tag it", "release PLSS 0.4"). Runs pre-flight, presents the mandatory ship prompt, and unlocks the git-guard hook only after an explicit yes.
+name: release
+description: The ONLY path to main, a tag, or a GitHub Release in takwerx/atak-plugins. Typed as /release (or "ship <Plugin> <version>" in words); /ship is Claude Code's built-in pull-request skill, not this. Invoke when the operator gives an unambiguous ship instruction ("send it to main", "merge to main", "tag it", "release PLSS 0.4"). Runs pre-flight, presents the mandatory ship prompt, and unlocks the git-guard hook only after an explicit yes.
 ---
 
-# /ship — atak-plugins release procedure
+# /release — atak-plugins release procedure
 
 `.claude/hooks/git-guard.sh` blocks merge-to-main, `git tag`, pushes of
 main/tags, and `gh release create` unless this skill's sentinel exists. General

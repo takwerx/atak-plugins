@@ -25,7 +25,7 @@ in one place outside all of them. The layout on the dev Mac:
 
 | Path | What it is |
 |---|---|
-| `~/GitHub/atak-plugins` | The **main checkout**, on `main`, always. Nobody's workspace: `/ship` merges here and `refresh_depot.py` reads here. |
+| `~/GitHub/atak-plugins` | The **main checkout**, on `main`, always. Nobody's workspace: `/release` merges here and `refresh_depot.py` reads here. |
 | `~/GitHub/atak-plugins-<plugin>` | One worktree per plugin, lowercase (`atak-plugins-fobs`, `atak-plugins-camdepot`), on that plugin's branch. It lives as long as the plugin; the branch inside it changes per release. |
 | `~/GitHub/atak-plugins-tooling` | The worktree for shared files, on a `tooling-<topic>` branch. |
 | `~/atak-dist/` | Every submission zip, and every tak.gov-signed APK under `signed/`. `dist` in each checkout is a symlink to it, so `ls dist/` is the same list everywhere and `submission-zip.sh` writes to one place. `env.sh` exports it as `ATAK_DIST`. |
@@ -61,7 +61,7 @@ The rules:
 - **Shared files change only on a tooling branch** in `atak-plugins-tooling`:
   `scripts/`, `.claude/`, this file, the root `README.md`, `.gitignore`, and
   any rule applied to every plugin's `app/build.gradle`. They reach `main` the
-  same day with `/ship tooling` (merge and push, nothing published) and never
+  same day with `/release tooling` (merge and push, nothing published) and never
   ride a plugin's release branch. The MDM versionCode rule sat on
   `camdepot-v1.3` for a day while FOBS 0.4 shipped without it.
 - **A plugin branch contains `main` before it builds a zip or ships, and
@@ -69,11 +69,11 @@ The rules:
   into its branch (SessionStart hook `.claude/hooks/update-from-main.sh`),
   and `submission-zip.sh` does the same before zipping; both go through
   `scripts/check-main-merged.sh --merge`, which touches only a clean tree and
-  on a conflict aborts and names the files. `/ship` runs the plain check. A
+  on a conflict aborts and names the files. `/release` runs the plain check. A
   conflict is the one case for a person: `git merge main`, resolve, commit.
   Before 2026-09-07 the check only refused, and every plugin worktree fell one
   commit behind at every ship.
-- **The main checkout stays on `main`.** `/ship` merges there with
+- **The main checkout stays on `main`.** `/release` merges there with
   `git -C ~/GitHub/atak-plugins`, so `main` is checked out in exactly one
   place and every worktree sees a new `main` the moment it lands. Never
   `git checkout main` in a worktree; git refuses anyway.
@@ -90,7 +90,7 @@ attached) and its own Issues. GitHub Releases and Issues are per repository, so
 sharing them across plugins in one repo was confusing to hand out.
 
 `takwerx/atak-plugins` (this repo) is the **development workspace**: shared
-scripts, these rules, the scrub/ship gates, all plugins side by side under
+scripts, these rules, the scrub/release gates, all plugins side by side under
 `plugins/`. A plugin reaches its public repo by subtree push, history preserved:
 
 ```bash
@@ -102,7 +102,7 @@ That push is refused when the public repo holds a commit the split does not:
 a pull request merged there (the Claude worker opens them), the worker
 workflow, the Market's community list. On 2026-10-31 all 16 public repos did.
 `scripts/sync-public-repo.sh <Plugin>` checks it and `--merge` brings the
-public commits back into `plugins/<Name>`; `/ship` runs it in pre-flight.
+public commits back into `plugins/<Name>`; `/release` runs it in pre-flight.
 Merging alone is not enough: the plain split drops a parent it was never told
 about, so the script also writes a recorded split (the `--rejoin` commit)
 whose split has the public main as a parent, and that is what makes the next
@@ -200,7 +200,7 @@ trip. like menus ... that arent map features"*). Only map shots wait for the
 signed build, and the operator frames those on the screenshot phone.
 `submission-zip.sh` stops when a release changes layouts, strings or UI code
 and no manual picture; `PICTURES_CHECKED=1` answers it when the manual shows
-none of those screens, or only map shots need retaking. `/ship` asks again.
+none of those screens, or only map shots need retaking. `/release` asks again.
 
 A plugin's *support surface* is its own repo: its Releases carry the
 tak.gov-signed APKs, its Issues take the bug reports. Anything that is not a
@@ -211,7 +211,7 @@ list does not read as if it were something to install.
 Each `plugins/<Name>/` carries its own `.gitignore` so it is safe as a standalone
 repo root. Per-plugin tags/releases live in the plugin repo (`v0.3`); this repo
 does not carry plugin release tags. The root README is the index of plugins →
-public repos. `/ship` covers the subtree push and the per-plugin release.
+public repos. `/release` covers the subtree push and the per-plugin release.
 
 ## Plugin UI standard — look like ATAK, not like a plugin
 
@@ -235,7 +235,7 @@ not have to be taught it again. The rules below are the base it builds on.
 **When the operator likes something and says it should be the standard** ("make
 this the standard", "I want this in my other plugins"), add it to the skill the
 same day, from any session: a `tooling-<topic>` branch in `atak-plugins-tooling`,
-then `/ship tooling`. A memory alone is not enough; memory is recalled by chance,
+then `/release tooling`. A memory alone is not enough; memory is recalled by chance,
 the skill is loaded for every new plugin. It changes new plugins only, never the
 existing ones unless the operator asks there.
 
@@ -351,7 +351,7 @@ visible (the Studio's emulator disappears); unset it for emulator work.
 that first proposes one, *before* any design conversation: it settles the name,
 makes the worktree, scaffolds inside it, removes the template manual, opens the
 PLAN, and hands the session over to the new worktree. This is a skill for the
-same reason `/ship` is: the rule was prose and prose lost to momentum. Comms
+same reason `/release` is: the rule was prose and prose lost to momentum. Comms
 and Feature Layer both got their folder late, because a session that starts
 talking about an idea keeps working in whatever directory it is already in.
 
@@ -377,7 +377,7 @@ git add plugins/<Name> && git commit
 package/class/descriptor, sets `rootProject.name`, removes the template's
 placeholder manual, and writes a gitignored `local.properties`. Open the session in that worktree; the plugin lives there
 through every release, the branch changing per version. Before its first
-`/ship`, its public repo `takwerx/<plugin-repo>` must exist (see "One public
+`/release`, its public repo `takwerx/<plugin-repo>` must exist (see "One public
 repo per plugin") and `refresh_depot.py` must list it (HARD RULE 2).
 
 **Plugin names are letters and digits only — no dashes, no underscores.** Capitals are
@@ -670,7 +670,7 @@ checked against the SBOM: a product the SBOM does not list is reported as a
 misidentified artifact and does not fail the gate, and one the SBOM *does* list
 fails it and has to be updated.
 
-`/ship` runs this before it will publish anything, and the scans stay on disk as
+`/release` runs this before it will publish anything, and the scans stay on disk as
 the record of what was checked.
 
 ### Point of contact — recorded once, injected automatically
@@ -756,7 +756,7 @@ git push https://github.com/takwerx/atak-plugin-pipeline.git pipeline-export:ref
 ```
 
 Its scripts are **deliberate forks** of `scripts/`, not links: they drop the
-worktrees, the notes repo, the depot catalog and `/ship`, and resolve a plugin
+worktrees, the notes repo, the depot catalog and `/release`, and resolve a plugin
 through `plugin_dir()` instead of assuming `plugins/<Name>/`. So a fix to a gate
 here is a fix there too, in the same tooling branch, or the public copy drifts.
 It must never carry an SDK artifact, a takwerx server, catalog or fleet detail,
@@ -877,7 +877,7 @@ resubmission is a new version; `--target` lets one target that was never
 signed be re-zipped), and with `--signed` this version's APKs are all present,
 one per target the README links, carry that target's code, and keep the package
 name and signing certificate of the last release. `submission-zip.sh` runs it per
-target before zipping, `/ship` runs it with `--signed --live`, and
+target before zipping, `/release` runs it with `--signed --live`, and
 `release-links-guard.sh` blocks the subtree push and `gh release create` on a
 FAIL. Watchtower accepted Cam Depot 1.3 as the update to 1.2 on 2026-09-06,
 which is the proof this is the shape an update has to have. What remains:
@@ -1011,7 +1011,7 @@ next day: whatever caused this is addressed across the whole fleet.
 - **The gate:** `scripts/check-firstnet.sh <Plugin>` needs no device. It fails
   on a host never probed or probed more than 120 days ago, and on a bad host
   in a plugin with no fallback. `submission-zip.sh` runs it before zipping
-  and `/ship` runs it again.
+  and `/release` runs it again.
 
 Status on 2026-11-18 (all 116 hosts on `main` plus FireView probed): bad on
 FirstNet are `tigerweb.geo.census.gov` and `geocoding.geo.census.gov`
@@ -1050,8 +1050,8 @@ Mechanics: `scripts/check-depot-catalog.sh <Plugin>` checks the live catalog
 against `PLUGIN_VERSION` on every target the README links; `--refresh` first
 rebuilds and publishes it from the GitHub Releases
 (`../atak-plugins-notes/tools/publish_depot.sh`, which refuses to remove or
-downgrade anything). `/ship` runs it as a step, and
-`.claude/hooks/ship-close-guard.sh` blocks `/ship` from re-locking until the
+downgrade anything). `/release` runs it as a step, and
+`.claude/hooks/ship-close-guard.sh` blocks `/release` from re-locking until the
 check passes. A nightly launchd job on the dev Mac runs the same publisher, so
 a missed step self-heals within a day. Do not work around the guard; fix the
 catalog.
@@ -1071,20 +1071,23 @@ catalog.
   whenever a change touches any of: network fetch, file writes or deletes, path
   construction from external input, parsing anything a server sent, or a version
   bump of vendored third-party code. Record the result (date, commit, outcome) in
-  `../atak-plugins-notes/docs/`. `/ship` then cites that record instead of
+  `../atak-plugins-notes/docs/`. `/release` then cites that record instead of
   discovering things when the APKs are already signed.
 - **`/new-plugin` is the ONLY way a new plugin starts**, invoked on the first
   message that proposes one — see "Creating a plugin".
-- **`/ship` is the ONLY path to `main`, a tag, or a GitHub Release.** The
+- **`/release` is the ONLY path to `main`, a tag, or a GitHub Release.** It was
+  `/ship` until 2026-11-24, when Claude Code shipped a built-in `ship` skill
+  (commit, push, open a pull request) that took the name: the operator typed
+  `/ship SitRep` and got its usage text. Never name this skill `ship` again. The
   PreToolUse hook `.claude/hooks/git-guard.sh` mechanically blocks merge-to-main,
-  `git tag`, pushes of main/tags, and `gh release create`; `/ship` runs pre-flight
+  `git tag`, pushes of main/tags, and `gh release create`; `/release` runs pre-flight
   (publish scrub, device-verification evidence, security scan, zips, open issues,
   commit scan), presents the ship prompt, and unlocks the guard for 30 minutes
   after an explicit "Ship it". Never create `.claude/.ship-authorized` outside
-  `/ship`. General approval given before the prompt does not count. Shared
-  files (scripts, hooks, this file) go to `main` with `/ship tooling` the same
+  `/release`. General approval given before the prompt does not count. Shared
+  files (scripts, hooks, this file) go to `main` with `/release tooling` the same
   day they change: merge and push, nothing published anywhere.
-- **A file that cannot change the APK is published with `/ship <Plugin> docs`,
+- **A file that cannot change the APK is published with `/release <Plugin> docs`,
   not with a version.** A README, a guide, a screenshot, a LICENSE. Until
   2026-09-14 the only route to a plugin's public repo was the subtree push
   inside a release, and a release refuses a version already signed -- so the

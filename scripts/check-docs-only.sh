@@ -4,7 +4,7 @@
 #
 # Publishing a file and releasing software were the same act until 2026-09-14,
 # because the only path to a plugin's public repo was a subtree push inside
-# /ship, and /ship refuses a version that is already signed. So a LICENSE file
+# /release, and /release refuses a version that is already signed. So a LICENSE file
 # two contributors were waiting on -- takwerx/comms#1 and #2, both offering
 # work, neither able to send a patch against a repo with no license -- could
 # only be published by inventing a version: a new tak.gov submission, three

@@ -10,7 +10,7 @@
 #                                                      # the GitHub releases first
 #                                                      # (private notes repo), then check
 #
-# Exit 1 on any finding. The ship-close guard runs the check form before /ship
+# Exit 1 on any finding. The ship-close guard runs the check form before /release
 # may re-lock, so a ship cannot be reported done with a stale catalog.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
