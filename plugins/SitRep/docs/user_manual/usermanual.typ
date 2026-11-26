@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Sit Rep",
-   plugin-version: "0.7",
+   plugin-version: "0.8",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -62,10 +62,12 @@ the SITREP icon (a clipboard, binoculars and a radio):
 - *New area* makes a report.
 - *Settings* holds the Nearby distance, the zoom at which places show, and
   the map key.
-- *Areas ON / OFF* shows or hides the outlines of saved reports on the map.
+- *All ON / OFF* turns every report's Map switch on or off at once. When
+  only some are on, it shows how many (All: 2 of 5); a tap turns them all on.
 - The arrows button makes the pane wide or half width.
 - *Reports* lists every saved report, newest first, with its main numbers.
-  *Map ON / OFF* on a row shows or hides that report on the map.
+  *Map ON / OFF* on a row shows or hides that report on the map: its
+  outline and its places.
 - Tap a report to read it.
 ]
 ]
@@ -145,8 +147,8 @@ it.
 
 Tap the outline to open that report.
 
-*Areas ON / OFF* on the main screen shows or hides every saved area;
-*Map ON / OFF* on a report's row does it for that one.
+*Map ON / OFF* on a report's row shows or hides that report;
+*All ON / OFF* on the main screen does it for every report.
 ]
 ]
 

@@ -43,7 +43,6 @@ import java.util.concurrent.ThreadFactory;
 public final class SitRepManager {
 
     private static final String TAG = "SitRep";
-    private static final String PREF_AREAS = "sitrep.areasVisible";
     public static final String PREF_NEARBY = "sitrep.nearbyMi";
     /** The places zoom gate: the scale bar's reading in meters, -1 for Always. */
     public static final String PREF_GATE = "sitrep.placesGateBarM";
@@ -118,7 +117,7 @@ public final class SitRepManager {
                         reports.clear();
                         reports.addAll(fromDisk);
                         loaded = true;
-                        outlines.sync(reports, areasVisible());
+                        outlines.sync(reports);
                         places.sync(reports);
                         changed();
                     }
@@ -167,13 +166,29 @@ public final class SitRepManager {
         return refreshing.contains(r.id + "/" + key);
     }
 
-    public boolean areasVisible() {
-        return prefs.getBoolean(PREF_AREAS, true);
+    /** How many saved reports have their Map switch ON. */
+    public int reportsOnMap() {
+        int n = 0;
+        for (Report r : reports)
+            if (r.onMap)
+                n++;
+        return n;
     }
 
-    public void setAreasVisible(boolean on) {
-        prefs.edit().putBoolean(PREF_AREAS, on).apply();
-        outlines.sync(reports, on);
+    /**
+     * The main screen's All ON/OFF: sets every report's own Map switch. It replaced
+     * an Areas switch over the outlines only, which hid a boundary while the report
+     * read Map ON (operator, 2026-11-25).
+     */
+    public void setAllOnMap(boolean on) {
+        for (Report r : reports) {
+            if (r.onMap == on)
+                continue;
+            r.onMap = on;
+            save(r);
+        }
+        outlines.sync(reports);
+        places.sync(reports);
         changed();
     }
 
@@ -386,7 +401,7 @@ public final class SitRepManager {
             r.onMap = true;
         save(r);
         if (wasOff)
-            outlines.sync(reports, areasVisible());
+            outlines.sync(reports);
         places.sync(reports);
         changed();
     }
@@ -461,7 +476,7 @@ public final class SitRepManager {
         reports.add(0, r);
         save(r);
         saveIndex();
-        outlines.sync(reports, areasVisible());
+        outlines.sync(reports);
         for (Section s : Sections.all())
             run(r, s);
         changed();
@@ -598,7 +613,7 @@ public final class SitRepManager {
             return;
         r.label = Report.cleanLabel(typed);
         save(r);
-        outlines.sync(reports, areasVisible());
+        outlines.sync(reports);
         changed();
     }
 
@@ -608,7 +623,7 @@ public final class SitRepManager {
             return;
         r.onMap = on;
         save(r);
-        outlines.sync(reports, areasVisible());
+        outlines.sync(reports);
         // Off takes everything of this report off the map; its place switches are
         // kept, so On brings back the same layers (operator, 2026-11-13).
         places.sync(reports);
@@ -628,7 +643,7 @@ public final class SitRepManager {
             }
         });
         saveIndex();
-        outlines.sync(reports, areasVisible());
+        outlines.sync(reports);
         places.sync(reports);
         changed();
     }

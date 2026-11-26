@@ -29,7 +29,7 @@
             android:text="@string/settings" />
 
         <Button
-            android:id="@+id/btn_areas"
+            android:id="@+id/btn_all"
             style="@style/TakwerxButton"
             android:layout_width="0dp"
             android:layout_weight="1"
