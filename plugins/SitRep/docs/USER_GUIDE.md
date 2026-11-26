@@ -1,8 +1,8 @@
-**Download Sit Rep 0.7** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Sit Rep 0.8** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/sit-rep/releases/download/v0.7/ATAK-Plugin-SitRep-0.7--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/sit-rep/releases/download/v0.7/ATAK-Plugin-SitRep-0.7--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/sit-rep/releases/download/v0.7/ATAK-Plugin-SitRep-0.7--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/sit-rep/releases/download/v0.8/ATAK-Plugin-SitRep-0.8--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/sit-rep/releases/download/v0.8/ATAK-Plugin-SitRep-0.8--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/sit-rep/releases/download/v0.8/ATAK-Plugin-SitRep-0.8--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/sit-rep/releases
 
@@ -44,10 +44,12 @@ the SITREP icon (a clipboard, binoculars and a radio).
 - **New area** makes a report.
 - **Settings** holds the Nearby distance, the zoom at which places show, and
   the map key.
-- **Areas ON / OFF** shows or hides the outlines of saved reports on the map.
+- **All ON / OFF** turns every report's Map switch on or off at once. When
+  only some are on, it shows how many (All: 2 of 5); a tap turns them all on.
 - The arrows button makes the pane wide or half width.
 - **Reports** lists every saved report, newest first, with its main numbers.
-  **Map ON / OFF** on a row shows or hides that report on the map.
+  **Map ON / OFF** on a row shows or hides that report on the map: its
+  outline and its places.
 - Tap a report to read it.
 
 ## Make a report

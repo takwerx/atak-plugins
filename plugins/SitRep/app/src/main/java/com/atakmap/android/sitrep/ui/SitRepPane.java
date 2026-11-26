@@ -52,7 +52,7 @@ public final class SitRepPane {
     private final TextView status;
     private final ListView list;
     private final View settingsPage, reportPage;
-    private final Button drawButton, areasButton;
+    private final Button drawButton, allButton;
     private final LinearLayout settingsContainer, reportSections;
     private final TextView reportTitle, reportAbout;
     private final ScrollView reportScroll;
@@ -86,7 +86,7 @@ public final class SitRepPane {
 
         final View header = PluginLayoutInflater.inflate(plugin, R.layout.controls_header, null);
         drawButton = header.findViewById(R.id.btn_draw);
-        areasButton = header.findViewById(R.id.btn_areas);
+        allButton = header.findViewById(R.id.btn_all);
         list.addHeaderView(header, null, false);
         list.setAdapter(adapter);
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -117,10 +117,12 @@ public final class SitRepPane {
                 showSettings();
             }
         });
-        areasButton.setOnClickListener(new View.OnClickListener() {
+        allButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                manager.setAreasVisible(!manager.areasVisible());
+                // All on: tap turns all off. Some or none on: tap turns all on.
+                final int n = manager.reports().size();
+                manager.setAllOnMap(n == 0 || manager.reportsOnMap() < n);
             }
         });
         root.findViewById(R.id.btn_settings_back).setOnClickListener(new View.OnClickListener() {
@@ -337,7 +339,7 @@ public final class SitRepPane {
             drawButton.setText(R.string.draw_area);
             drawButton.setTextColor(0xFFFFFFFF);
         }
-        setState(areasButton, "Areas", manager.areasVisible());
+        paintAll();
         shown = manager.reports();
         adapter.notifyDataSetChanged();
         if (nearbyFold != null)
@@ -1049,6 +1051,18 @@ public final class SitRepPane {
         }
     }
 
+
+    /** All ON when every report is on the map, All OFF when none is, else how many. */
+    private void paintAll() {
+        final int n = manager.reports().size();
+        final int on = manager.reportsOnMap();
+        allButton.setEnabled(n > 0);
+        if (n > 0 && on > 0 && on < n) {
+            allButton.setText("All: " + on + " of " + n);
+            allButton.setTextColor(0xFFFFFFFF);
+        } else
+            setState(allButton, "All", n > 0 && on == n);
+    }
 
     private static void setState(Button b, String thing, boolean on) {
         b.setText(thing + (on ? " ON" : " OFF"));

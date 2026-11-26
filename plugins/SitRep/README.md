@@ -1,10 +1,10 @@
 ATAK Plugin — Sit Rep
 
-**Download Sit Rep 0.7** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Sit Rep 0.8** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/sit-rep/releases/download/v0.7/ATAK-Plugin-SitRep-0.7--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/sit-rep/releases/download/v0.7/ATAK-Plugin-SitRep-0.7--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/sit-rep/releases/download/v0.7/ATAK-Plugin-SitRep-0.7--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/sit-rep/releases/download/v0.8/ATAK-Plugin-SitRep-0.8--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/sit-rep/releases/download/v0.8/ATAK-Plugin-SitRep-0.8--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/sit-rep/releases/download/v0.8/ATAK-Plugin-SitRep-0.8--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/sit-rep/releases
 
@@ -48,6 +48,12 @@ and others), with an Open or Get button.
 
 _________________________________________________________________
 STATUS
+
+Version 0.8: All ON / OFF replaces the Areas switch. It turns every
+report's Map switch on or off at once, outline and places together. When
+only some reports are on, it shows how many (All: 2 of 5), and a tap turns
+them all on. Before, Areas OFF hid every outline while each report still
+read Map ON.
 
 Version 0.7: Evacuations shows Genasys Protect evacuation zones, in every
 state where an agency issues them through Genasys. In California and Oregon
