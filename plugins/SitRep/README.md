@@ -49,6 +49,12 @@ and others), with an Open or Get button.
 _________________________________________________________________
 STATUS
 
+Version 0.8: All ON / OFF replaces the Areas switch. It turns every
+report's Map switch on or off at once, outline and places together. When
+only some reports are on, it shows how many (All: 2 of 5), and a tap turns
+them all on. Before, Areas OFF hid every outline while each report still
+read Map ON.
+
 Version 0.7: Evacuations shows Genasys Protect evacuation zones, in every
 state where an agency issues them through Genasys. In California and Oregon
 it also shows the Cal OES, CAL FIRE, Oregon and county zones that Genasys
