@@ -27,6 +27,8 @@ import java.util.TimeZone;
 public final class NomadsWind {
 
     public static final String HOST = "nomads.ncep.noaa.gov";
+    /** How a status line names this host: operators know NOAA, not the host name. */
+    public static final String SERVER_NAME = "the NOAA weather server";
     private static final String FILTER = "https://" + HOST + "/cgi-bin/";
 
     /**

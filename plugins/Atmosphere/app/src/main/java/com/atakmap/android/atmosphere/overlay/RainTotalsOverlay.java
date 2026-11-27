@@ -458,7 +458,7 @@ public final class RainTotalsOverlay extends ImageOverlay {
                     } catch (Http.StatusException e) {
                         error = e.status == 404 ? notHeld(spec) : "the server answered " + e.status;
                     } catch (IOException e) {
-                        error = e.getMessage() == null ? "network error" : e.getMessage();
+                        error = Http.words(e);
                     } catch (InterruptedException e) {
                         return;
                     } catch (RuntimeException e) {

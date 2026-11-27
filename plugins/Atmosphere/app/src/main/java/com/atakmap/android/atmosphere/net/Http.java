@@ -434,14 +434,17 @@ public final class Http {
     }
 
     private static String describe(IOException e) {
-        final String message = e.getMessage();
-        if (e instanceof java.net.SocketTimeoutException)
-            return "timed out";
-        if (e instanceof java.net.UnknownHostException)
-            return "no route to the provider";
-        if (e instanceof javax.net.ssl.SSLException)
-            return "TLS failed";
-        return message == null ? "network error" : message;
+        return FailureText.describe(e);
+    }
+
+    /** The words for a failed request, for a layer that makes its own request. */
+    public static String words(IOException e) {
+        return FailureText.describe(e);
+    }
+
+    /** See {@link FailureText#line}. */
+    public static String line(String error, String provider, boolean pictureDrawn) {
+        return FailureText.line(error, provider, pictureDrawn);
     }
 
     /** Query strings can carry coordinates; keep them out of the log. */

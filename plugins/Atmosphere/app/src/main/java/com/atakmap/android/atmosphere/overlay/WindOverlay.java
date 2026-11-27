@@ -634,7 +634,7 @@ public final class WindOverlay {
                 if (k.equals(pendingKey)) pendingKey = null;
                 if (mine != generation)
                     return;
-                status(error);
+                status(Http.line(error, NomadsWind.SERVER_NAME, shown != null));
             }
         });
     }
