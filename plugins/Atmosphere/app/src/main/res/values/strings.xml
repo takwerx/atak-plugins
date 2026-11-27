@@ -239,6 +239,11 @@
     <string name="waves_calm">Calm</string>
     <string name="waves_phenomenal">Phenomenal</string>
     <string name="rain_on">Rain ON</string>
+    <string name="temperature_on">Air Temperature ON</string>
+    <string name="temperature_off">Air Temperature OFF</string>
+    <string name="temperature_allow_title">Show air temperature?</string>
+    <string name="temperature_allow_text">Air temperature is an estimate from NOAA\'s global forecast model, not a station measurement. Turning it on sends the area of the map you are viewing to NOAA. Your position is not sent.\n\nServer: nomads.ncep.noaa.gov</string>
+    <string name="credit_temperature">Air temperature forecast from NOAA GFS (%1$s)</string>
     <string name="raintotals_on">Rain Totals ON</string>
     <string name="raingauges_on">Rain Gauges ON</string>
     <string name="raingauges_off">Rain Gauges OFF</string>

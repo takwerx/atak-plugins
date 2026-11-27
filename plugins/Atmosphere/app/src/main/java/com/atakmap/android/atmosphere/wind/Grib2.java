@@ -137,8 +137,13 @@ public final class Grib2 {
                             throw new IOException("a basic angle other than degrees is not read");
                         nx = (int) u32(b, p + 30);
                         ny = (int) u32(b, p + 34);
-                        final double a1 = s32(b, p + 46) / 1e6, o1 = normLon(s32(b, p + 50) / 1e6);
+                        final double a1 = s32(b, p + 46) / 1e6;
+                        double o1 = normLon(s32(b, p + 50) / 1e6);
                         final double a2 = s32(b, p + 55) / 1e6, o2 = normLon(s32(b, p + 59) / 1e6);
+                        // A box asked for from -180 comes back starting at 180.0: the
+                        // same meridian, and as a west edge it is the western one.
+                        if (o1 >= 180 && o2 < o1)
+                            o1 -= 360;
                         final int scan0 = u8(b, p + 71);
                         if ((scan0 & 0x80) != 0 || (scan0 & 0x20) != 0)
                             throw new IOException("scanning mode " + scan0

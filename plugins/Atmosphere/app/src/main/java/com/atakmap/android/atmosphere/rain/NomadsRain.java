@@ -68,6 +68,11 @@ public final class NomadsRain {
     /** The filter request for the rain rate over a box at a forecast hour of a run. */
     public static String url(long runUtc, int forecastHour, double west, double south,
             double east, double north) {
+        return url(runUtc, forecastHour, west, south, east, north, FIELDS);
+        }
+
+        static String url(long runUtc, int forecastHour, double west, double south,
+            double east, double north, String fields) {
         final Calendar c = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
         c.setTimeInMillis(runUtc);
         final String day = String.format(Locale.US, "%04d%02d%02d", c.get(Calendar.YEAR),
@@ -76,7 +81,7 @@ public final class NomadsRain {
         return FILTER + "?dir=%2Fgfs." + day + "%2F" + hh + "%2Fatmos"
                 + "&file=gfs.t" + hh + "z.pgrb2.0p25.f"
                 + String.format(Locale.US, "%03d", forecastHour)
-                + "&" + FIELDS + "&subregion="
+                + "&" + fields + "&subregion="
                 + String.format(Locale.US, "&toplat=%.3f&leftlon=%.3f&rightlon=%.3f&bottomlat=%.3f",
                         Math.min(90, north), west, east, Math.max(-90, south));
     }
