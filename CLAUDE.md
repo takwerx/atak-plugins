@@ -296,8 +296,9 @@ silently trimmed map reads as the whole picture.
 ## The SDK lives outside this repo
 
 - Path: `~/atak-sdk/ATAK-CIV-<version>/`, one per target, all from tak.gov:
-  `5.6.0.23`, `5.7.0.14`, `5.8.0.3` (`local-properties.sh` picks the newest per
-  target). `5.6.0.8` is older and only still supplies `takdev.plugin`. The open
+  `5.6.0.23`, `5.7.0.14`, `5.8.0.10` (`local-properties.sh` picks the newest per
+  target; 5.8.0.3 and 5.8.0.5 stay installed; every plugin that targets 5.8.0 builds
+  against 5.8.0.10, debug and release, ops #802). `5.6.0.8` is older and only still supplies `takdev.plugin`. The open
   source at `TAK-Product-Center/atak-civ` (checked out at `~/atak-sdk/atak-civ-source`)
   stops at 5.5.1.10 and is not what any plugin builds against.
 - Contains `main.jar` (the ATAK API you compile against), `atak-gradle-takdev.jar`
