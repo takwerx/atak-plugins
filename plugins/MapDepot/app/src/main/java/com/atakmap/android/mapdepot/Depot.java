@@ -1566,28 +1566,23 @@ public final class Depot {
         return new Storms(section.optString("builtAt", ""), out);
     }
 
+    /**
+     * The catalog section that holds the base maps needing the operator's own
+     * key (CARTO). It is a sibling of {@code basemaps}, not part of it, on
+     * purpose: Map Depot 1.16 and older read {@code basemaps.sources} only, and
+     * ignore every other key. A keyed row in {@code basemaps.sources} would be
+     * listed by those phones, and Add would install the template with a literal
+     * {@code {$key}} in the tile address, which CARTO answers with its
+     * watermarked tile. Here only 1.17 and newer ever see the rows.
+     */
+    static final String KEYED_SECTION = "basemapsKeyed";
+
     public static List<BaseMap> parseBaseMaps(String json) throws Exception {
         final JSONObject root = new JSONObject(json);
-        final JSONObject section = root.optJSONObject("basemaps");
-        if (section == null)
-            return Collections.emptyList();
-
-        final JSONArray arr = section.optJSONArray("sources");
-        if (arr == null)
-            return Collections.emptyList();
-
         final List<BaseMap> maps = new ArrayList<>();
-        for (int i = 0; i < arr.length(); i++) {
-            final JSONObject o = arr.optJSONObject(i);
-            if (o == null)
-                continue;
-            try {
-                maps.add(new BaseMap(o));
-            } catch (IllegalArgumentException bad) {
-                com.atakmap.coremap.log.Log.w("MapDepot",
-                        "rejected base map: " + bad.getMessage());
-            }
-        }
+        final java.util.Set<String> seen = new java.util.HashSet<>();
+        addBaseMaps(root.optJSONObject("basemaps"), maps, seen);
+        addBaseMaps(root.optJSONObject(KEYED_SECTION), maps, seen);
 
         Collections.sort(maps, new Comparator<BaseMap>() {
             @Override
@@ -1597,6 +1592,33 @@ public final class Depot {
             }
         });
         return maps;
+    }
+
+    /**
+     * One section's {@code sources} array into the list. A row that fails its
+     * checks is skipped and logged, as before; an id already listed is skipped,
+     * so a row in both sections shows once.
+     */
+    private static void addBaseMaps(JSONObject section, List<BaseMap> out,
+            java.util.Set<String> seen) {
+        if (section == null)
+            return;
+        final JSONArray arr = section.optJSONArray("sources");
+        if (arr == null)
+            return;
+        for (int i = 0; i < arr.length(); i++) {
+            final JSONObject o = arr.optJSONObject(i);
+            if (o == null)
+                continue;
+            try {
+                final BaseMap map = new BaseMap(o);
+                if (seen.add(map.id))
+                    out.add(map);
+            } catch (IllegalArgumentException bad) {
+                com.atakmap.coremap.log.Log.w("MapDepot",
+                        "rejected base map: " + bad.getMessage());
+            }
+        }
     }
 
     public static Manifest parseManifest(String json) throws Exception {
