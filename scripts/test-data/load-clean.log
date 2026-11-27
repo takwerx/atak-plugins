@@ -1,0 +1,25 @@
+--------- beginning of main
+11-12 07:39:27.931  5130  5130 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+11-12 07:39:27.933  5130  5130 I AndroidRuntime: Using default boot image
+11-12 07:39:27.933  5130  5130 I AndroidRuntime: Leaving lock profiling enabled
+11-12 07:39:27.983  5130  5130 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+11-12 07:39:28.346  4496  4496 D AtakPluginRegistry: Plugin has not been scanned, scanning now: com.atakmap.android.signaldf.plugin
+11-12 07:39:28.359  4496  4496 D AtakPluginRegistry: Successfully loaded plugin descriptor for com.atakmap.android.signaldf.plugin: [Extension type=gov.tak.api.plugin.IPlugin, impl=com.atakmap.android.signaldf.plugin.SignalDF], 
+11-12 07:39:28.360  4496  4496 D AtakPluginRegistry: com.atakmap.android.signaldf.plugin: [Extension type=gov.tak.api.plugin.IPlugin, impl=com.atakmap.android.signaldf.plugin.SignalDF],  will NOT load
+11-12 07:39:28.360  4496  4496 D AtakPluginRegistry: Scanned and found plugin: com.atakmap.android.signaldf.plugin
+11-12 07:39:28.391  4496  4496 D AtakPluginRegistry: Plugin was previously scanned: com.atakmap.android.signaldf.plugin
+11-12 07:39:28.399  4496  4496 D AtakPluginRegistry: Plugin was previously scanned: com.atakmap.android.signaldf.plugin
+11-12 07:39:29.459  5130  5130 D AndroidRuntime: Shutting down VM
+11-12 07:39:30.393  4496  4496 D AtakPluginRegistry: Loading plugin: com.atakmap.android.signaldf.plugin
+11-12 07:39:30.393  4496  4496 D AtakPluginRegistry: Plugin was previously scanned: com.atakmap.android.signaldf.plugin
+11-12 07:39:30.395  4496  4496 D AtakPluginRegistry: Plugin was previously scanned: com.atakmap.android.signaldf.plugin
+11-12 07:39:30.400  4496  4496 D AtakPluginRegistry: Loading com.atak.plugins.impl.IToolbarItem extensions for com.atakmap.android.signaldf.plugin: [Extension type=gov.tak.api.plugin.IPlugin, impl=com.atakmap.android.signaldf.plugin.SignalDF], 
+11-12 07:39:30.400  4496  4496 D AtakPluginRegistry: Found 0 plugin extensions matching IToolbarItem in 5 plugins
+11-12 07:39:30.400  4496  4496 D AtakPluginRegistry: Loading gov.tak.api.plugin.IPlugin extensions for com.atakmap.android.signaldf.plugin: [Extension type=gov.tak.api.plugin.IPlugin, impl=com.atakmap.android.signaldf.plugin.SignalDF], 
+11-12 07:39:30.400  4496  4496 D AtakPluginRegistry: api matches[ com.atakmap.android.signaldf.plugin]; pluginApiVersion:com.atakmap.app@5.8.0.CIV
+11-12 07:39:30.400  4496  4496 D AtakPluginRegistry: SDK skipping signature check[com.atakmap.android.signaldf.plugin]
+11-12 07:39:30.405  4496  4496 D AtakPluginRegistry: Loaded com.atakmap.android.signaldf.plugin.SignalDF, for plugin: com.atakmap.android.signaldf.plugin: [Extension type=gov.tak.api.plugin.IPlugin, impl=com.atakmap.android.signaldf.plugin.SignalDF], 
+11-12 07:39:30.405  4496  4496 D AtakPluginRegistry: Found 1 plugin extensions matching IPlugin in 5 plugins
+11-12 07:39:30.405  4496  4496 D AtakPluginRegistry: Loading new Kernel plugin: com.atakmap.android.signaldf.plugin.SignalDF@22de85a
+11-12 07:39:30.414  4496  4496 D AtakPluginRegistry: Loaded plugin: com.atakmap.android.signaldf.plugin, with extension count: 2
+11-12 07:39:30.424  4496  4496 D PluginMapComponent: addPluginIcon: com.atakmap.android.signaldf.plugin
