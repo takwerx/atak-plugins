@@ -1,12 +1,12 @@
 # Map Depot for ATAK — User Guide
 
-**Version 1.16 · takwerx**
+**Version 1.17 · takwerx**
 
-**Download Map Depot 1.16** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Map Depot 1.17** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.16/ATAK-Plugin-MapDepot-1.16--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.16/ATAK-Plugin-MapDepot-1.16--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.16/ATAK-Plugin-MapDepot-1.16--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.17/ATAK-Plugin-MapDepot-1.17--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.17/ATAK-Plugin-MapDepot-1.17--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.17/ATAK-Plugin-MapDepot-1.17--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/map-depot/releases
 
@@ -142,6 +142,22 @@ Each row says who serves the map and how far it can be zoomed. **Zoom 21** is
 close enough to see parking spaces; **zoom 10** is regional only.
 
 ![Base map rows](screenshots/10_base_map_rows.png)
+
+### Maps that need your own key
+
+A few servers only serve clean tiles to requests that carry an API key of
+your own; CARTO's **Voyager**, **Positron** and **Dark Matter** are the ones
+in the list. Their rows say *needs your API key*. Tap **Add** and the plugin
+asks for the key, with a **Get a key** button that opens the provider's page
+(CARTO's is free for ordinary use). The key is kept on the device and written
+into the map source file ATAK reads; the row then says *key set*. To change or
+clear it later, go to **Settings › Tool Preferences › Map Depot**. After a
+change, the affected rows go back to **Add** so you can re-add them with the
+new key.
+
+![CARTO key prompt](screenshots/66_carto_key_prompt.png)
+
+![CARTO key in Tool Preferences](screenshots/67_carto_key_preference.png)
 
 ### Overlays
 
