@@ -626,7 +626,7 @@ public final class RadarOverlay {
                         capsInFlight = false;
                         if (mine != generation)
                             return;
-                        status(error);
+                        status(Http.line(error, "the radar server", false));
                     }
                 });
     }
@@ -822,7 +822,7 @@ public final class RadarOverlay {
                     pendingKey = null;
                 if (mine != generation)
                     return;
-                status(error);
+                status(Http.line(error, "the radar server", false));
                 stepLoop();
             }
         });
