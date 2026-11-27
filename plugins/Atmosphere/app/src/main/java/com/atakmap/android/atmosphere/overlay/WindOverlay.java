@@ -8,6 +8,7 @@ import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.net.Http;
 import com.atakmap.android.atmosphere.wind.NomadsWind;
 import com.atakmap.android.atmosphere.wind.WindGrid;
+import com.atakmap.android.atmosphere.wind.WindRegion;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoBounds;
@@ -115,7 +116,8 @@ public final class WindOverlay {
      * scrubber says is counted from here; only the fetch uses the model's own hour.
      */
     private int firstHour;
-    private GeoBounds region;
+    /** The region asked for and what the grid that came back covers; see {@link WindRegion}. */
+    private final WindRegion area = new WindRegion();
     private WindGrid shown;
     private int generation;
     private String pendingKey;
@@ -173,7 +175,7 @@ public final class WindOverlay {
                 setRun(latest);
                 hour = (int) Math.max(firstHour, Math.min(hours, Math.round((shownTime - latest) / 3_600_000.0)));
                 cache.clear();
-                region = null;
+                area.clear();
                 generation++;
                 pendingKey = null;
                 Log.d(TAG, "newer run " + latest + ", refetching");
@@ -402,7 +404,7 @@ public final class WindOverlay {
             return;
         hour = h;
         mapView.removeCallbacks(scrubSettled);
-        if (region != null && cache.containsKey(key(run, hour, region)))
+        if (area.isSet() && cache.containsKey(key(run, hour, area.asked())))
             showHour();
         else
             mapView.postDelayed(scrubSettled, SCRUB_SETTLE_MS);
@@ -410,9 +412,8 @@ public final class WindOverlay {
 
     // ---- region and grids ----------------------------------------------------------
 
-    private String key(long run, int hour, GeoBounds r) {
-        return String.format(Locale.US, "%s|%s|%d|%d|%.3f,%.3f,%.3f,%.3f", model.name(),
-                level.name(), run, hour, r.getWest(), r.getSouth(), r.getEast(), r.getNorth());
+    private String key(long run, int hour, WindRegion.Box r) {
+        return WindRegion.key(model.name(), level.name(), run, hour, r);
     }
 
     /** How many heights the slider walks. */
@@ -454,17 +455,12 @@ public final class WindOverlay {
         if (p != null)
             p.edit().putInt(PREF_LEVEL, i).apply();
         cache.clear();
-        region = null;
+        area.clear();
         generation++;
         pendingKey = null;
         ensureRegion();
     }
 
-
-    private static boolean contains(GeoBounds outer, GeoBounds inner) {
-        return inner.getWest() >= outer.getWest() && inner.getEast() <= outer.getEast()
-                && inner.getSouth() >= outer.getSouth() && inner.getNorth() <= outer.getNorth();
-    }
 
     private void ensureRegion() {
         if (!on)
@@ -481,7 +477,7 @@ public final class WindOverlay {
                 if (view != null)
                     view.setGrid(null);
                 status("Zoom in to see the wind");
-                region = null;
+                area.clear();
                 return;
             }
             final double dLat = reach / 110540.0;
@@ -509,7 +505,7 @@ public final class WindOverlay {
                 if (view != null)
                     view.setGrid(null);
                 status("Zoom in to see the wind");
-                region = null;
+                area.clear();
                 return;
             }
             vw = bounds.getWest();
@@ -529,21 +525,9 @@ public final class WindOverlay {
             return;
         }
 
-        boolean refetch = chosen != model || region == null || !contains(region, clamped);
-        if (refetch && region != null && chosen == model
-                && clamped.getEast() - clamped.getWest() > chosen.maxSpanLon) {
-            // Wider than the box this model is asked for: refetch only when the view's
-            // center leaves it, so a pan across a continent is not a request a second.
-            final double cx = (clamped.getEast() + clamped.getWest()) / 2;
-            final double cy = (clamped.getNorth() + clamped.getSouth()) / 2;
-            refetch = cx < region.getWest() || cx > region.getEast()
-                    || cy < region.getSouth() || cy > region.getNorth();
-        }
-        if (!refetch) {
-            final double viewSpan = clamped.getEast() - clamped.getWest();
-            final double regionSpan = region.getEast() - region.getWest();
-            refetch = viewSpan < regionSpan / 3.5 || viewSpan > regionSpan * 1.6;
-        }
+        final WindRegion.Box clampedBox = new WindRegion.Box(clamped.getWest(), clamped.getSouth(),
+                clamped.getEast(), clamped.getNorth());
+        final boolean refetch = area.needsRegion(chosen != model, clampedBox, chosen.maxSpanLon);
         if (refetch) {
             if (chosen != model) {
                 // Each model runs on its own clock: HRRR and RAP hourly, GFS every six.
@@ -572,17 +556,18 @@ public final class WindOverlay {
             // cells, 700 KB a frame, when the cap says 120.
             final double padX = Math.min((e - w) * 0.5, Math.max(0, (chosen.maxSpanLon - (e - w)) / 2));
             final double padY = Math.min((n - s) * 0.5, Math.max(0, (chosen.maxSpanLat - (n - s)) / 2));
-            region = new GeoBounds(Math.min(chosen.north, n + padY), Math.max(chosen.west, w - padX),
-                    Math.max(chosen.south, s - padY), Math.min(chosen.east, e + padX));
+            area.choose(new WindRegion.Box(Math.max(chosen.west, w - padX),
+                    Math.max(chosen.south, s - padY), Math.min(chosen.east, e + padX),
+                    Math.min(chosen.north, n + padY)));
             cache.clear();
         }
         showHour();
     }
 
     private void showHour() {
-        if (!on || region == null)
+        if (!on || !area.isSet())
             return;
-        final GeoBounds r = region;
+        final WindRegion.Box r = area.asked();
         final String k = key(run, hour, r);
         final WindGrid hit = cache.get(k);
         if (hit != null) {
@@ -596,14 +581,14 @@ public final class WindOverlay {
     }
 
     /** Ask the filter; a non-GRIB answer means the run is not out yet, so step back. */
-    private void fetch(final long tryRun, final int stepsBack, final int h, final GeoBounds r,
+    private void fetch(final long tryRun, final int stepsBack, final int h, final WindRegion.Box r,
             final String k, final int mine) {
         final NomadsWind.Model asked = model;
         final NomadsWind.Level askedLevel = level;
         status("Getting the wind…");
         // The filter's box is the region grown by a cell, so the grid covers it fully.
-        Http.getBytes(NomadsWind.url(asked, askedLevel, tryRun, h, r.getWest() - 0.05, r.getSouth() - 0.05,
-                r.getEast() + 0.05, r.getNorth() + 0.05), egress.userAgent(), new Http.BytesCallback() {
+        Http.getBytes(NomadsWind.url(asked, askedLevel, tryRun, h, r.west - 0.05, r.south - 0.05,
+                r.east + 0.05, r.north + 0.05), egress.userAgent(), new Http.BytesCallback() {
             @Override
             public void onSuccess(byte[] body) {
                 if (mine != generation || !on) {
@@ -654,10 +639,10 @@ public final class WindOverlay {
         });
     }
 
-    private void show(WindGrid grid, GeoBounds r) {
+    private void show(WindGrid grid, WindRegion.Box r) {
         shown = grid;
         // The grid's own extent is the region grown by the filter's cut.
-        region = new GeoBounds(grid.north, grid.west, grid.south, grid.east);
+        area.shown(new WindRegion.Box(grid.west, grid.south, grid.east, grid.north));
         if (view != null)
             view.setGrid(grid);
         if (heatOn)
