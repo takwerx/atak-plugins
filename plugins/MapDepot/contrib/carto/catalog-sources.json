@@ -1,5 +1,5 @@
 {
-  "_comment": "Draft entries for the depot's basemaps.sources array. The XML files beside this go to basemaps/v1/. bytes and sha256 are for the template as drafted; the depot's ingest should recompute them on publish. keyProvider and keyUrl are new fields read by Map Depot 1.17 and newer; older plugins ignore them and would install the template verbatim, which CARTO serves watermarked.",
+  "_comment": "Draft entries for the depot catalog's basemapsKeyed.sources array (a section of its own, not basemaps.sources). The XML files beside this go to basemaps/v1/. bytes and sha256 are for the template as drafted; the depot's ingest should recompute them on publish. keyProvider and keyUrl are read by Map Depot 1.17 and newer. Map Depot 1.16 and older read basemaps.sources only, so the rows never reach them; in that array they would install the template verbatim, which CARTO serves watermarked (ops #1402).",
   "sources": [
     {
       "id": "carto-carto-voyager",
