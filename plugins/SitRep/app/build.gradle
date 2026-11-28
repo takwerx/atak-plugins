@@ -309,6 +309,9 @@ def getCommandFlavor() {
 
 dependencies {
     implementation fileTree(dir: 'libs', include: '*.jar')
+    // JUnit and the real org.json for the JVM unit tests (the Android stubs return defaults).
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
 }
 
 configurations.all {
