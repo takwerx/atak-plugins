@@ -129,7 +129,8 @@
             <ImageButton
                 android:id="@+id/btn_report_share"
                 style="@style/TakwerxIconButton"
-                android:contentDescription="@string/share" />
+                android:contentDescription="@string/share"
+                android:src="@drawable/ic_share" />
 
             <ImageButton
                 android:id="@+id/btn_report_delete"

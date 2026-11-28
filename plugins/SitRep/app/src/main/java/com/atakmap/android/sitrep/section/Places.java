@@ -301,8 +301,10 @@ public final class Places extends Section {
                     info.add("Wheelchair accessible.");
                 if ("YES".equals(a.optString("generator_onsite")))
                     info.add("Generator on site.");
-                final String pets = a.optString("pet_accommodations_desc", "").trim();
-                if (!pets.isEmpty())
+                // A blank field comes back as JSON null, which optString reads as "null".
+                final String pets = a.isNull("pet_accommodations_desc") ? ""
+                        : a.optString("pet_accommodations_desc", "").trim();
+                if (!pets.isEmpty() && !"null".equalsIgnoreCase(pets))
                     info.add("Pets: " + pets + ".");
                 info.add(join(a.optString("address_1", ""), capital(a.optString("city", "")), a.optString("state", "")));
                 found.get("shelter").add(point("shelter", (isOpen ? "OPEN: " : "") + a.optString("shelter_name"),
