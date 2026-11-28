@@ -127,6 +127,11 @@
                 android:contentDescription="@string/refresh" />
 
             <ImageButton
+                android:id="@+id/btn_report_share"
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/share" />
+
+            <ImageButton
                 android:id="@+id/btn_report_delete"
                 style="@style/TakwerxIconButton"
                 android:contentDescription="@string/delete" />

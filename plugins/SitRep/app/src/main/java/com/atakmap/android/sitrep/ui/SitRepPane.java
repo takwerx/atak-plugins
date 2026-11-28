@@ -170,6 +170,19 @@ public final class SitRepPane {
         hostIcon((android.widget.ImageButton) root.findViewById(R.id.btn_report_settings), "nav_settings");
         hostIcon((android.widget.ImageButton) root.findViewById(R.id.btn_report_refresh), "ic_refresh");
         hostIcon((android.widget.ImageButton) root.findViewById(R.id.btn_report_delete), "ic_menu_delete");
+        if (!hostIcon((android.widget.ImageButton) root.findViewById(R.id.btn_report_share), "ic_menu_share"))
+            hostIcon((android.widget.ImageButton) root.findViewById(R.id.btn_report_share), "send_menu_default");
+        final com.atakmap.android.sitrep.ReportShare sharer = new com.atakmap.android.sitrep.ReportShare(mapView,
+                plugin, manager);
+        root.findViewById(R.id.btn_report_share).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Share as PDF: a read-only snapshot in a data package (takwerx/sit-rep#1).
+                final Report r = openId == null ? null : manager.find(openId);
+                if (r != null)
+                    sharer.share(r);
+            }
+        });
         root.findViewById(R.id.btn_report_goto).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {

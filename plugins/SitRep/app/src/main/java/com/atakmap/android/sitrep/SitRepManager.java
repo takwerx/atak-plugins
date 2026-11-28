@@ -64,6 +64,8 @@ public final class SitRepManager {
     private final File root, dir, index;
     private final ExecutorService fetch = Executors.newFixedThreadPool(4, named("sitrep-fetch"));
     private final ExecutorService disk = Executors.newSingleThreadExecutor(named("sitrep-disk"));
+    /** Shared PDFs are drawn here, off main and apart from the report saves. */
+    private final ExecutorService share = Executors.newSingleThreadExecutor(named("sitrep-share"));
     private final List<Report> reports = new ArrayList<>();
     /** report id + "/" + section key, for sections being fetched again over a kept answer. */
     private final Set<String> refreshing = new HashSet<>();
@@ -139,9 +141,27 @@ public final class SitRepManager {
         }
         outlines.dispose();
         fetch.shutdownNow();
+        share.shutdownNow();
         // Writes already queued finish: a report saved a moment before a reinstall is kept.
         disk.shutdown();
         listener = null;
+    }
+
+    /** Runs a shared PDF's work on its own worker; false once the plugin has stopped. */
+    public boolean shareWork(Runnable r) {
+        if (stopped)
+            return false;
+        try {
+            share.execute(r);
+            return true;
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            return false;
+        }
+    }
+
+    /** The plugin's own folder in ATAK storage: {@code atak/tools/sitrep}. */
+    public File folder() {
+        return root;
     }
 
     // ------------------------------------------------------------------ reading
