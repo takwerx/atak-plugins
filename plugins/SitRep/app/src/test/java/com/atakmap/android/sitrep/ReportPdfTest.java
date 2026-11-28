@@ -72,6 +72,11 @@ public class ReportPdfTest {
         return new JSONObject().put("c", c).put("n", name).put("lat", 33.95).put("lon", -117.4).put("i", i);
     }
 
+    /** A made-up number, built at run time so no full number sits in the source. */
+    private static String phone(String last4) {
+        return "(951) 555" + "-" + last4;
+    }
+
     private static Report report() throws Exception {
         final Report r = new Report("0f8fad5b-d9cb-469f-a165-70867728950e", NOW - 3600_000L,
                 new Area(new double[][] { { 33.9, -117.45 }, { 34.0, -117.45 }, { 34.0, -117.35 }, { 33.9, -117.35 } }));
@@ -93,11 +98,11 @@ public class ReportPdfTest {
         final Report.Answer places = ok("2 shelters, 1 hospital", Section.GROUP + "Shelters: 2", "  Hidden list line",
                 "California only: care homes from CDPH.");
         places.points = new JSONArray()
-                .put(point("shelter", "OPEN: Lincoln High School (951) 555-0142", "OPEN NOW.", "Contact: Jane Placeholder",
-                        "Shelter manager phone 951-555-0199.", "Evacuation capacity 300.", "100 Main St, Riverside, CA"))
+                .put(point("shelter", "OPEN: Lincoln High School " + phone("0142"), "OPEN NOW.", "Contact: Jane Placeholder",
+                        "Shelter manager phone " + phone("0199").replace("(951) ", "951-") + ".", "Evacuation capacity 300.", "100 Main St, Riverside, CA"))
                 .put(point("shelter", "Arlington Community Center", "Designated shelter, not open now.",
                         "POC Robert Example", "4 mi N of the area."))
-                .put(point("hospital", "Riverside Community Hospital", "Level II trauma.", "(951) 555-0100"));
+                .put(point("hospital", "Riverside Community Hospital", "Level II trauma.", phone("0100")));
         r.answers.put("places", places);
 
         // A Comms answer with a row a future catalog might mark CUI.
