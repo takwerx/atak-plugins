@@ -81,6 +81,7 @@ The buttons across the top:
 
 - **Back** to the list. **Go to** puts the area in view.
 - **Refresh** runs the live sections again for the same area.
+- **Share** sends the report as a PDF (see "Share a report as PDF" below).
 - **Delete** removes the report. **Rename** (the pencil) changes its name.
 - **Settings** (the gear). **Wide or half width** (the arrows).
 
@@ -147,6 +148,28 @@ section says "No public call feed here".
 
 Places show only at the zoom you set in Settings, so the map stays readable.
 The status line says when places are hidden.
+
+## Share a report as PDF
+
+Tap **Share** (the share icon) on a report to send it to your team as a PDF.
+
+![ATAK's send window with a Sit Rep PDF](screenshots/19_share.png)
+
+- Sit Rep makes a PDF of the report as it is now: the area, its center
+  (latitude, longitude and MGRS), its size, the time, your callsign, and every
+  section with the same answers the report shows.
+- The PDF is a snapshot. It does not update. Every page says when it was made.
+- ATAK's own send window opens. Pick **Contact** for people or teams,
+  **Select Server** or **Data Sync** for a TAK server, or **Export** to keep a
+  copy on this device.
+- The PDF goes as an ATAK data package. Your teammate finds it in
+  **Overlay Manager, Data Packages**, opens the package, and taps the open
+  button beside the PDF. It opens read-only in the device's PDF viewer.
+- Making the PDF needs no network. Sending needs whatever link the contact or
+  server needs.
+- Shelter contact details and anything marked CUI never go in the PDF.
+- A large report takes a few seconds. A window shows which page Sit Rep is
+  drawing. The PDFs stay in `atak/tools/sitrep/share` for a week.
 
 ## Settings
 

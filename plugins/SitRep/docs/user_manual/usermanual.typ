@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Sit Rep",
-   plugin-version: "0.8",
+   plugin-version: "0.9",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -129,6 +129,7 @@ The buttons across the top:
 
 - *Back* to the list. *Go to* puts the area in view.
 - *Refresh* runs the live sections again for the same area.
+- *Share* sends the report as a PDF.
 - *Delete* removes the report. *Rename* (the pencil) changes its name.
 - *Settings* (the gear). *Wide or half width* (the arrows).
 
@@ -248,6 +249,26 @@ Where a city or county publishes its 911 calls, the section lists the last 2
 hours inside the area, by agency. *Calls on map* puts them on the map and
 fetches them again every 5 minutes. Medical calls are shown to the block in
 the text.
+]
+
+#tak-slide[
+= Share a report as PDF
+
+#toolbox.side-by-side(columns: (1fr, 1fr))[
+  #image("19.png", width: 100%)
+][
+Tap *Share* on a report. Sit Rep makes a read-only PDF of it: the area, its
+center in latitude, longitude and MGRS, the time, your callsign, and every
+section as the report shows it. It is a snapshot and does not update.
+
+ATAK's send window opens: *Contact* for people or teams, *Select Server* or
+*Data Sync* for a TAK server, *Export* to keep a copy. It goes as a data
+package. The teammate opens it in *Overlay Manager, Data Packages* and taps
+the open button beside the PDF.
+
+No network is needed to make it. Shelter contact details and anything
+marked CUI never go in the PDF.
+]
 ]
 
 #tak-slide[

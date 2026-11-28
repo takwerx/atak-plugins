@@ -49,6 +49,13 @@ and others), with an Open or Get button.
 _________________________________________________________________
 STATUS
 
+Version 0.9: Share as PDF. The Share button on a report makes a read-only
+PDF of it, a snapshot of one area at one time, and sends it as an ATAK data
+package through ATAK's own send window (contacts, teams, TAK servers, Data
+Sync, Export). It is made on the device with no network. It never carries
+shelter contact details or anything marked CUI. Shelter rows no longer say
+"Pets: null" when the shelter list leaves that field blank.
+
 Version 0.8: All ON / OFF replaces the Areas switch. It turns every
 report's Map switch on or off at once, outline and places together. When
 only some reports are on, it shows how many (All: 2 of 5), and a tap turns
